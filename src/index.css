@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Truckinglane Industrial Design System */
+
+@layer base {
+  :root {
+    /* Industrial trucking palette - charcoal base with safety orange accents */
+    --background: 220 10% 96%;
+    --foreground: 220 15% 15%;
+
+    --card: 220 10% 98%;
+    --card-foreground: 220 15% 15%;
+
+    --popover: 220 10% 98%;
+    --popover-foreground: 220 15% 15%;
+
+    /* Charcoal primary */
+    --primary: 220 15% 20%;
+    --primary-foreground: 220 10% 98%;
+
+    /* Slate secondary */
+    --secondary: 220 8% 90%;
+    --secondary-foreground: 220 15% 20%;
+
+    --muted: 220 8% 88%;
+    --muted-foreground: 220 10% 45%;
+
+    /* Safety orange accent */
+    --accent: 25 95% 53%;
+    --accent-foreground: 220 15% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 10% 85%;
+    --input: 220 10% 85%;
+    --ring: 25 95% 53%;
+
+    --radius: 0.375rem;
+
+    /* Trucking-specific tokens */
+    --charcoal: 220 15% 20%;
+    --safety-orange: 25 95% 53%;
+    --dot-green: 145 63% 42%;
+    --highway-blue: 210 80% 45%;
+    --caution-amber: 38 92% 50%;
+    --steel-gray: 220 8% 70%;
+
+    /* Typography - industrial sans */
+    --font-serif: 'DM Sans', system-ui, sans-serif;
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(220 15% 20% / 0.1);
+    --shadow-medium: 0 4px 16px -4px hsl(220 15% 20% / 0.15);
+
+    /* Transitions */
+    --transition-smooth: all 0.2s ease-out;
+    --transition-bounce: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --sidebar-background: 220 15% 18%;
+    --sidebar-foreground: 220 10% 90%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 220 15% 15%;
+    --sidebar-accent: 220 12% 25%;
+    --sidebar-accent-foreground: 220 10% 90%;
+    --sidebar-border: 220 12% 25%;
+    --sidebar-ring: 25 95% 53%;
+  }
+
+  .dark {
+    --background: 220 15% 10%;
+    --foreground: 220 10% 92%;
+
+    --card: 220 15% 13%;
+    --card-foreground: 220 10% 92%;
+
+    --popover: 220 15% 12%;
+    --popover-foreground: 220 10% 92%;
+
+    --primary: 25 95% 53%;
+    --primary-foreground: 220 15% 10%;
+
+    --secondary: 220 12% 20%;
+    --secondary-foreground: 220 10% 92%;
+
+    --muted: 220 12% 18%;
+    --muted-foreground: 220 8% 55%;
+
+    --accent: 25 95% 53%;
+    --accent-foreground: 220 15% 10%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 12% 22%;
+    --input: 220 12% 22%;
+    --ring: 25 95% 53%;
+
+    --charcoal: 220 10% 92%;
+    --safety-orange: 25 95% 55%;
+    --dot-green: 145 60% 50%;
+    --highway-blue: 210 75% 55%;
+    --caution-amber: 38 90% 55%;
+    --steel-gray: 220 8% 50%;
+
+    --sidebar-background: 220 15% 8%;
+    --sidebar-foreground: 220 10% 90%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 220 15% 10%;
+    --sidebar-accent: 220 12% 18%;
+    --sidebar-accent-foreground: 220 10% 90%;
+    --sidebar-border: 220 12% 18%;
+    --sidebar-ring: 25 95% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-serif);
+  }
+
+  .font-sans {
+    font-family: var(--font-sans);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Trucking utility classes */
+  .text-safety-orange {
+    color: hsl(var(--safety-orange));
+  }
+  
+  .bg-safety-orange {
+    background-color: hsl(var(--safety-orange));
+  }
+  
+  .text-dot-green {
+    color: hsl(var(--dot-green));
+  }
+  
+  .bg-dot-green {
+    background-color: hsl(var(--dot-green));
+  }
+  
+  .text-charcoal {
+    color: hsl(var(--charcoal));
+  }
+  
+  .bg-charcoal {
+    background-color: hsl(var(--charcoal));
+  }
+}

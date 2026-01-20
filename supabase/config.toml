@@ -1,0 +1,103 @@
+project_id = "vjgakkomhphvdbwjjwiv"
+
+[functions.send-auth-email]
+verify_jwt = false
+
+[functions.elevenlabs-conversation-token]
+verify_jwt = false
+
+[functions.elevenlabs-webhook]
+verify_jwt = false
+
+[functions.lookup-load]
+verify_jwt = false
+
+[functions.create-lead]
+verify_jwt = false
+
+[functions.get-high-intent-keywords]
+verify_jwt = false
+
+[functions.check-high-intent]
+verify_jwt = false
+
+[functions.backfill-elevenlabs-calls]
+verify_jwt = false
+
+[functions.import-loads]
+verify_jwt = false
+
+[functions.invite-agent]
+verify_jwt = false
+
+[functions.ai-assistant]
+verify_jwt = false
+
+[functions.carrier-lookup]
+verify_jwt = false
+
+[functions.send-trust-code]
+verify_jwt = false
+
+[functions.system-health]
+verify_jwt = false
+
+[functions.health-check-runner]
+verify_jwt = false
+
+[functions.public-status]
+verify_jwt = false
+
+[functions.discover-accounts]
+verify_jwt = false
+
+[functions.enrich-account-fmcsa]
+verify_jwt = false
+
+[functions.score-account-fit]
+verify_jwt = false
+
+[functions.chat-send-message]
+verify_jwt = false
+
+[functions.notify-sms]
+verify_jwt = false
+
+[functions.seed-chat-channels]
+verify_jwt = false
+
+[functions.keyword-analytics]
+verify_jwt = false
+
+[functions.submit-agency-request]
+verify_jwt = false
+
+[functions.approve-agency-request]
+verify_jwt = false
+
+[functions.get-agency-request]
+verify_jwt = false
+
+[functions.complete-agency-setup]
+verify_jwt = false
+
+[functions.send-agent-invites]
+verify_jwt = false
+
+[functions.accept-invite]
+verify_jwt = false
+
+[functions.get-invite]
+verify_jwt = false
+
+[functions.create-agency]
+verify_jwt = false
+
+[functions.set-user-password]
+verify_jwt = false
+
+[functions.backfill-intent-scores]
+verify_jwt = false
+
+[functions.daily-agent-reset]
+verify_jwt = false

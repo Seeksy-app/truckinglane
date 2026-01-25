@@ -47,6 +47,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { SystemHealthDashboard } from '@/components/admin/SystemHealthDashboard';
 import { TrustPageAdmin } from '@/components/admin/TrustPageAdmin';
 import { PlatformAnalytics } from '@/components/admin/PlatformAnalytics';
+import { InviteSuperAdminDialog } from '@/components/admin/InviteSuperAdminDialog';
 
 interface Agency {
   id: string;
@@ -248,6 +249,7 @@ export default function SuperAdminDashboard() {
             <h1 className="text-3xl font-bold">Platform Overview</h1>
             <p className="text-muted-foreground mt-1">Manage agencies and monitor platform health</p>
           </div>
+          <InviteSuperAdminDialog />
         </div>
 
         {/* Stats Overview */}

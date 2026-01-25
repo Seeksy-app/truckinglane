@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.daily-agent-reset]
 verify_jwt = false
+
+[functions.invite-super-admin]
+verify_jwt = false

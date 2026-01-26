@@ -97,7 +97,10 @@ serve(async (req: Request) => {
 
       if (existingMember) {
         return new Response(
-          JSON.stringify({ error: "This user is already a super admin" }),
+          JSON.stringify({ 
+            error: `${normalizedEmail} is already a Super Admin on the platform`,
+            code: "ALREADY_SUPER_ADMIN"
+          }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -25,6 +25,7 @@ import {
   Link,
   Copy,
   Send,
+  Shield,
 } from 'lucide-react';
 import {
   Table,
@@ -95,6 +96,30 @@ export default function SuperAdminDashboard() {
     navigate('/dashboard');
     return null;
   }
+
+  // Fetch all super admins
+  const { data: superAdmins = [], isLoading: superAdminsLoading } = useQuery({
+    queryKey: ['super_admin_list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('agency_members')
+        .select(`
+          id,
+          user_id,
+          created_at,
+          profiles:user_id (
+            email,
+            full_name
+          )
+        `)
+        .eq('role', 'super_admin')
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: role === 'super_admin',
+  });
 
   // Fetch all agencies with stats
   const { data: agencies = [], isLoading: agenciesLoading } = useQuery({
@@ -307,6 +332,54 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Super Admins Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Platform Super Admins ({superAdmins.length})
+            </CardTitle>
+            <CardDescription>
+              Users with full platform access
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {superAdminsLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : superAdmins.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No super admins found</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Added</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {superAdmins.map((admin) => {
+                    const profile = admin.profiles as { email?: string; full_name?: string } | null;
+                    return (
+                      <TableRow key={admin.id}>
+                        <TableCell className="font-medium">
+                          {profile?.full_name || 'Unknown'}
+                        </TableCell>
+                        <TableCell>{profile?.email || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(admin.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Pending Approval Requests */}
         {requests.length > 0 && (

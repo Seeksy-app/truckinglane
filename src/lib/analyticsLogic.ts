@@ -53,9 +53,11 @@ export interface LoadRecord {
 
 /**
  * Normalizes duration from various call record formats
+ * Returns null if no duration is available (not 0!)
  */
-export function getCallDuration(call: CallRecord): number {
-  return call.duration_seconds ?? call.duration_secs ?? call.call_duration_secs ?? 0;
+export function getCallDuration(call: CallRecord): number | null {
+  const duration = call.duration_seconds ?? call.duration_secs ?? call.call_duration_secs;
+  return duration ?? null;
 }
 
 /**
@@ -67,8 +69,8 @@ export function getCallDuration(call: CallRecord): number {
 export function isEngagedCall(call: CallRecord, associatedLead?: LeadRecord | null): boolean {
   const duration = getCallDuration(call);
   
-  // Duration >= threshold
-  if (duration >= ENGAGED_THRESHOLD_SECS) return true;
+  // Duration >= threshold (only if we have a real duration)
+  if (duration !== null && duration >= ENGAGED_THRESHOLD_SECS) return true;
   
   // Tagged as high intent
   if (call.is_high_intent) return true;
@@ -81,10 +83,13 @@ export function isEngagedCall(call: CallRecord, associatedLead?: LeadRecord | nu
 
 /**
  * Determines if a call is a "quick hangup"
- * Duration < 10 seconds
+ * Duration < 10 seconds - ONLY if we have a real duration value
+ * NULL duration means "unknown", not "0 seconds"
  */
 export function isQuickHangup(call: CallRecord): boolean {
   const duration = getCallDuration(call);
+  // Only count as quick hangup if we have an actual duration value
+  if (duration === null) return false;
   return duration < QUICK_HANGUP_THRESHOLD_SECS;
 }
 
@@ -108,10 +113,10 @@ export function isHighIntent(
   // Call is marked high intent
   if (call?.is_high_intent) return true;
   
-  // Call duration >= threshold
+  // Call duration >= threshold (only if we have a real duration)
   if (call) {
     const duration = getCallDuration(call);
-    if (duration >= HIGH_INTENT_DURATION_THRESHOLD_SECS) return true;
+    if (duration !== null && duration >= HIGH_INTENT_DURATION_THRESHOLD_SECS) return true;
   }
   
   return false;
@@ -178,7 +183,7 @@ export function calculateAnalyticsMetrics(
   
   for (const call of calls) {
     const duration = getCallDuration(call);
-    totalSeconds += duration;
+    totalSeconds += duration ?? 0; // Only add if we have a real value
     
     const associatedLead = callToLeadMap.get(call.id);
     

@@ -264,12 +264,11 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Parse subject line for agency code
-    // Expected format: "ADELPHIA IMPORT - [AGENCY_CODE]" or "IMPORT - [AGENCY_CODE]"
-    const subjectUpper = (subject || "").toUpperCase();
-    const importMatch = subjectUpper.match(/(?:ADELPHIA\s+)?IMPORT\s*[-–—]\s*\[?([A-Z0-9_-]+)\]?/i);
+    // Check for the required subject line
+    const expectedSubject = "Shipping list for Adelphia Metals";
+    const subjectTrimmed = (subject || "").trim();
     
-    if (!importMatch) {
+    if (subjectTrimmed.toLowerCase() !== expectedSubject.toLowerCase()) {
       console.error("Subject line does not match required format:", subject);
       
       // Log the failed attempt
@@ -277,40 +276,40 @@ Deno.serve(async (req) => {
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: "Subject line does not match required format. Expected: ADELPHIA IMPORT - [AGENCY_CODE]",
+        error_message: `Subject line does not match. Expected: "${expectedSubject}"`,
         raw_headers: emailHeaders,
       });
       
       return new Response(JSON.stringify({ 
-        error: "Subject line must match format: ADELPHIA IMPORT - [AGENCY_CODE]" 
+        error: `Subject line must be exactly: "${expectedSubject}"` 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     
-    const agencyCode = importMatch[1].toUpperCase();
-    console.log("Parsed agency code:", agencyCode);
+    console.log("Subject line matches - processing Adelphia import");
     
-    // Look up agency by import_email_code
+    // Look up Adelphia agency by name (or the first agency with Adelphia imports configured)
     const { data: agency, error: agencyError } = await supabase
       .from("agencies")
-      .select("id, name, import_email_code, allowed_sender_domains")
-      .eq("import_email_code", agencyCode)
+      .select("id, name, allowed_sender_domains")
+      .or("name.ilike.%adelphia%,import_email_code.eq.ADELPHIA")
+      .limit(1)
       .single();
     
     if (agencyError || !agency) {
-      console.error("Agency not found for code:", agencyCode);
+      console.error("Adelphia agency not found");
       
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Agency not found for code: ${agencyCode}`,
+        error_message: "Adelphia agency not configured in the system",
         raw_headers: emailHeaders,
       });
       
-      return new Response(JSON.stringify({ error: "Agency not found for provided code" }), {
+      return new Response(JSON.stringify({ error: "Adelphia agency not configured" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

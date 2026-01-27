@@ -7,25 +7,36 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("=== CHECK HIGH INTENT ===");
+  console.log("=== CHECK HIGH INTENT START ===");
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch (parseErr) {
+      console.log("No JSON body or parse error, using defaults");
+    }
+    
     console.log("Request body:", JSON.stringify(body));
 
-    const { load_number, origin_city, destination_city, keyword, agent_id } = body;
+    const { load_number, origin_city, destination_city, keyword, agent_id } = body || {};
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!SUPABASE_URL || !SERVICE_KEY) {
+      console.error("Missing env vars");
+      // Return a valid response even on config error - don't block calls
       return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          is_high_intent: false, 
+          instructions: "Proceed with standard load lookup and rate discussion." 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -38,7 +49,8 @@ serve(async (req) => {
     let premiumResponse = null;
 
     // Get all active keywords - both global and agent-specific
-    let query = supabase
+    // Set a short timeout to not block calls
+    const queryPromise = supabase
       .from("high_intent_keywords")
       .select(`
         id,
@@ -56,18 +68,32 @@ serve(async (req) => {
       .eq("active", true)
       .gt("expires_at", new Date().toISOString());
 
-    const { data: keywords, error } = await query;
+    // Race against a timeout
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Query timeout")), 3000)
+    );
 
-    if (error) {
-      console.error("Query error:", error);
+    let keywords: any[] = [];
+    try {
+      const result = await Promise.race([queryPromise, timeoutPromise]) as any;
+      if (result.error) {
+        console.error("Query error:", result.error);
+      } else {
+        keywords = result.data || [];
+      }
+    } catch (timeoutErr) {
+      console.error("Query timed out, returning default response");
       return new Response(
-        JSON.stringify({ is_high_intent: false, error: "Failed to check keywords" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          is_high_intent: false, 
+          instructions: "Proceed with standard load lookup and rate discussion." 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Filter keywords based on scope and agent_id
-    const relevantKeywords = (keywords || []).filter(k => {
+    const relevantKeywords = keywords.filter(k => {
       if (k.scope === "global") return true;
       if (k.scope === "agent" && agent_id && k.agent_id === agent_id) return true;
       return false;
@@ -90,7 +116,7 @@ serve(async (req) => {
       
       // Check load number match
       if (load_number) {
-        const normalizedLoad = load_number.replace(/[-\s]/g, "").toLowerCase();
+        const normalizedLoad = String(load_number).replace(/[-\s]/g, "").toLowerCase();
         if (normalizedKeyword.includes(normalizedLoad) || normalizedLoad.includes(normalizedKeyword)) {
           isHighIntent = true;
           matchedKeyword = k.keyword;
@@ -100,7 +126,7 @@ serve(async (req) => {
         }
         // Also check associated load
         if (load?.load_number) {
-          const loadNum = load.load_number.replace(/[-\s]/g, "").toLowerCase();
+          const loadNum = String(load.load_number).replace(/[-\s]/g, "").toLowerCase();
           if (loadNum.includes(normalizedLoad) || normalizedLoad.includes(loadNum)) {
             isHighIntent = true;
             matchedKeyword = k.keyword;
@@ -113,12 +139,12 @@ serve(async (req) => {
 
       // Check origin/destination city match
       if (origin_city || destination_city) {
-        const originLower = origin_city?.toLowerCase() || "";
-        const destLower = destination_city?.toLowerCase() || "";
+        const originLower = (origin_city || "").toLowerCase();
+        const destLower = (destination_city || "").toLowerCase();
         
         if (load) {
-          const pickupCity = load.pickup_city?.toLowerCase() || "";
-          const destCity = load.dest_city?.toLowerCase() || "";
+          const pickupCity = (load.pickup_city || "").toLowerCase();
+          const destCity = (load.dest_city || "").toLowerCase();
           
           // Check if both cities match (lane match)
           if (originLower && destLower) {
@@ -150,7 +176,7 @@ serve(async (req) => {
 
       // Check custom keyword match
       if (keyword) {
-        const keywordLower = keyword.toLowerCase();
+        const keywordLower = String(keyword).toLowerCase();
         if (normalizedKeyword.includes(keywordLower) || keywordLower.includes(normalizedKeyword)) {
           isHighIntent = true;
           matchedKeyword = k.keyword;
@@ -173,15 +199,20 @@ serve(async (req) => {
         : "This is a normal call. Proceed with standard load lookup and rate discussion."
     };
 
+    console.log("=== CHECK HIGH INTENT END ===");
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
     console.error("Error:", err);
+    // Always return a valid response - don't break calls
     return new Response(
-      JSON.stringify({ is_high_intent: false, error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        is_high_intent: false, 
+        instructions: "Proceed with standard load lookup and rate discussion." 
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

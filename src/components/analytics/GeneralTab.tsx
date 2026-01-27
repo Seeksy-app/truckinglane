@@ -196,19 +196,25 @@ export const GeneralTab = ({ loads, leads, calls, elevenLabsCalls = [], aiBookin
     
     if (useElevenLabs) {
       elevenLabsCalls.forEach(c => {
-        const duration = c.call_duration_secs || 0;
-        const isEngaged = duration >= ENGAGED_THRESHOLD_SECS || c.is_high_intent;
+        const duration = c.call_duration_secs;
+        const hasDuration = duration !== null && duration !== undefined;
+        
+        // Engaged: has duration >= 20s OR is high intent OR has an associated lead
+        const isEngaged = (hasDuration && duration >= ENGAGED_THRESHOLD_SECS) || c.is_high_intent;
         
         if (isEngaged) {
           engagedCallsList.push(c);
         }
         
-        if (duration < QUICK_HANGUP_THRESHOLD_SECS) {
+        // Quick hangup: ONLY if we have a real duration value that is < 10s
+        // NULL duration means unknown, NOT zero seconds
+        if (hasDuration && duration < QUICK_HANGUP_THRESHOLD_SECS) {
           quickHangupsList.push(c);
         }
       });
     }
     
+    // Engaged count should be at least equal to leads count (leads imply engagement)
     const totalLeadCount = leads.length;
     const finalEngagedCount = Math.max(engagedCallsList.length, totalLeadCount);
     

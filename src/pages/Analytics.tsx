@@ -191,13 +191,17 @@ const Analytics = () => {
     enabled: !!user,
   });
 
-  // Fetch ElevenLabs post-call data
+  // Fetch AI call summaries (canonical source for call analytics - no duplicates)
   const { data: elevenLabsCalls = [] } = useQuery({
-    queryKey: ["analytics-elevenlabs-calls", dateRange],
+    queryKey: ["analytics-ai-call-summaries", dateRange, agencyId || agencyMember?.agency_id],
     queryFn: async () => {
+      const effectiveAgencyId = agencyId || agencyMember?.agency_id;
+      if (!effectiveAgencyId) return [];
+      
       let query = supabase
-        .from("elevenlabs_post_calls")
-        .select("*")
+        .from("ai_call_summaries")
+        .select("id, created_at, duration_secs, is_high_intent, conversation_id, external_number, summary_title, summary_short, termination_reason, call_outcome")
+        .eq("agency_id", effectiveAgencyId)
         .order("created_at", { ascending: false });
       
       if (dateFilter.start) {
@@ -209,9 +213,18 @@ const Analytics = () => {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Transform to match expected interface (map duration_secs to call_duration_secs)
+      return (data || []).map(c => ({
+        ...c,
+        call_duration_secs: c.duration_secs,
+        call_summary_title: c.summary_title,
+        transcript_summary: c.summary_short,
+        status: 'done',
+        payload: null,
+      }));
     },
-    enabled: !!user,
+    enabled: !!user && !!(agencyId || agencyMember?.agency_id),
   });
 
   // Fetch conversations for sentiment analysis

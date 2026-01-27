@@ -26,6 +26,9 @@ import {
   Copy,
   Send,
   Shield,
+  Settings,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Table,
@@ -49,6 +52,8 @@ import { SystemHealthDashboard } from '@/components/admin/SystemHealthDashboard'
 import { TrustPageAdmin } from '@/components/admin/TrustPageAdmin';
 import { PlatformAnalytics } from '@/components/admin/PlatformAnalytics';
 import { InviteSuperAdminDialog } from '@/components/admin/InviteSuperAdminDialog';
+import { AgencyEmailImportSettings } from '@/components/admin/AgencyEmailImportSettings';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Agency {
   id: string;
@@ -57,6 +62,8 @@ interface Agency {
   member_count?: number;
   call_count?: number;
   lead_count?: number;
+  import_email_code?: string | null;
+  allowed_sender_domains?: string[] | null;
 }
 
 interface AgencyRequest {
@@ -89,6 +96,7 @@ export default function SuperAdminDashboard() {
   const [selectedRequest, setSelectedRequest] = useState<AgencyRequest | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [expandedAgencyId, setExpandedAgencyId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Redirect if not super admin
@@ -127,7 +135,7 @@ export default function SuperAdminDashboard() {
     queryFn: async () => {
       const { data: agenciesData, error } = await supabase
         .from('agencies')
-        .select('id, name, created_at')
+        .select('id, name, created_at, import_email_code, allowed_sender_domains')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -579,35 +587,79 @@ export default function SuperAdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {agencies.map((agency) => (
-                    <TableRow key={agency.id}>
-                      <TableCell className="font-medium">{agency.name}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{agency.member_count}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">{agency.call_count}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">{agency.lead_count}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {new Date(agency.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="gap-1"
-                          onClick={() => handleImpersonate(agency)}
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                          <ArrowRight className="h-3 w-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {agencies.map((agency) => {
+                    const isExpanded = expandedAgencyId === agency.id;
+                    return (
+                      <>
+                        <TableRow key={agency.id} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setExpandedAgencyId(isExpanded ? null : agency.id)}
+                                className="p-1 hover:bg-muted rounded"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                              {agency.name}
+                              {agency.import_email_code && (
+                                <Badge variant="outline" className="text-xs ml-2">
+                                  Email Import
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary">{agency.member_count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline">{agency.call_count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline">{agency.lead_count}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(agency.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1"
+                                onClick={() => setExpandedAgencyId(isExpanded ? null : agency.id)}
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1"
+                                onClick={() => handleImpersonate(agency)}
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={`${agency.id}-settings`}>
+                            <TableCell colSpan={6} className="bg-muted/30 p-4">
+                              <AgencyEmailImportSettings 
+                                agency={agency} 
+                                onUpdate={() => queryClient.invalidateQueries({ queryKey: ['super_admin_agencies'] })}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

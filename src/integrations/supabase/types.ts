@@ -125,25 +125,31 @@ export type Database = {
       }
       agencies: {
         Row: {
+          allowed_sender_domains: string[] | null
           created_at: string
           description: string | null
           id: string
+          import_email_code: string | null
           logo_url: string | null
           name: string
           updated_at: string
         }
         Insert: {
+          allowed_sender_domains?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
+          import_email_code?: string | null
           logo_url?: string | null
           name: string
           updated_at?: string
         }
         Update: {
+          allowed_sender_domains?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
+          import_email_code?: string | null
           logo_url?: string | null
           name?: string
           updated_at?: string
@@ -918,6 +924,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "elevenlabs_post_calls_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_import_logs: {
+        Row: {
+          agency_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          imported_count: number | null
+          raw_headers: Json | null
+          sender_email: string
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          agency_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          imported_count?: number | null
+          raw_headers?: Json | null
+          sender_email: string
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          agency_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          imported_count?: number | null
+          raw_headers?: Json | null
+          sender_email?: string
+          status?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_import_logs_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "agencies"

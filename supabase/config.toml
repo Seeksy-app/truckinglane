@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.invite-super-admin]
 verify_jwt = false
+
+[functions.email-import-loads]
+verify_jwt = false

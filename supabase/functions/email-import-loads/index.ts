@@ -354,7 +354,7 @@ Deno.serve(async (req) => {
     }
     
     // Find XLSX attachment
-    const xlsxAttachment = attachments.find((att: { filename: string; content: string }) => 
+    const xlsxAttachment = attachments.find((att: { filename?: string; content?: string; id?: string }) => 
       att.filename?.toLowerCase().endsWith(".xlsx") || att.filename?.toLowerCase().endsWith(".xls")
     );
     
@@ -390,9 +390,45 @@ Deno.serve(async (req) => {
     
     console.log("Processing attachment:", xlsxAttachment.filename);
     
-    // Decode base64 attachment content
-    const fileContent = decodeBase64(xlsxAttachment.content);
-    const buffer = new Uint8Array(fileContent).buffer as ArrayBuffer;
+    // Fetch attachment content - Resend inbound webhooks provide attachment ID, not content
+    // We need to fetch the attachment content using the Resend API
+    let buffer: ArrayBuffer;
+    
+    if (xlsxAttachment.content) {
+      // Content is provided directly (base64 encoded)
+      console.log("Attachment has direct content, decoding base64...");
+      const fileContent = decodeBase64(xlsxAttachment.content);
+      buffer = new Uint8Array(fileContent).buffer as ArrayBuffer;
+    } else if (xlsxAttachment.id && resendApiKey) {
+      // Content needs to be fetched via Resend API
+      console.log("Fetching attachment content via Resend API, attachment ID:", xlsxAttachment.id);
+      const emailId = payload.data?.email_id || payload.email_id;
+      
+      if (!emailId) {
+        throw new Error("No email_id found in payload to fetch attachment");
+      }
+      
+      // Fetch attachment content from Resend
+      const attachmentResponse = await fetch(
+        `https://api.resend.com/emails/${emailId}/attachments/${xlsxAttachment.id}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+          },
+        }
+      );
+      
+      if (!attachmentResponse.ok) {
+        const errorText = await attachmentResponse.text();
+        console.error("Failed to fetch attachment from Resend:", attachmentResponse.status, errorText);
+        throw new Error(`Failed to fetch attachment: ${attachmentResponse.status}`);
+      }
+      
+      buffer = await attachmentResponse.arrayBuffer();
+      console.log("Fetched attachment, size:", buffer.byteLength, "bytes");
+    } else {
+      throw new Error("No attachment content or ID available, and no Resend API key configured");
+    }
     
     // Parse XLSX (Adelphia format: header on row 4)
     const rows = parseXLSX(buffer, "PAGE 1", 4);

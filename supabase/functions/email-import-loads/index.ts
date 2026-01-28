@@ -409,9 +409,10 @@ Deno.serve(async (req) => {
         throw new Error("No email_id found in payload to fetch attachment");
       }
       
-      // Call Resend's inbound attachments list endpoint
+      // Call Resend's inbound/receiving attachments list endpoint
+      // Note: For inbound emails, the endpoint is /emails/receiving/{emailId}/attachments
       const listResponse = await fetch(
-        `https://api.resend.com/emails/${emailId}/attachments`,
+        `https://api.resend.com/emails/receiving/${emailId}/attachments`,
         {
           headers: {
             "Authorization": `Bearer ${resendApiKey}`,

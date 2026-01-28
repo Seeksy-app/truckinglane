@@ -401,16 +401,17 @@ Deno.serve(async (req) => {
       buffer = new Uint8Array(fileContent).buffer as ArrayBuffer;
     } else if (xlsxAttachment.id && resendApiKey) {
       // Content needs to be fetched via Resend API
-      console.log("Fetching attachment content via Resend API, attachment ID:", xlsxAttachment.id);
+      // Step 1: List attachments to get the download_url
+      console.log("Fetching attachment list via Resend API...");
       const emailId = payload.data?.email_id || payload.email_id;
       
       if (!emailId) {
         throw new Error("No email_id found in payload to fetch attachment");
       }
       
-      // Fetch attachment content from Resend
-      const attachmentResponse = await fetch(
-        `https://api.resend.com/emails/${emailId}/attachments/${xlsxAttachment.id}`,
+      // Call Resend's inbound attachments list endpoint
+      const listResponse = await fetch(
+        `https://api.resend.com/emails/${emailId}/attachments`,
         {
           headers: {
             "Authorization": `Bearer ${resendApiKey}`,
@@ -418,14 +419,36 @@ Deno.serve(async (req) => {
         }
       );
       
-      if (!attachmentResponse.ok) {
-        const errorText = await attachmentResponse.text();
-        console.error("Failed to fetch attachment from Resend:", attachmentResponse.status, errorText);
-        throw new Error(`Failed to fetch attachment: ${attachmentResponse.status}`);
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error("Failed to list attachments from Resend:", listResponse.status, errorText);
+        throw new Error(`Failed to list attachments: ${listResponse.status}`);
       }
       
-      buffer = await attachmentResponse.arrayBuffer();
-      console.log("Fetched attachment, size:", buffer.byteLength, "bytes");
+      const attachmentsList = await listResponse.json();
+      console.log("Attachments list response:", JSON.stringify(attachmentsList));
+      
+      // Find our attachment by ID
+      const attachmentData = attachmentsList.data?.find((a: { id: string }) => a.id === xlsxAttachment.id);
+      
+      if (!attachmentData || !attachmentData.download_url) {
+        console.error("Attachment not found in list or no download_url:", xlsxAttachment.id);
+        throw new Error("Attachment download_url not found");
+      }
+      
+      console.log("Found download_url, fetching file content...");
+      
+      // Step 2: Download the actual file content from the download_url
+      const fileResponse = await fetch(attachmentData.download_url);
+      
+      if (!fileResponse.ok) {
+        const errorText = await fileResponse.text();
+        console.error("Failed to download attachment:", fileResponse.status, errorText);
+        throw new Error(`Failed to download attachment: ${fileResponse.status}`);
+      }
+      
+      buffer = await fileResponse.arrayBuffer();
+      console.log("Downloaded attachment, size:", buffer.byteLength, "bytes");
     } else {
       throw new Error("No attachment content or ID available, and no Resend API key configured");
     }

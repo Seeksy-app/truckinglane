@@ -241,14 +241,17 @@ Deno.serve(async (req) => {
   try {
     // Resend inbound email webhook payload
     const payload = await req.json();
-    console.log("Received inbound email payload");
+    console.log("Received inbound email payload:", JSON.stringify(payload, null, 2));
     
-    const {
-      from: senderEmail,
-      subject,
-      attachments = [],
-      headers: emailHeaders,
-    } = payload;
+    // Resend inbound webhooks use different field names
+    // See: https://resend.com/docs/dashboard/webhooks/event-types#email-received
+    const senderEmail = payload.from || payload.sender || payload.email?.from || 
+      (typeof payload.data?.from === 'string' ? payload.data.from : payload.data?.from?.email);
+    const subject = payload.subject || payload.data?.subject || payload.email?.subject;
+    const attachments = payload.attachments || payload.data?.attachments || payload.email?.attachments || [];
+    const emailHeaders = payload.headers || payload.data?.headers || {};
+    
+    console.log("Parsed - From:", senderEmail, "Subject:", subject, "Attachments:", attachments?.length);
     
     console.log("From:", senderEmail);
     console.log("Subject:", subject);

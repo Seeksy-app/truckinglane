@@ -158,12 +158,21 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
   
   let loadIndex = 1;
   
-  for (const line of lines) {
-    // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
-    // or with notes: "2 - Donalsonville, Ga - cars - Jackson, Tn $1300 - 1 ready in am..."
-    const match = line.match(/^(\d+)\s*-\s*([^-]+),\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
+  for (let line of lines) {
+    // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 
+    line = line.replace(/^\*+/, '').replace(/\*+$/, '').trim();
     
-    if (!match) continue;
+    // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
+    // Also handles "$1400" without space before "$" and notes after rate
+    // Format: COUNT - PICKUP_CITY, ST - COMMODITY - DEST_CITY, ST $RATE [- NOTES]
+    const match = line.match(/^(\d+)\s*-\s*([^,]+),\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
+    
+    if (!match) {
+      console.log("VMS line did not match pattern:", line);
+      continue;
+    }
+    
+    console.log("VMS matched line:", line);
     
     const count = parseInt(match[1], 10);
     const pickupCity = match[2].trim();

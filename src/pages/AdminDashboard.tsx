@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { AppHeader } from '@/components/AppHeader';
 import { TrustPageAdmin } from '@/components/admin/TrustPageAdmin';
 import { SystemHealthDashboard } from '@/components/admin/SystemHealthDashboard';
+import { EmailImportLogs } from '@/components/admin/EmailImportLogs';
 import {
   Dialog,
   DialogContent,
@@ -591,6 +592,9 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Email Import Logs - visible to agency admins */}
+        {agencyId && <EmailImportLogs agencyId={agencyId} />}
 
         {/* Super Admin Only Sections */}
         {isSuperAdmin && (

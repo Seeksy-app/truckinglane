@@ -350,22 +350,7 @@ Deno.serve(async (req) => {
     // Support both "VMS" and "MVS" (common typo)
     const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
     
-    // Get email body for VMS parsing - try ALL possible sources from Resend webhook
-    // Resend inbound may put body in: text, html, body, data.text, data.html, data.body
-    let emailBody = payload.text || payload.data?.text || payload.email?.text || 
-                    payload.body || payload.data?.body || 
-                    payload.html || payload.data?.html ||
-                    payload.plain_body || payload.data?.plain_body ||
-                    payload.raw || payload.data?.raw || "";
-    
-    console.log("Email body source check:");
-    console.log("  payload.text:", typeof payload.text, payload.text?.substring?.(0, 100));
-    console.log("  payload.data?.text:", typeof payload.data?.text, payload.data?.text?.substring?.(0, 100));
-    console.log("  payload.html:", typeof payload.html, payload.html?.substring?.(0, 100));
-    console.log("  payload.data?.html:", typeof payload.data?.html, payload.data?.html?.substring?.(0, 100));
-    console.log("  payload.body:", typeof payload.body, payload.body?.substring?.(0, 100));
-    console.log("  Final emailBody length:", emailBody.length);
-    
+    // Determine import type from subject line first
     if (!containsAdelphia && !containsVMS) {
       console.error("Subject line does not match any known import type:", subject);
       
@@ -388,6 +373,36 @@ Deno.serve(async (req) => {
     
     const importType = containsVMS ? "vms" : "adelphia";
     console.log(`Subject line matches - processing ${importType.toUpperCase()} import`);
+    
+    // For VMS imports, we need to fetch the email body from Resend API
+    // Resend inbound webhooks don't include body - must use resend.emails.receiving.get()
+    let emailBody = "";
+    const emailId = payload.data?.email_id || payload.email_id;
+    
+    if (containsVMS && emailId && resendApiKey) {
+      console.log("Fetching email content from Resend receiving API for email_id:", emailId);
+      try {
+        // Use the receiving API to get inbound email content
+        const emailResponse = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+          },
+        });
+        
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          console.log("Resend receiving API response keys:", Object.keys(emailData));
+          emailBody = emailData.text || emailData.html || "";
+          console.log("Fetched email body length:", emailBody.length);
+          console.log("Email body preview:", emailBody.substring(0, 200));
+        } else {
+          const errorText = await emailResponse.text();
+          console.error("Failed to fetch email from Resend receiving API:", emailResponse.status, errorText);
+        }
+      } catch (e) {
+        console.error("Error fetching email from Resend receiving API:", e);
+      }
+    }
     
     // Look up agency based on import type
     let agencyQuery;

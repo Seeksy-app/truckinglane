@@ -151,6 +151,81 @@ function generateLoadCallScript(load: Record<string, unknown>): string {
   return `Load ${loadNumber}: Pickup ${pickupRaw}. Deliver ${destRaw}. Delivery ${deliveryDate}. Weight ${weightLbs} lbs. Length ${lengthFt} ft. Tarp ${tarpRequired}. Rate ${rateStr}. Invoice est ${invoiceStr}. Notes: ${notes}`;
 }
 
+// ============= VMS EMAIL BODY PARSER =============
+function parseVMSEmailBody(body: string, agencyId: string): Record<string, unknown>[] {
+  const loads: Record<string, unknown>[] = [];
+  const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  let loadIndex = 1;
+  
+  for (const line of lines) {
+    // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
+    // or with notes: "2 - Donalsonville, Ga - cars - Jackson, Tn $1300 - 1 ready in am..."
+    const match = line.match(/^(\d+)\s*-\s*([^-]+),\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
+    
+    if (!match) continue;
+    
+    const count = parseInt(match[1], 10);
+    const pickupCity = match[2].trim();
+    const pickupState = match[3].toUpperCase();
+    const commodityRaw = match[4].trim().toLowerCase();
+    const destCity = match[5].trim();
+    const destState = match[6].toUpperCase();
+    const rateRaw = parseFloat(match[7].replace(/,/g, ''));
+    
+    // Normalize commodity - "cars" or "bales" = "Crushed Cars"
+    const commodity = (commodityRaw === 'cars' || commodityRaw === 'bales') ? 'Crushed Cars' : commodityRaw;
+    
+    // Fixed weight of 47,000 lbs per user specification
+    const weightLbs = 47000;
+    
+    // Calculate financial fields (flat rate, not per ton)
+    const rateFields = calculateRateFields(rateRaw, weightLbs, false);
+    
+    // Extract notes from remainder of line
+    const noteMatch = line.match(/\$[\d,]+\s*-?\s*(.+)$/i);
+    const notes = noteMatch ? noteMatch[1].replace(/^-\s*/, '').trim() : null;
+    
+    // Create 'count' number of individual load records
+    for (let i = 0; i < count; i++) {
+      const loadNumber = `VMS-${String(loadIndex).padStart(4, '0')}-${pickupState}-${destState}`;
+      loadIndex++;
+      
+      const baseLoad: Record<string, unknown> = {
+        agency_id: agencyId,
+        template_type: "vms_email",
+        load_number: loadNumber,
+        pickup_city: pickupCity,
+        pickup_state: pickupState,
+        pickup_location_raw: `${pickupCity}, ${pickupState}`,
+        dest_city: destCity,
+        dest_state: destState,
+        dest_location_raw: `${destCity}, ${destState}`,
+        ship_date: new Date().toISOString().split('T')[0],
+        delivery_date: null,
+        trailer_footage: null,
+        weight_lbs: weightLbs,
+        tarp_required: false,
+        ...rateFields,
+        commodity: commodity,
+        miles: null,
+        status: "open",
+        source_row: { original_line: line, load_instance: i + 1, total_instances: count },
+      };
+      
+      if (notes) {
+        baseLoad.commodity = `${commodity} - ${notes}`;
+      }
+      
+      baseLoad.load_call_script = generateLoadCallScript(baseLoad);
+      
+      loads.push(baseLoad);
+    }
+  }
+  
+  return loads;
+}
+
 // ============= ADELPHIA MAPPER =============
 function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex: number): Record<string, unknown> {
   const pickupLocationRaw = row["_col_A"] || row["PICK UP AT"] || "";
@@ -267,52 +342,70 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Check if subject contains "adelphia" (case-insensitive)
+    // Determine import type from subject line
     const subjectLower = (subject || "").toLowerCase();
     const containsAdelphia = subjectLower.includes("adelphia");
+    const containsVMS = subjectLower.includes("vms");
     
-    if (!containsAdelphia) {
-      console.error("Subject line does not contain 'adelphia':", subject);
+    // Get email body for VMS parsing
+    const emailBody = payload.text || payload.data?.text || payload.email?.text || 
+                      payload.body || payload.data?.body || "";
+    
+    if (!containsAdelphia && !containsVMS) {
+      console.error("Subject line does not match any known import type:", subject);
       
       // Log the failed attempt
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Subject line must contain "adelphia"`,
+        error_message: `Subject must contain "adelphia" or "VMS"`,
         raw_headers: emailHeaders,
       });
       
       return new Response(JSON.stringify({ 
-        error: `Subject line must contain "adelphia"` 
+        error: `Subject must contain "adelphia" or "VMS"` 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     
-    console.log("Subject line matches - processing Adelphia import");
+    const importType = containsVMS ? "vms" : "adelphia";
+    console.log(`Subject line matches - processing ${importType.toUpperCase()} import`);
     
-    // Look up Adelphia agency by name (or the first agency with Adelphia imports configured)
-    const { data: agency, error: agencyError } = await supabase
-      .from("agencies")
-      .select("id, name, allowed_sender_domains")
-      .or("name.ilike.%adelphia%,import_email_code.eq.ADELPHIA")
-      .limit(1)
-      .single();
+    // Look up agency based on import type
+    let agencyQuery;
+    if (importType === "vms") {
+      agencyQuery = supabase
+        .from("agencies")
+        .select("id, name, allowed_sender_domains")
+        .or("name.ilike.%dl transport%,import_email_code.eq.VMS")
+        .limit(1)
+        .single();
+    } else {
+      agencyQuery = supabase
+        .from("agencies")
+        .select("id, name, allowed_sender_domains")
+        .or("name.ilike.%adelphia%,import_email_code.eq.ADELPHIA")
+        .limit(1)
+        .single();
+    }
+    
+    const { data: agency, error: agencyError } = await agencyQuery;
     
     if (agencyError || !agency) {
-      console.error("Adelphia agency not found");
+      console.error(`${importType.toUpperCase()} agency not found`);
       
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: "Adelphia agency not configured in the system",
+        error_message: `${importType.toUpperCase()} agency not configured in the system`,
         raw_headers: emailHeaders,
       });
       
-      return new Response(JSON.stringify({ error: "Adelphia agency not configured" }), {
+      return new Response(JSON.stringify({ error: `${importType.toUpperCase()} agency not configured` }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -353,6 +446,173 @@ Deno.serve(async (req) => {
       });
     }
     
+    // ============= VMS EMAIL BODY IMPORT =============
+    if (importType === "vms") {
+      console.log("Processing VMS email body import");
+      console.log("Email body length:", emailBody.length);
+      
+      if (!emailBody || emailBody.trim().length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "No email body found for VMS import",
+          raw_headers: emailHeaders,
+        });
+        
+        return new Response(JSON.stringify({ error: "No email body found" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      // Parse VMS email body
+      const mappedLoads = parseVMSEmailBody(emailBody, agency.id);
+      
+      console.log(`Parsed ${mappedLoads.length} VMS loads from email body`);
+      
+      if (mappedLoads.length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "No valid loads found in email body",
+          raw_headers: emailHeaders,
+        });
+        
+        return new Response(JSON.stringify({ error: "No valid loads found in email body" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      // Create import batch record
+      await supabase.from("load_import_runs").insert({
+        agency_id: agency.id,
+        template_type: "vms_email",
+        file_name: `email-${new Date().toISOString().split('T')[0]}`,
+        row_count: mappedLoads.length,
+        replaced_count: 0,
+      });
+      
+      // Archive existing active, non-booked, non-claimed VMS loads
+      const { data: archivedData } = await supabase
+        .from("loads")
+        .update({
+          is_active: false,
+          archived_at: new Date().toISOString(),
+        })
+        .eq("agency_id", agency.id)
+        .eq("template_type", "vms_email")
+        .eq("is_active", true)
+        .is("booked_at", null)
+        .is("claimed_by", null)
+        .select("id");
+      
+      const archivedCount = archivedData?.length || 0;
+      console.log(`Archived ${archivedCount} existing VMS loads`);
+      
+      // Get protected load numbers
+      const { data: protectedLoads } = await supabase
+        .from("loads")
+        .select("load_number")
+        .eq("agency_id", agency.id)
+        .eq("template_type", "vms_email")
+        .eq("is_active", true)
+        .or("claimed_by.not.is.null,booked_at.not.is.null");
+      
+      const protectedLoadNumbers = new Set(
+        (protectedLoads || []).map(l => l.load_number)
+      );
+      
+      // Filter out protected loads
+      const safeLoads = mappedLoads.filter(load => 
+        !protectedLoadNumbers.has(load.load_number as string)
+      );
+      
+      let importedCount = 0;
+      
+      if (safeLoads.length > 0) {
+        const today = new Date().toISOString().split("T")[0];
+        const loadsWithBoardDate = safeLoads.map(load => ({
+          ...load,
+          is_active: true,
+          board_date: today,
+          archived_at: null,
+        }));
+        
+        const { error: insertError } = await supabase
+          .from("loads")
+          .upsert(loadsWithBoardDate, {
+            onConflict: "agency_id,template_type,load_number",
+            ignoreDuplicates: false,
+          });
+        
+        if (insertError) {
+          console.error("Upsert error:", insertError);
+          
+          await supabase.from("email_import_logs").insert({
+            agency_id: agency.id,
+            sender_email: senderEmail,
+            subject: subject,
+            status: "failed",
+            error_message: insertError.message,
+            raw_headers: emailHeaders,
+          });
+          
+          return new Response(JSON.stringify({ error: insertError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        importedCount = safeLoads.length;
+      }
+      
+      console.log(`Imported ${importedCount} VMS loads`);
+      
+      // Log successful import
+      await supabase.from("email_import_logs").insert({
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject: subject,
+        status: "success",
+        imported_count: importedCount,
+        raw_headers: emailHeaders,
+      });
+      
+      // Send confirmation email
+      if (resend) {
+        await resend.emails.send({
+          from: "Trucking Lane <noreply@truckinglane.com>",
+          to: [senderEmail],
+          subject: `VMS Import Successful - ${importedCount} Loads`,
+          html: `
+            <h2>VMS Load Import Complete</h2>
+            <p>Your email has been successfully imported for <strong>${agency.name}</strong>.</p>
+            <ul>
+              <li><strong>Loads imported:</strong> ${importedCount}</li>
+              <li><strong>Loads archived:</strong> ${archivedCount}</li>
+            </ul>
+            <p>The loads are now available in your dashboard.</p>
+          `,
+        }).catch(e => console.error("Failed to send confirmation email:", e));
+      }
+      
+      return new Response(JSON.stringify({
+        success: true,
+        imported: importedCount,
+        archived: archivedCount,
+        agency: agency.name,
+        import_type: "vms_email",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    // ============= ADELPHIA XLSX IMPORT =============
     // Find XLSX attachment
     const xlsxAttachment = attachments.find((att: { filename?: string; content?: string; id?: string }) => 
       att.filename?.toLowerCase().endsWith(".xlsx") || att.filename?.toLowerCase().endsWith(".xls")

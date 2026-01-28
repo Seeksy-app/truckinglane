@@ -264,24 +264,24 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Check for the required subject line
-    const expectedSubject = "Shipping list for Adelphia Metals";
-    const subjectTrimmed = (subject || "").trim();
+    // Check if subject contains "adelphia" (case-insensitive)
+    const subjectLower = (subject || "").toLowerCase();
+    const containsAdelphia = subjectLower.includes("adelphia");
     
-    if (subjectTrimmed.toLowerCase() !== expectedSubject.toLowerCase()) {
-      console.error("Subject line does not match required format:", subject);
+    if (!containsAdelphia) {
+      console.error("Subject line does not contain 'adelphia':", subject);
       
       // Log the failed attempt
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Subject line does not match. Expected: "${expectedSubject}"`,
+        error_message: `Subject line must contain "adelphia"`,
         raw_headers: emailHeaders,
       });
       
       return new Response(JSON.stringify({ 
-        error: `Subject line must be exactly: "${expectedSubject}"` 
+        error: `Subject line must contain "adelphia"` 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

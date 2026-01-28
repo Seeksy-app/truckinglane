@@ -316,7 +316,11 @@ Deno.serve(async (req) => {
   try {
     // Resend inbound email webhook payload
     const payload = await req.json();
-    console.log("Received inbound email payload:", JSON.stringify(payload, null, 2));
+    
+    // Log ALL keys to understand what Resend is sending
+    console.log("Payload keys:", Object.keys(payload));
+    console.log("Payload.data keys:", payload.data ? Object.keys(payload.data) : "no data");
+    console.log("Full payload:", JSON.stringify(payload, null, 2));
     
     // Resend inbound webhooks use different field names
     // See: https://resend.com/docs/dashboard/webhooks/event-types#email-received
@@ -325,8 +329,6 @@ Deno.serve(async (req) => {
     const subject = payload.subject || payload.data?.subject || payload.email?.subject;
     const attachments = payload.attachments || payload.data?.attachments || payload.email?.attachments || [];
     const emailHeaders = payload.headers || payload.data?.headers || {};
-    
-    console.log("Parsed - From:", senderEmail, "Subject:", subject, "Attachments:", attachments?.length);
     
     console.log("From:", senderEmail);
     console.log("Subject:", subject);
@@ -348,32 +350,21 @@ Deno.serve(async (req) => {
     // Support both "VMS" and "MVS" (common typo)
     const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
     
-    // Get email body for VMS parsing - try multiple sources
+    // Get email body for VMS parsing - try ALL possible sources from Resend webhook
+    // Resend inbound may put body in: text, html, body, data.text, data.html, data.body
     let emailBody = payload.text || payload.data?.text || payload.email?.text || 
                     payload.body || payload.data?.body || 
-                    payload.html || payload.data?.html || "";
+                    payload.html || payload.data?.html ||
+                    payload.plain_body || payload.data?.plain_body ||
+                    payload.raw || payload.data?.raw || "";
     
-    // If we have an email_id but no body, fetch from Resend API
-    const emailId = payload.data?.email_id || payload.email_id;
-    if (containsVMS && (!emailBody || emailBody.trim().length === 0) && emailId && resendApiKey) {
-      console.log("Fetching email content from Resend API for email_id:", emailId);
-      try {
-        const emailResponse = await fetch(`https://api.resend.com/emails/${emailId}`, {
-          headers: {
-            "Authorization": `Bearer ${resendApiKey}`,
-          },
-        });
-        if (emailResponse.ok) {
-          const emailData = await emailResponse.json();
-          emailBody = emailData.text || emailData.html || "";
-          console.log("Fetched email body length:", emailBody.length);
-        } else {
-          console.error("Failed to fetch email from Resend:", emailResponse.status);
-        }
-      } catch (e) {
-        console.error("Error fetching email from Resend:", e);
-      }
-    }
+    console.log("Email body source check:");
+    console.log("  payload.text:", typeof payload.text, payload.text?.substring?.(0, 100));
+    console.log("  payload.data?.text:", typeof payload.data?.text, payload.data?.text?.substring?.(0, 100));
+    console.log("  payload.html:", typeof payload.html, payload.html?.substring?.(0, 100));
+    console.log("  payload.data?.html:", typeof payload.data?.html, payload.data?.html?.substring?.(0, 100));
+    console.log("  payload.body:", typeof payload.body, payload.body?.substring?.(0, 100));
+    console.log("  Final emailBody length:", emailBody.length);
     
     if (!containsAdelphia && !containsVMS) {
       console.error("Subject line does not match any known import type:", subject);

@@ -275,7 +275,11 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
                   <TableCell className="font-medium">{load.load_number || "—"}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {load.template_type === "adelphia_xlsx" ? "Adelphia" : "Aljex"}
+                      {load.template_type === "adelphia_xlsx" 
+                        ? "Adelphia" 
+                        : load.template_type === "vms_email" 
+                          ? "VMS" 
+                          : "Aljex"}
                     </Badge>
                   </TableCell>
                   <TableCell>{load.ship_date || "—"}</TableCell>

@@ -345,11 +345,35 @@ Deno.serve(async (req) => {
     // Determine import type from subject line
     const subjectLower = (subject || "").toLowerCase();
     const containsAdelphia = subjectLower.includes("adelphia");
-    const containsVMS = subjectLower.includes("vms");
+    // Support both "VMS" and "MVS" (common typo)
+    const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
     
-    // Get email body for VMS parsing
-    const emailBody = payload.text || payload.data?.text || payload.email?.text || 
-                      payload.body || payload.data?.body || "";
+    // Get email body for VMS parsing - try multiple sources
+    let emailBody = payload.text || payload.data?.text || payload.email?.text || 
+                    payload.body || payload.data?.body || 
+                    payload.html || payload.data?.html || "";
+    
+    // If we have an email_id but no body, fetch from Resend API
+    const emailId = payload.data?.email_id || payload.email_id;
+    if (containsVMS && (!emailBody || emailBody.trim().length === 0) && emailId && resendApiKey) {
+      console.log("Fetching email content from Resend API for email_id:", emailId);
+      try {
+        const emailResponse = await fetch(`https://api.resend.com/emails/${emailId}`, {
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+          },
+        });
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          emailBody = emailData.text || emailData.html || "";
+          console.log("Fetched email body length:", emailBody.length);
+        } else {
+          console.error("Failed to fetch email from Resend:", emailResponse.status);
+        }
+      } catch (e) {
+        console.error("Error fetching email from Resend:", e);
+      }
+    }
     
     if (!containsAdelphia && !containsVMS) {
       console.error("Subject line does not match any known import type:", subject);
@@ -359,12 +383,12 @@ Deno.serve(async (req) => {
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Subject must contain "adelphia" or "VMS"`,
+        error_message: `Subject must contain "adelphia", "VMS", or "MVS"`,
         raw_headers: emailHeaders,
       });
       
       return new Response(JSON.stringify({ 
-        error: `Subject must contain "adelphia" or "VMS"` 
+        error: `Subject must contain "adelphia", "VMS", or "MVS"` 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

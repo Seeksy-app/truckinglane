@@ -28,7 +28,7 @@ import {
 
 type Load = Tables<"loads">;
 
-type SortOption = "none" | "pickup_city" | "pickup_state" | "dest_city" | "dest_state";
+type SortOption = "none" | "template_type" | "pickup_city" | "pickup_state" | "dest_city" | "dest_state";
 
 interface LoadsTableProps {
   loads: Load[];
@@ -172,6 +172,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
             </SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="none">No sorting</SelectItem>
+              <SelectItem value="template_type">Template (A-Z)</SelectItem>
               <SelectItem value="pickup_city">Pickup City (A-Z)</SelectItem>
               <SelectItem value="pickup_state">Pickup State (A-Z)</SelectItem>
               <SelectItem value="dest_city">Delivery City (A-Z)</SelectItem>

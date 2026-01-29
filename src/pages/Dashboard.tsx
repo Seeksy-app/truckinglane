@@ -441,9 +441,9 @@ const Dashboard = () => {
         const destCity = l.dest_city?.toLowerCase().trim() || "";
         const destState = l.dest_state?.toLowerCase().trim() || "";
         return searchTerms.some((term) => {
-          // For 2-letter state abbreviations, use exact match on state fields
+          // For 2-letter state abbreviations, use exact match on state fields only
           if (isStateAbbr && term.length === 2) {
-            return pickupState === term || destState === term || loadNumber.includes(term);
+            return pickupState === term || destState === term;
           }
           return (
             loadNumber.includes(term) ||

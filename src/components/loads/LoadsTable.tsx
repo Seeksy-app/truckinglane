@@ -92,6 +92,17 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
     // Apply sorting
     if (sortBy !== "none") {
       result = [...result].sort((a, b) => {
+        if (sortBy === "template_type") {
+          // Custom order: VMS first, then Adelphia, then Aljex
+          const templateOrder: Record<string, number> = {
+            vms_email: 1,
+            adelphia_xlsx: 2,
+            aljex_flat: 3,
+          };
+          const aOrder = templateOrder[a.template_type] || 99;
+          const bOrder = templateOrder[b.template_type] || 99;
+          return aOrder - bOrder;
+        }
         const aVal = (a[sortBy] || "").toLowerCase();
         const bVal = (b[sortBy] || "").toLowerCase();
         return aVal.localeCompare(bVal);

@@ -45,6 +45,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
   const [sortBy, setSortBy] = useState<SortOption>("none");
   const [pickupStateFilter, setPickupStateFilter] = useState<string>("all");
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
 
   const handleNavigateToDetail = (loadId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -55,25 +56,37 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  // Extract unique states from loads for filter dropdowns
-  const { pickupStates, destStates } = useMemo(() => {
+  // Extract unique states and clients from loads for filter dropdowns
+  const { pickupStates, destStates, clients } = useMemo(() => {
     const pickupSet = new Set<string>();
     const destSet = new Set<string>();
+    const clientSet = new Set<string>();
     
     loads.forEach((load) => {
       if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
       if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
+      if (load.template_type) clientSet.add(load.template_type);
     });
     
     return {
       pickupStates: Array.from(pickupSet).sort(),
       destStates: Array.from(destSet).sort(),
+      clients: Array.from(clientSet).sort((a, b) => {
+        // Custom order: VMS first, then Adelphia, then Aljex
+        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3 };
+        return (order[a] || 99) - (order[b] || 99);
+      }),
     };
   }, [loads]);
 
   // Apply filters then sort
   const filteredAndSortedLoads = useMemo(() => {
     let result = loads;
+    
+    // Apply client filter
+    if (clientFilter !== "all") {
+      result = result.filter((l) => l.template_type === clientFilter);
+    }
     
     // Apply pickup state filter
     if (pickupStateFilter !== "all") {
@@ -110,11 +123,12 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
     }
     
     return result;
-  }, [loads, pickupStateFilter, destStateFilter, sortBy]);
+  }, [loads, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
 
-  const hasActiveFilters = pickupStateFilter !== "all" || destStateFilter !== "all";
+  const hasActiveFilters = clientFilter !== "all" || pickupStateFilter !== "all" || destStateFilter !== "all";
 
   const clearFilters = () => {
+    setClientFilter("all");
     setPickupStateFilter("all");
     setDestStateFilter("all");
   };
@@ -183,7 +197,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
             </SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="none">No sorting</SelectItem>
-              <SelectItem value="template_type">Template (A-Z)</SelectItem>
+              <SelectItem value="template_type">Client</SelectItem>
               <SelectItem value="pickup_city">Pickup City (A-Z)</SelectItem>
               <SelectItem value="pickup_state">Pickup State (A-Z)</SelectItem>
               <SelectItem value="dest_city">Delivery City (A-Z)</SelectItem>
@@ -194,9 +208,27 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
 
         <div className="h-6 w-px bg-border hidden sm:block" />
 
-        {/* Filter by Pickup State */}
+        {/* Filter by Client */}
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Client:</span>
+          <Select value={clientFilter} onValueChange={setClientFilter}>
+            <SelectTrigger className="w-[110px] h-8 text-sm bg-background">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="all">All</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client} value={client}>
+                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : "Aljex"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filter by Pickup State */}
+        <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
             <SelectTrigger className="w-[100px] h-8 text-sm bg-background">
@@ -257,7 +289,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
           <TableRow className="bg-muted/50 border-b border-border">
             <TableHead className="w-10"></TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Load #</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Template</TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Client</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Ship Date</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Pickup</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Delivery</TableHead>

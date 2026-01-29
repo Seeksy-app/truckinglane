@@ -343,8 +343,17 @@ Deno.serve(async (req) => {
     console.log("Subject:", subject);
     console.log("Attachments count:", attachments.length);
     
-    // Extract sender domain
-    const senderDomain = senderEmail?.split("@")[1]?.toLowerCase();
+    // Extract sender domain - handle both "email@domain.com" and "Name <email@domain.com>" formats
+    let cleanEmail = senderEmail || "";
+    // Extract email from "Name <email@domain.com>" format
+    const emailMatch = cleanEmail.match(/<([^>]+)>/);
+    if (emailMatch) {
+      cleanEmail = emailMatch[1];
+    }
+    const senderDomain = cleanEmail.split("@")[1]?.toLowerCase()?.replace(/[^a-z0-9.-]/g, '');
+    
+    console.log("Cleaned email:", cleanEmail, "Domain:", senderDomain);
+    
     if (!senderDomain) {
       console.error("Invalid sender email:", senderEmail);
       return new Response(JSON.stringify({ error: "Invalid sender email" }), {

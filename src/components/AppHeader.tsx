@@ -248,14 +248,47 @@ export function AppHeader() {
                     <span className="hidden sm:inline">Analytics</span>
                   </Button>
                   
-                  {/* Import Loads */}
-                  <Dialog open={importOpen} onOpenChange={handleImportOpenChange}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="gap-2">
-                        <Upload className="h-4 w-4" />
-                        <span className="hidden sm:inline">Import Loads</span>
+                  {/* Loads Dropdown - Import, Export, Converter */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <FileSpreadsheet className="h-4 w-4" />
+                        <span className="hidden sm:inline">Loads</span>
+                        <ChevronDown className="h-3 w-3" />
                       </Button>
-                    </DialogTrigger>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="bg-popover">
+                      <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import Loads
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          if (loads.length === 0) {
+                            toast.error("No active loads to export");
+                            return;
+                          }
+                          downloadDATExport(loads);
+                          toast.success(`Exported ${loads.length} loads to DAT format`);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export to DAT
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/csv-converter')}>
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        CSV Converter
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Import Loads Dialog - triggered from dropdown */}
+                  <Dialog open={importOpen} onOpenChange={handleImportOpenChange}>
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -349,35 +382,6 @@ export function AppHeader() {
                       )}
                     </DialogContent>
                   </Dialog>
-
-                  {/* Export to DAT */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => {
-                      if (loads.length === 0) {
-                        toast.error("No active loads to export");
-                        return;
-                      }
-                      downloadDATExport(loads);
-                      toast.success(`Exported ${loads.length} loads to DAT format`);
-                    }}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Export to DAT</span>
-                  </Button>
-
-                  {/* CSV Converter (manual mapping) */}
-                  <Button
-                    variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => navigate('/csv-converter')}
-                    className="gap-2"
-                  >
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span className="hidden sm:inline">CSV Converter</span>
-                  </Button>
 
                   {isAdmin && (
                     <DropdownMenu>

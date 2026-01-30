@@ -68,8 +68,19 @@ function mapLoadToDAT(load: Load): Record<string, string> {
   // Length: use trailer_footage if available, otherwise leave blank
   const lengthValue = load.trailer_footage ? String(load.trailer_footage) : "";
   
-  // Commodity: use the commodity field directly (already set during import)
-  const commodityValue = load.commodity || "";
+  // Commodity logic for Adelphia loads:
+  // - If trailer_footage has a value → "rebar"
+  // - If trailer_footage is blank/null → "COILS"
+  // For other templates, use the commodity field directly
+  let commodityValue = load.commodity || "";
+  
+  // Check if this is an Adelphia load (load_number starts with "ADE-")
+  const isAdelphiaLoad = load.load_number?.startsWith("ADE-");
+  
+  if (isAdelphiaLoad && (!commodityValue || commodityValue === "")) {
+    // Infer commodity from trailer_footage for legacy Adelphia loads
+    commodityValue = load.trailer_footage ? "rebar" : "COILS";
+  }
   
   return {
     "Pickup Earliest*": formatDate(load.ship_date),

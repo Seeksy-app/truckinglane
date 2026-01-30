@@ -15,14 +15,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
+import { downloadDATExport } from '@/lib/datExport';
+import { useLoads } from '@/hooks/useLoads';
 type ImportState = "idle" | "loading" | "success" | "error";
 
 interface ImportResult {
@@ -38,7 +39,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-
+  const { loads } = useLoads();
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
   const [templateType, setTemplateType] = useState<string>("aljex_flat");
@@ -348,6 +349,24 @@ export function AppHeader() {
                       )}
                     </DialogContent>
                   </Dialog>
+
+                  {/* Export to DAT */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => {
+                      if (loads.length === 0) {
+                        toast.error("No active loads to export");
+                        return;
+                      }
+                      downloadDATExport(loads);
+                      toast.success(`Exported ${loads.length} loads to DAT format`);
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Export to DAT</span>
+                  </Button>
 
                   {isAdmin && (
                     <DropdownMenu>

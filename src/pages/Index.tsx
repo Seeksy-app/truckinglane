@@ -561,15 +561,14 @@ function StatsSection() {
     totalCalls: 0,
     totalMinutes: 0,
     totalLeads: 0,
-    bookedLoads: 0,
   });
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch total calls
+        // Fetch total calls from ai_call_summaries (more accurate)
         const { count: callCount } = await supabase
-          .from("phone_calls")
+          .from("ai_call_summaries")
           .select("*", { count: "exact", head: true });
 
         // Fetch total AI call minutes
@@ -584,17 +583,10 @@ function StatsSection() {
           .from("leads")
           .select("*", { count: "exact", head: true });
 
-        // Fetch booked loads
-        const { count: bookedCount } = await supabase
-          .from("loads")
-          .select("*", { count: "exact", head: true })
-          .not("booked_at", "is", null);
-
         setStats({
           totalCalls: callCount || 0,
           totalMinutes: Math.round(totalMinutes / 60),
           totalLeads: leadCount || 0,
-          bookedLoads: bookedCount || 0,
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -605,10 +597,9 @@ function StatsSection() {
   }, []);
 
   const displayStats = [
-    { value: stats.totalCalls.toLocaleString(), label: "Total Calls Received" },
-    { value: `${stats.totalMinutes}+`, label: "AI Minutes Logged" },
+    { value: stats.totalCalls.toLocaleString(), label: "AI Calls Handled" },
+    { value: `${stats.totalMinutes.toLocaleString()}+`, label: "AI Minutes Logged" },
     { value: stats.totalLeads.toLocaleString(), label: "Leads Generated" },
-    { value: stats.bookedLoads.toLocaleString(), label: "Loads Booked" },
   ];
 
   return (
@@ -628,7 +619,7 @@ function StatsSection() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-3 gap-8">
           {displayStats.map((stat, index) => (
             <motion.div
               key={stat.label}

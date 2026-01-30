@@ -65,10 +65,16 @@ function mapEquipmentCode(trailerType: string | null | undefined): string {
 
 // Map a load to DAT row format
 function mapLoadToDAT(load: Load): Record<string, string> {
+  // Length: use trailer_footage if available, otherwise leave blank
+  const lengthValue = load.trailer_footage ? String(load.trailer_footage) : "";
+  
+  // Commodity: use the commodity field directly (already set during import)
+  const commodityValue = load.commodity || "";
+  
   return {
     "Pickup Earliest*": formatDate(load.ship_date),
     "Pickup Latest": formatDate(load.delivery_date),
-    "Length (ft)*": load.trailer_footage ? String(load.trailer_footage) : "",
+    "Length (ft)*": lengthValue,
     "Weight (lbs)*": load.weight_lbs ? String(load.weight_lbs) : "",
     "Full/Partial*": "Full",
     "Equipment*": mapEquipmentCode(load.trailer_type),
@@ -88,7 +94,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Destination State*": load.dest_state || "",
     "Destination Postal Code": load.dest_zip || "",
     "Comment": load.tarps ? `Tarps: ${load.tarps}` : "",
-    "Commodity": load.commodity || "",
+    "Commodity": commodityValue,
     "Reference ID": load.load_number || ""
   };
 }

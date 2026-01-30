@@ -106,7 +106,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Destination Postal Code": load.dest_zip || "",
     "Comment": load.tarps ? `Tarps: ${load.tarps}` : "",
     "Commodity": commodityValue,
-    "Reference ID": load.load_number || ""
+    "Reference ID": ""
   };
 }
 

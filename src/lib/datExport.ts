@@ -54,8 +54,15 @@ function getCurrentDate(): string {
 }
 
 // Map trailer type to DAT equipment code
-function mapEquipmentCode(trailerType: string | null | undefined): string {
-  if (!trailerType) return "";
+// templateType is used to default Adelphia and VMS to Flatbed
+function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
+  // Default Adelphia and VMS to Flatbed if no trailer type specified
+  if (!trailerType) {
+    if (templateType === "adelphia_xlsx" || templateType === "vms_email") {
+      return "F"; // Flatbed
+    }
+    return "";
+  }
   const type = trailerType.toLowerCase();
   
   // Common mappings - V=Van, R=Reefer, F=Flatbed
@@ -103,7 +110,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Length (ft)*": lengthValue,
     "Weight (lbs)*": weightValue,
     "Full/Partial*": "Full",
-    "Equipment*": mapEquipmentCode(load.trailer_type),
+    "Equipment*": mapEquipmentCode(load.trailer_type, load.template_type),
     "Use Private Network*": "no",
     "Private Network Rate": "",
     "Allow Private Network Booking": "no",

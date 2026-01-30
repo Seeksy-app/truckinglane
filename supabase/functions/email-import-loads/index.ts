@@ -212,6 +212,7 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
         dest_location_raw: `${destCity}, ${destState}`,
         ship_date: new Date().toISOString().split('T')[0],
         delivery_date: null,
+        trailer_type: "Flatbed", // VMS defaults to flatbed
         trailer_footage: null,
         weight_lbs: weightLbs,
         tarp_required: false,
@@ -291,6 +292,7 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
     dest_location_raw: destLocationRaw || null,
     ship_date: parseDate(deliveryDateStr),
     delivery_date: parseDate(deliveryDateStr),
+    trailer_type: "Flatbed", // Adelphia defaults to flatbed
     trailer_footage: parseNumber(lengthStr),
     weight_lbs: weightLbs,
     tarp_required: parseTarpRequired(tarpStr),

@@ -548,7 +548,7 @@ Deno.serve(async (req) => {
         replaced_count: 0,
       });
       
-      // Archive existing active, non-booked, non-claimed VMS loads
+      // Archive ALL existing active VMS loads (except booked) - replaced by new import
       const { data: archivedData } = await supabase
         .from("loads")
         .update({
@@ -559,29 +559,13 @@ Deno.serve(async (req) => {
         .eq("template_type", "vms_email")
         .eq("is_active", true)
         .is("booked_at", null)
-        .is("claimed_by", null)
         .select("id");
       
       const archivedCount = archivedData?.length || 0;
       console.log(`Archived ${archivedCount} existing VMS loads`);
       
-      // Get protected load numbers
-      const { data: protectedLoads } = await supabase
-        .from("loads")
-        .select("load_number")
-        .eq("agency_id", agency.id)
-        .eq("template_type", "vms_email")
-        .eq("is_active", true)
-        .or("claimed_by.not.is.null,booked_at.not.is.null");
-      
-      const protectedLoadNumbers = new Set(
-        (protectedLoads || []).map(l => l.load_number)
-      );
-      
-      // Filter out protected loads
-      const safeLoads = mappedLoads.filter(load => 
-        !protectedLoadNumbers.has(load.load_number as string)
-      );
+      // All new loads are inserted (old ones already archived)
+      const safeLoads = mappedLoads;
       
       let importedCount = 0;
       
@@ -624,48 +608,6 @@ Deno.serve(async (req) => {
       
       console.log(`Imported ${importedCount} VMS loads`);
       
-      // Enforce retention: keep only 100 most recent active VMS loads
-      // Get IDs of loads to keep (most recent 100 by created_at)
-      const { data: loadsToKeep } = await supabase
-        .from("loads")
-        .select("id")
-        .eq("agency_id", agency.id)
-        .eq("template_type", "vms_email")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      
-      const keepIds = new Set((loadsToKeep || []).map(l => l.id));
-      
-      // Archive all active VMS loads NOT in the keep set
-      if (keepIds.size > 0) {
-        const { data: allActiveVMS } = await supabase
-          .from("loads")
-          .select("id")
-          .eq("agency_id", agency.id)
-          .eq("template_type", "vms_email")
-          .eq("is_active", true);
-        
-        const idsToArchive = (allActiveVMS || [])
-          .filter(l => !keepIds.has(l.id))
-          .map(l => l.id);
-        
-        if (idsToArchive.length > 0) {
-          const { error: retentionError } = await supabase
-            .from("loads")
-            .update({
-              is_active: false,
-              archived_at: new Date().toISOString(),
-            })
-            .in("id", idsToArchive);
-          
-          if (retentionError) {
-            console.error("Retention cleanup error:", retentionError);
-          } else {
-            console.log(`Retention cleanup: archived ${idsToArchive.length} old VMS loads, kept ${keepIds.size}`);
-          }
-        }
-      }
       
       // Log successful import
       await supabase.from("email_import_logs").insert({
@@ -878,7 +820,7 @@ Deno.serve(async (req) => {
       replaced_count: 0,
     });
     
-    // Archive existing active, non-booked, non-claimed Adelphia loads
+    // Archive ALL existing active Adelphia loads (except booked) - replaced by new import
     const { data: archivedData } = await supabase
       .from("loads")
       .update({
@@ -889,29 +831,13 @@ Deno.serve(async (req) => {
       .eq("template_type", "adelphia_xlsx")
       .eq("is_active", true)
       .is("booked_at", null)
-      .is("claimed_by", null)
       .select("id");
     
     const archivedCount = archivedData?.length || 0;
     console.log(`Archived ${archivedCount} existing Adelphia loads`);
     
-    // Get protected load numbers
-    const { data: protectedLoads } = await supabase
-      .from("loads")
-      .select("load_number")
-      .eq("agency_id", agency.id)
-      .eq("template_type", "adelphia_xlsx")
-      .eq("is_active", true)
-      .or("claimed_by.not.is.null,booked_at.not.is.null");
-    
-    const protectedLoadNumbers = new Set(
-      (protectedLoads || []).map(l => l.load_number)
-    );
-    
-    // Filter out protected loads
-    const safeLoads = mappedLoads.filter(load => 
-      !protectedLoadNumbers.has(load.load_number as string)
-    );
+    // All new loads are inserted (old ones already archived)
+    const safeLoads = mappedLoads;
     
     let importedCount = 0;
     

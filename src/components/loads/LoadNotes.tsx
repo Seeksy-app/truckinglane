@@ -111,6 +111,20 @@ interface LoadDetailsGridProps {
   load: Load;
 }
 
+// Get commodity display value - infer for Adelphia loads if not set
+function getCommodityDisplay(load: Load): string | null {
+  // If commodity is already set, use it
+  if (load.commodity) return load.commodity;
+  
+  // For Adelphia loads, infer from trailer_footage
+  // If length has value -> rebar, if blank -> COILS
+  if (load.load_number?.startsWith("ADE-")) {
+    return load.trailer_footage ? "rebar" : "COILS";
+  }
+  
+  return null;
+}
+
 export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
   const pickup = formatLocation(load.pickup_city, load.pickup_state, load.pickup_zip);
   const delivery = formatLocation(load.dest_city, load.dest_state, load.dest_zip);
@@ -125,6 +139,9 @@ export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
   const tarpsDisplay = load.tarps 
     ? (load.tarp_size ? `${load.tarps} (${load.tarp_size})` : load.tarps)
     : null;
+
+  // Get commodity (with inference for Adelphia)
+  const commodityDisplay = getCommodityDisplay(load);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -147,7 +164,7 @@ export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
           <Field label="Footage" value={load.trailer_footage ? `${load.trailer_footage} ft` : null} />
           <Field label="Tarps" value={tarpsDisplay} />
           <Field label="Weight" value={load.weight_lbs ? `${load.weight_lbs.toLocaleString()} lbs` : null} />
-          <Field label="Commodity" value={load.commodity} className="col-span-2" />
+          <Field label="Commodity" value={commodityDisplay} className="col-span-2" />
           {load.dispatch_status && (
             <Field label="Dispatch" value={load.dispatch_status} className="col-span-2" />
           )}

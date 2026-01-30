@@ -566,28 +566,19 @@ function StatsSection() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch total calls from ai_call_summaries (more accurate)
-        const { count: callCount } = await supabase
-          .from("ai_call_summaries")
-          .select("*", { count: "exact", head: true });
-
-        // Fetch total AI call minutes
-        const { data: aiCalls } = await supabase
-          .from("ai_call_summaries")
-          .select("duration_secs");
+        // Use edge function to bypass RLS for public stats
+        const response = await fetch(
+          "https://vjgakkomhphvdbwjjwiv.supabase.co/functions/v1/public-stats"
+        );
         
-        const totalMinutes = aiCalls?.reduce((acc, call) => acc + (call.duration_secs || 0), 0) || 0;
-
-        // Fetch total leads
-        const { count: leadCount } = await supabase
-          .from("leads")
-          .select("*", { count: "exact", head: true });
-
-        setStats({
-          totalCalls: callCount || 0,
-          totalMinutes: Math.round(totalMinutes / 60),
-          totalLeads: leadCount || 0,
-        });
+        if (response.ok) {
+          const data = await response.json();
+          setStats({
+            totalCalls: data.ai_calls || 0,
+            totalMinutes: data.ai_minutes || 0,
+            totalLeads: data.leads || 0,
+          });
+        }
       } catch (error) {
         console.error("Error fetching stats:", error);
       }

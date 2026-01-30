@@ -44,6 +44,15 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+// Get current date formatted as M/D/YYYY
+function getCurrentDate(): string {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const year = now.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
 // Map trailer type to DAT equipment code
 function mapEquipmentCode(trailerType: string | null | undefined): string {
   if (!trailerType) return "";
@@ -82,11 +91,17 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     commodityValue = load.trailer_footage ? "rebar" : "COILS";
   }
   
+  // Use current date for first two columns
+  const currentDate = getCurrentDate();
+  
+  // Default weight to 47,000 if empty
+  const weightValue = load.weight_lbs ? String(load.weight_lbs) : "47000";
+  
   return {
-    "Pickup Earliest*": formatDate(load.ship_date),
-    "Pickup Latest": formatDate(load.delivery_date),
+    "Pickup Earliest*": currentDate,
+    "Pickup Latest": currentDate,
     "Length (ft)*": lengthValue,
-    "Weight (lbs)*": load.weight_lbs ? String(load.weight_lbs) : "",
+    "Weight (lbs)*": weightValue,
     "Full/Partial*": "Full",
     "Equipment*": mapEquipmentCode(load.trailer_type),
     "Use Private Network*": "no",

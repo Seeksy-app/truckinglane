@@ -368,6 +368,17 @@ export function AppHeader() {
                     <span className="hidden sm:inline">Export to DAT</span>
                   </Button>
 
+                  {/* CSV Converter (manual mapping) */}
+                  <Button
+                    variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => navigate('/csv-converter')}
+                    className="gap-2"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span className="hidden sm:inline">CSV Converter</span>
+                  </Button>
+
                   {isAdmin && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

@@ -566,7 +566,7 @@ Deno.serve(async (req) => {
       console.error("Batch insert error:", batchError);
     }
     
-    // Soft-delete: Archive existing active, non-booked, non-claimed loads for this agency + template
+    // Archive ALL existing active loads (except booked) - replaced by new import
     const { data: archivedData, error: archiveError } = await supabase
       .from("loads")
       .update({
@@ -577,7 +577,6 @@ Deno.serve(async (req) => {
       .eq("template_type", templateType)
       .eq("is_active", true)
       .is("booked_at", null) // Don't archive booked loads
-      .is("claimed_by", null) // Don't archive claimed loads
       .select("id");
     
     if (archiveError) {
@@ -591,25 +590,9 @@ Deno.serve(async (req) => {
     const archivedCount = archivedData?.length || 0;
     console.log(`Archived ${archivedCount} existing ${templateType} loads`);
     
-    // Get claimed/booked load_numbers to exclude from upsert (don't overwrite claimed loads)
-    const { data: protectedLoads } = await supabase
-      .from("loads")
-      .select("load_number")
-      .eq("agency_id", agencyId)
-      .eq("template_type", templateType)
-      .eq("is_active", true)
-      .or("claimed_by.not.is.null,booked_at.not.is.null");
-    
-    const protectedLoadNumbers = new Set(
-      (protectedLoads || []).map(l => l.load_number)
-    );
-    console.log(`Protecting ${protectedLoadNumbers.size} claimed/booked loads from overwrite`);
-    
-    // Filter out loads that would overwrite claimed/booked loads
-    const safeLoads = mappedLoads.filter(load => 
-      !protectedLoadNumbers.has(load.load_number as string)
-    );
-    console.log(`${safeLoads.length} loads to upsert after filtering protected`);
+    // All new loads are inserted (old ones already archived)
+    const safeLoads = mappedLoads;
+    console.log(`${safeLoads.length} loads to upsert`);
     
     // Only upsert if there are safe loads to import
     if (safeLoads.length > 0) {

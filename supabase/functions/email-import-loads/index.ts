@@ -624,6 +624,49 @@ Deno.serve(async (req) => {
       
       console.log(`Imported ${importedCount} VMS loads`);
       
+      // Enforce retention: keep only 100 most recent active VMS loads
+      // Get IDs of loads to keep (most recent 100 by created_at)
+      const { data: loadsToKeep } = await supabase
+        .from("loads")
+        .select("id")
+        .eq("agency_id", agency.id)
+        .eq("template_type", "vms_email")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      const keepIds = new Set((loadsToKeep || []).map(l => l.id));
+      
+      // Archive all active VMS loads NOT in the keep set
+      if (keepIds.size > 0) {
+        const { data: allActiveVMS } = await supabase
+          .from("loads")
+          .select("id")
+          .eq("agency_id", agency.id)
+          .eq("template_type", "vms_email")
+          .eq("is_active", true);
+        
+        const idsToArchive = (allActiveVMS || [])
+          .filter(l => !keepIds.has(l.id))
+          .map(l => l.id);
+        
+        if (idsToArchive.length > 0) {
+          const { error: retentionError } = await supabase
+            .from("loads")
+            .update({
+              is_active: false,
+              archived_at: new Date().toISOString(),
+            })
+            .in("id", idsToArchive);
+          
+          if (retentionError) {
+            console.error("Retention cleanup error:", retentionError);
+          } else {
+            console.log(`Retention cleanup: archived ${idsToArchive.length} old VMS loads, kept ${keepIds.size}`);
+          }
+        }
+      }
+      
       // Log successful import
       await supabase.from("email_import_logs").insert({
         agency_id: agency.id,

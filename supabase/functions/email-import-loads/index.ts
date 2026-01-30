@@ -364,8 +364,8 @@ Deno.serve(async (req) => {
     
     // Determine import type from subject line
     const subjectLower = (subject || "").toLowerCase();
-    // Support both "adelphia" and "aldelphia" (common typo)
-    const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia");
+    // Support common typos: "adelphia", "aldelphia", "adlephia"
+    const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia") || subjectLower.includes("adlephia");
     // Support both "VMS" and "MVS" (common typo)
     const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
     

@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Download, ArrowRight, FileSpreadsheet, X, RotateCcw } from "lucide-react";
+import { Upload, Download, ArrowRight, FileSpreadsheet, X, RotateCcw, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-
 interface ColumnMapping {
   sourceColumn: string;
   targetColumn: string;
@@ -69,10 +69,10 @@ function generateCSV(headers: string[], rows: Record<string, string>[]): string 
 }
 
 export default function CsvConverter() {
+  const navigate = useNavigate();
   const [sourceFile, setSourceFile] = useState<{ name: string; headers: string[]; rows: Record<string, string>[] } | null>(null);
   const [targetFile, setTargetFile] = useState<{ name: string; headers: string[] } | null>(null);
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
-
   const handleSourceUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -153,9 +153,19 @@ export default function CsvConverter() {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">CSV Format Converter</h1>
-            <p className="text-muted-foreground">Map columns from your source file to the DAT format</p>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/dashboard')}
+              className="h-9 w-9"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">CSV Format Converter</h1>
+              <p className="text-muted-foreground">Map columns from your source file to the DAT format</p>
+            </div>
           </div>
           {(sourceFile || targetFile) && (
             <Button variant="outline" onClick={resetAll} className="gap-2">

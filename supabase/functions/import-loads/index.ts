@@ -307,7 +307,7 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
   // Column G: Initials (SC, MM, DE, etc.)
   // Column H: Date (17-Dec)
   // Column I: Weight (48061)
-  // Column J: Length (20')
+  // Column J: Length (20' or blank) - blank = COILS, has value = rebar
   // Column K: Tarp (NO/YES)
   
   const pickupLocationRaw = row["_col_A"] || row["PICK UP AT"] || "";
@@ -319,6 +319,22 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
   const weightStr = row["_col_I"] || row["WEIGHT"] || "";
   const lengthStr = row["_col_J"] || row["LENGTH"] || "";
   const tarpStr = row["_col_K"] || row["TARP"] || "";
+  
+  // Parse length - extract numeric value from strings like "40'" or "20'"
+  let trailerFootage: number | null = null;
+  const lengthTrimmed = lengthStr.trim();
+  if (lengthTrimmed) {
+    // Remove quotes, apostrophes, "ft", etc. and extract number
+    const lengthMatch = lengthTrimmed.match(/(\d+)/);
+    if (lengthMatch) {
+      trailerFootage = parseInt(lengthMatch[1], 10);
+    }
+  }
+  
+  // Determine commodity based on length column:
+  // If length is blank -> COILS
+  // If length has a value (e.g., "40'") -> rebar
+  const commodity = lengthTrimmed ? "rebar" : "COILS";
   
   // Parse destination - it's just the city/state already
   let destCity = "";
@@ -371,11 +387,11 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
     dest_location_raw: destLocationRaw || null,
     ship_date: parseDate(deliveryDateStr),
     delivery_date: parseDate(deliveryDateStr),
-    trailer_footage: parseNumber(lengthStr),
+    trailer_footage: trailerFootage,
     weight_lbs: weightLbs,
     tarp_required: parseTarpRequired(tarpStr),
     ...rateFields,
-    commodity: notes || null,
+    commodity: commodity,
     miles: null,
     status: "open",
     source_row: row,

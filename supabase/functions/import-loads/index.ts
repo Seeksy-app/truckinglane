@@ -119,6 +119,18 @@ function parseXLSX(buffer: ArrayBuffer, sheetName: string, headerRow: number): R
   return rows;
 }
 
+// Generate a simple hash for deterministic load number generation
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  // Convert to positive hex string, padded to 8 chars
+  return Math.abs(hash).toString(16).padStart(8, '0').substring(0, 8);
+}
+
 // ============= HELPER FUNCTIONS =============
 function parseNumber(value: string | undefined | null): number | null {
   if (!value) return null;
@@ -369,11 +381,13 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
   const isPerTon = false;
   const rateFields = calculateRateFields(rateNumeric, weightLbs, isPerTon);
   
-  // Generate a synthetic load number for Adelphia (required by database)
-  // Format: ADE-{rowIndex padded}-{pickup abbrev}-{dest abbrev}
+  // Generate a deterministic load number for Adelphia using content hash
+  // This ensures re-imports of the same data update rather than duplicate
   const pickupAbbrev = pickupState || pickupCity.substring(0, 3).toUpperCase();
   const destAbbrev = destState || destCity.substring(0, 3).toUpperCase();
-  const loadNumber = `ADE-${String(rowIndex).padStart(4, '0')}-${pickupAbbrev}-${destAbbrev}`;
+  const contentKey = `${pickupLocationRaw}|${destLocationRaw}|${rateRawStr}|${weightStr}`;
+  const contentHash = simpleHash(contentKey);
+  const loadNumber = `ADE-${pickupAbbrev}${destAbbrev}-${contentHash}`;
   
   const baseLoad: Record<string, unknown> = {
     agency_id: agencyId,

@@ -152,11 +152,22 @@ function generateLoadCallScript(load: Record<string, unknown>): string {
 }
 
 // ============= VMS EMAIL BODY PARSER =============
+
+// Generate a simple hash for deterministic load number generation
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  // Convert to positive hex string, padded to 8 chars
+  return Math.abs(hash).toString(16).padStart(8, '0').substring(0, 8);
+}
+
 function parseVMSEmailBody(body: string, agencyId: string): Record<string, unknown>[] {
   const loads: Record<string, unknown>[] = [];
   const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  
-  let loadIndex = 1;
   
   for (let line of lines) {
     // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 
@@ -195,10 +206,13 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const noteMatch = line.match(/\$[\d,]+\s*-?\s*(.+)$/i);
     const notes = noteMatch ? noteMatch[1].replace(/^-\s*/, '').trim() : null;
     
-    // Create 'count' number of individual load records
+    // Create 'count' number of individual load records with DETERMINISTIC load numbers
     for (let i = 0; i < count; i++) {
-      const loadNumber = `VMS-${String(loadIndex).padStart(4, '0')}-${pickupState}-${destState}`;
-      loadIndex++;
+      // Create deterministic load number based on content hash
+      // This ensures same data re-imports as same load (upsert will update, not duplicate)
+      const contentKey = `${pickupCity}|${pickupState}|${destCity}|${destState}|${rateRaw}|${i+1}of${count}`;
+      const contentHash = simpleHash(contentKey);
+      const loadNumber = `VMS-${pickupState}${destState}-${contentHash}`;
       
       const baseLoad: Record<string, unknown> = {
         agency_id: agencyId,
@@ -276,9 +290,12 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
   const isPerTon = false;
   const rateFields = calculateRateFields(rateNumeric, weightLbs, isPerTon);
   
+  // Generate deterministic load number based on content hash
   const pickupAbbrev = pickupState || pickupCity.substring(0, 3).toUpperCase();
   const destAbbrev = destState || destCity.substring(0, 3).toUpperCase();
-  const loadNumber = `ADE-${String(rowIndex).padStart(4, '0')}-${pickupAbbrev}-${destAbbrev}`;
+  const contentKey = `${pickupLocationRaw}|${destLocationRaw}|${rateRawStr}|${weightStr}`;
+  const contentHash = simpleHash(contentKey);
+  const loadNumber = `ADE-${pickupAbbrev}${destAbbrev}-${contentHash}`;
   
   const baseLoad: Record<string, unknown> = {
     agency_id: agencyId,

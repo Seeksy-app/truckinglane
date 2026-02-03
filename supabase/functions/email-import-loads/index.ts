@@ -169,6 +169,10 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
   const loads: Record<string, unknown>[] = [];
   const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
+  // Track route+rate combinations to generate deterministic load numbers
+  // Key: "pickup_city|pickup_state|dest_city|dest_state|rate" -> count of loads for this route
+  const routeCounts: Map<string, number> = new Map();
+  
   for (let line of lines) {
     // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 
     line = line.replace(/^\*+/, '').replace(/\*+$/, '').trim();
@@ -206,13 +210,21 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const noteMatch = line.match(/\$[\d,]+\s*-?\s*(.+)$/i);
     const notes = noteMatch ? noteMatch[1].replace(/^-\s*/, '').trim() : null;
     
-    // Create 'count' number of individual load records with DETERMINISTIC load numbers
+    // Create 'count' number of individual load records with TRULY DETERMINISTIC load numbers
+    // Use route+rate as the key, and a simple instance counter within that route
+    const routeKey = `${pickupCity.toLowerCase()}|${pickupState}|${destCity.toLowerCase()}|${destState}|${rateRaw}`;
+    
     for (let i = 0; i < count; i++) {
-      // Create deterministic load number based on content hash
-      // This ensures same data re-imports as same load (upsert will update, not duplicate)
-      const contentKey = `${pickupCity}|${pickupState}|${destCity}|${destState}|${rateRaw}|${i+1}of${count}`;
-      const contentHash = simpleHash(contentKey);
-      const loadNumber = `VMS-${pickupState}${destState}-${contentHash}`;
+      // Get current count for this route and increment
+      const currentRouteCount = routeCounts.get(routeKey) || 0;
+      const instanceNum = currentRouteCount + 1;
+      routeCounts.set(routeKey, instanceNum);
+      
+      // Create a deterministic load number based on route + instance within that route
+      // This ensures that the SAME route from ANY email gets the SAME load numbers
+      // Format: VMS-{pickup_state}{dest_state}-{hash_of_route}-{instance}
+      const routeHash = simpleHash(routeKey);
+      const loadNumber = `VMS-${pickupState}${destState}-${routeHash}-${String(instanceNum).padStart(2, '0')}`;
       
       const baseLoad: Record<string, unknown> = {
         agency_id: agencyId,

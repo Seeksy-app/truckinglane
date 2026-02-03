@@ -169,10 +169,6 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
   const loads: Record<string, unknown>[] = [];
   const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
-  // Track route+rate combinations to generate deterministic load numbers
-  // Key: "pickup_city|pickup_state|dest_city|dest_state|rate" -> count of loads for this route
-  const routeCounts: Map<string, number> = new Map();
-  
   for (let line of lines) {
     // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 
     line = line.replace(/^\*+/, '').replace(/\*+$/, '').trim();
@@ -210,20 +206,15 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const noteMatch = line.match(/\$[\d,]+\s*-?\s*(.+)$/i);
     const notes = noteMatch ? noteMatch[1].replace(/^-\s*/, '').trim() : null;
     
-    // Create 'count' number of individual load records with TRULY DETERMINISTIC load numbers
-    // Use route+rate as the key, and a simple instance counter within that route
+    // Create 'count' number of individual load records with FIXED instance numbers
+    // The instance number is simply 1 to count, making load numbers deterministic per route
+    // When the same route appears with count=2, it will always create instances 01 and 02
+    // Format: VMS-{pickup_state}{dest_state}-{hash_of_route}-{instance}
     const routeKey = `${pickupCity.toLowerCase()}|${pickupState}|${destCity.toLowerCase()}|${destState}|${rateRaw}`;
+    const routeHash = simpleHash(routeKey);
     
     for (let i = 0; i < count; i++) {
-      // Get current count for this route and increment
-      const currentRouteCount = routeCounts.get(routeKey) || 0;
-      const instanceNum = currentRouteCount + 1;
-      routeCounts.set(routeKey, instanceNum);
-      
-      // Create a deterministic load number based on route + instance within that route
-      // This ensures that the SAME route from ANY email gets the SAME load numbers
-      // Format: VMS-{pickup_state}{dest_state}-{hash_of_route}-{instance}
-      const routeHash = simpleHash(routeKey);
+      const instanceNum = i + 1; // Always 1, 2, 3... based on count in THIS line
       const loadNumber = `VMS-${pickupState}${destState}-${routeHash}-${String(instanceNum).padStart(2, '0')}`;
       
       const baseLoad: Record<string, unknown> = {

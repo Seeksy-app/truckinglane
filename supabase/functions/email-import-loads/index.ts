@@ -210,12 +210,15 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     // The instance number is simply 1 to count, making load numbers deterministic per route
     // When the same route appears with count=2, it will always create instances 01 and 02
     // Format: VMS-{pickup_state}{dest_state}-{hash_of_route}-{instance}
-    const routeKey = `${pickupCity.toLowerCase()}|${pickupState}|${destCity.toLowerCase()}|${destState}|${rateRaw}`;
+    // IMPORTANT: Normalize case to ensure "Tn" and "TN" hash the same
+    const normalizedPickupState = pickupState.toUpperCase();
+    const normalizedDestState = destState.toUpperCase();
+    const routeKey = `${pickupCity.toLowerCase()}|${normalizedPickupState}|${destCity.toLowerCase()}|${normalizedDestState}|${rateRaw}`;
     const routeHash = simpleHash(routeKey);
     
     for (let i = 0; i < count; i++) {
       const instanceNum = i + 1; // Always 1, 2, 3... based on count in THIS line
-      const loadNumber = `VMS-${pickupState}${destState}-${routeHash}-${String(instanceNum).padStart(2, '0')}`;
+      const loadNumber = `VMS-${normalizedPickupState}${normalizedDestState}-${routeHash}-${String(instanceNum).padStart(2, '0')}`;
       
       const baseLoad: Record<string, unknown> = {
         agency_id: agencyId,

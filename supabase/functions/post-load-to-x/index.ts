@@ -54,7 +54,7 @@ function formatLoadPost(load: LoadData): string {
   lines.push("");
   
   // Call to action
-  lines.push("📞 Call now for rates!");
+  lines.push("📞 Call now for rates: +1 888 785 7499");
   lines.push("#trucking #freightbroker #flatbed #loads #carriers");
   
   return lines.join("\n");

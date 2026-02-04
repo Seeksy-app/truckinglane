@@ -604,9 +604,14 @@ Deno.serve(async (req) => {
     const archivedCount = archivedData?.length || 0;
     console.log(`Archived ${archivedCount} existing ${templateType} loads`);
     
-    // All new loads are inserted (old ones already archived)
-    const safeLoads = mappedLoads;
-    console.log(`${safeLoads.length} loads to upsert`);
+    // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
+    const loadsByNumber = new Map<string, Record<string, unknown>>();
+    for (const load of mappedLoads) {
+      const loadNumber = load.load_number as string;
+      loadsByNumber.set(loadNumber, load);
+    }
+    const safeLoads = Array.from(loadsByNumber.values());
+    console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique loads`);
     
     // Only upsert if there are safe loads to import
     if (safeLoads.length > 0) {

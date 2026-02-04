@@ -584,8 +584,15 @@ Deno.serve(async (req) => {
       const archivedCount = archivedData?.length || 0;
       console.log(`Archived ${archivedCount} existing VMS loads`);
       
-      // All new loads are inserted (old ones already archived)
-      const safeLoads = mappedLoads;
+      // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
+      // Keep the last occurrence of each load_number (in case of duplicates)
+      const loadsByNumber = new Map<string, Record<string, unknown>>();
+      for (const load of mappedLoads) {
+        const loadNumber = load.load_number as string;
+        loadsByNumber.set(loadNumber, load);
+      }
+      const safeLoads = Array.from(loadsByNumber.values());
+      console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique loads`);
       
       let importedCount = 0;
       
@@ -856,8 +863,14 @@ Deno.serve(async (req) => {
     const archivedCount = archivedData?.length || 0;
     console.log(`Archived ${archivedCount} existing Adelphia loads`);
     
-    // All new loads are inserted (old ones already archived)
-    const safeLoads = mappedLoads;
+    // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
+    const loadsByNumber = new Map<string, Record<string, unknown>>();
+    for (const load of mappedLoads) {
+      const loadNumber = load.load_number as string;
+      loadsByNumber.set(loadNumber, load);
+    }
+    const safeLoads = Array.from(loadsByNumber.values());
+    console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique Adelphia loads`);
     
     let importedCount = 0;
     

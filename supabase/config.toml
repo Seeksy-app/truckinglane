@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.email-import-loads]
 verify_jwt = false
+
+[functions.archive-daily-loads]
+verify_jwt = false

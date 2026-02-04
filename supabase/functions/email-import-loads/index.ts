@@ -167,7 +167,38 @@ function simpleHash(str: string): string {
 
 function parseVMSEmailBody(body: string, agencyId: string): Record<string, unknown>[] {
   const loads: Record<string, unknown>[] = [];
-  const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  // Stop parsing when we hit reply chain markers to avoid processing historical data
+  // Common patterns: "On Mon, Feb 3, 2026 at 10:30 AM ... wrote:", "> quoted text", "From:", "Sent:"
+  const replyMarkers = [
+    /^On\s+\w+,\s+\w+\s+\d+,?\s+\d+\s+at\s+\d+:\d+\s*[AP]M/i, // "On Mon, Feb 3, 2026 at 10:30 AM"
+    /^On\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i, // "On 2/3/2026"
+    /^From:\s+/i, // "From: someone@email.com"
+    /^Sent:\s+/i, // "Sent: Monday, February 3"
+    /^-{3,}\s*Original Message/i, // "--- Original Message ---"
+    /^>{1,2}\s/, // "> quoted text" or ">> double quoted"
+    /wrote:$/i, // "John Doe wrote:"
+  ];
+  
+  const rawLines = body.split('\n');
+  const filteredLines: string[] = [];
+  
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    
+    // Check if this line starts a reply chain
+    const isReplyMarker = replyMarkers.some(pattern => pattern.test(line));
+    if (isReplyMarker) {
+      console.log("VMS parser: Stopping at reply marker:", line.substring(0, 50));
+      break; // Stop processing - everything after is old data
+    }
+    
+    filteredLines.push(line);
+  }
+  
+  console.log(`VMS parser: Processing ${filteredLines.length} lines (stopped before reply chain)`);
+  const lines = filteredLines;
   
   for (let line of lines) {
     // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 

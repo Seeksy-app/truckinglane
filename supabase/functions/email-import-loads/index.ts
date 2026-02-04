@@ -680,23 +680,7 @@ Deno.serve(async (req) => {
         raw_headers: emailHeaders,
       });
       
-      // Send confirmation email
-      if (resend) {
-        await resend.emails.send({
-          from: "Trucking Lane <noreply@truckinglane.com>",
-          to: [senderEmail],
-          subject: `VMS Import Successful - ${importedCount} Loads`,
-          html: `
-            <h2>VMS Load Import Complete</h2>
-            <p>Your email has been successfully imported for <strong>${agency.name}</strong>.</p>
-            <ul>
-              <li><strong>Loads imported:</strong> ${importedCount}</li>
-              <li><strong>Loads archived:</strong> ${archivedCount}</li>
-            </ul>
-            <p>The loads are now available in your dashboard.</p>
-          `,
-        }).catch(e => console.error("Failed to send confirmation email:", e));
-      }
+      // Note: No confirmation emails to external senders - import logs are visible in admin dashboard
       
       return new Response(JSON.stringify({
         success: true,
@@ -727,17 +711,7 @@ Deno.serve(async (req) => {
         raw_headers: emailHeaders,
       });
       
-      if (resend) {
-        await resend.emails.send({
-          from: "Trucking Lane <noreply@truckinglane.com>",
-          to: [senderEmail],
-          subject: "Import Failed - No Attachment",
-          html: `
-            <p>Your email import for ${agency.name} failed because no XLSX attachment was found.</p>
-            <p>Please attach an Adelphia spreadsheet (.xlsx) and resend.</p>
-          `,
-        }).catch(e => console.error("Failed to send error email:", e));
-      }
+      // Note: No error emails to external senders - errors are logged in admin dashboard
       
       return new Response(JSON.stringify({ error: "No XLSX attachment found" }), {
         status: 400,
@@ -824,17 +798,7 @@ Deno.serve(async (req) => {
         raw_headers: emailHeaders,
       });
       
-      if (resend) {
-        await resend.emails.send({
-          from: "Trucking Lane <noreply@truckinglane.com>",
-          to: [senderEmail],
-          subject: "Import Failed - Empty Spreadsheet",
-          html: `
-            <p>Your email import for ${agency.name} failed because no data rows were found in the spreadsheet.</p>
-            <p>Please verify the spreadsheet format and resend.</p>
-          `,
-        }).catch(e => console.error("Failed to send error email:", e));
-      }
+      // Note: No error emails to external senders - errors are logged in admin dashboard
       
       return new Response(JSON.stringify({ error: "No data rows found in XLSX" }), {
         status: 400,
@@ -957,24 +921,7 @@ Deno.serve(async (req) => {
       raw_headers: emailHeaders,
     });
     
-    // Send confirmation email
-    if (resend) {
-      await resend.emails.send({
-        from: "Trucking Lane <noreply@truckinglane.com>",
-        to: [senderEmail],
-        subject: `Import Successful - ${importedCount} Loads`,
-        html: `
-          <h2>Adelphia Import Complete</h2>
-          <p>Your spreadsheet has been successfully imported for <strong>${agency.name}</strong>.</p>
-          <ul>
-            <li><strong>Loads imported:</strong> ${importedCount}</li>
-            <li><strong>Loads archived:</strong> ${archivedCount}</li>
-            <li><strong>File:</strong> ${xlsxAttachment.filename}</li>
-          </ul>
-          <p>The loads are now available in your dashboard.</p>
-        `,
-      }).catch(e => console.error("Failed to send confirmation email:", e));
-    }
+    // Note: No confirmation emails to external senders - import logs are visible in admin dashboard
     
     return new Response(JSON.stringify({
       success: true,

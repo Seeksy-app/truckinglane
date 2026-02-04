@@ -382,10 +382,18 @@ Deno.serve(async (req) => {
     // Resend inbound email webhook payload
     const payload = await req.json();
     
-    // Log ALL keys to understand what Resend is sending
+    // Only process email.received events - ignore domain.updated, email.bounced, etc.
+    const eventType = payload.type;
+    if (eventType && eventType !== "email.received") {
+      console.log("Ignoring non-email event:", eventType);
+      return new Response(JSON.stringify({ ignored: true, event_type: eventType }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
     console.log("Payload keys:", Object.keys(payload));
     console.log("Payload.data keys:", payload.data ? Object.keys(payload.data) : "no data");
-    console.log("Full payload:", JSON.stringify(payload, null, 2));
     
     // Resend inbound webhooks use different field names
     // See: https://resend.com/docs/dashboard/webhooks/event-types#email-received

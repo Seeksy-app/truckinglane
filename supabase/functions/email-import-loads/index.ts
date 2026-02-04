@@ -133,6 +133,96 @@ function calculateRateFields(rateRaw: number | null, weightLbs: number | null, i
   };
 }
 
+// ============= POST LOADS TO X HELPER =============
+async function postLoadsToX(loads: Record<string, unknown>[]): Promise<void> {
+  const UPLOAD_POST_API_KEY = Deno.env.get("UPLOAD_POST_API_KEY");
+  if (!UPLOAD_POST_API_KEY) {
+    console.log("UPLOAD_POST_API_KEY not configured, skipping X posting");
+    return;
+  }
+  
+  console.log(`Posting ${loads.length} loads to X via Upload Post`);
+  
+  // Only post first 5 loads to avoid rate limiting
+  const loadsToPost = loads.slice(0, 5);
+  
+  for (const load of loadsToPost) {
+    try {
+      const postText = formatLoadForX(load);
+      console.log(`Posting load ${load.load_number} to X`);
+      
+      const response = await fetch("https://api.upload-post.com/api/upload_text", {
+        method: "POST",
+        headers: {
+          "Authorization": `Apikey ${UPLOAD_POST_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user: "@TruckingLane",
+          platforms: ["x"],
+          text: postText,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`X post failed for ${load.load_number}: ${response.status} - ${errorText}`);
+      } else {
+        console.log(`Successfully posted load ${load.load_number} to X`);
+      }
+      
+      // Delay between posts to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (err) {
+      console.error(`Error posting load ${load.load_number} to X:`, err);
+    }
+  }
+}
+
+function formatLoadForX(load: Record<string, unknown>): string {
+  const lines: string[] = [];
+  
+  lines.push(`🚛 LOAD #${load.load_number}`);
+  lines.push("");
+  
+  // Route
+  if (load.ship_date) {
+    lines.push(`📅 ${load.ship_date}`);
+  }
+  if (load.pickup_city && load.pickup_state) {
+    lines.push(`📍 ${load.pickup_city}, ${load.pickup_state}`);
+  }
+  if (load.dest_city && load.dest_state) {
+    lines.push(`➡️ ${load.dest_city}, ${load.dest_state}`);
+  }
+  lines.push("");
+  
+  // Equipment
+  const equipmentParts: string[] = [];
+  if (load.trailer_type) {
+    equipmentParts.push(String(load.trailer_type));
+  }
+  if (load.trailer_footage) {
+    equipmentParts.push(`${load.trailer_footage}ft`);
+  }
+  if (equipmentParts.length > 0) {
+    lines.push(`🔧 ${equipmentParts.join(" | ")}`);
+  }
+  
+  if (load.weight_lbs) {
+    lines.push(`⚖️ ${Number(load.weight_lbs).toLocaleString()} lbs`);
+  }
+  if (load.commodity) {
+    lines.push(`📦 ${load.commodity}`);
+  }
+  lines.push("");
+  
+  lines.push("📞 Call for rates!");
+  lines.push("#trucking #flatbed #freight #loads");
+  
+  return lines.join("\n");
+}
+
 function generateLoadCallScript(load: Record<string, unknown>): string {
   const loadNumber = load.load_number || "";
   const pickupRaw = load.pickup_location_raw || "";
@@ -673,6 +763,9 @@ Deno.serve(async (req) => {
         }
         
         importedCount = safeLoads.length;
+        
+        // Post new loads to X
+        await postLoadsToX(safeLoads);
       }
       
       console.log(`Imported ${importedCount} VMS loads`);
@@ -915,6 +1008,9 @@ Deno.serve(async (req) => {
       }
       
       importedCount = safeLoads.length;
+      
+      // Post new loads to X
+      await postLoadsToX(safeLoads);
     }
     
     console.log(`Imported ${importedCount} loads`);

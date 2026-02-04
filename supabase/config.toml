@@ -110,3 +110,6 @@ verify_jwt = false
 
 [functions.archive-daily-loads]
 verify_jwt = false
+
+[functions.post-load-to-x]
+verify_jwt = false

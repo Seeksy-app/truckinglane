@@ -33,6 +33,7 @@ import AcceptInvite from "./pages/AcceptInvite";
 import CompleteAgencySetup from "./pages/CompleteAgencySetup";
 import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
+import BusinessDevelopment from "./pages/BusinessDevelopment";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -197,6 +198,11 @@ const App = () => (
               <Route path="/my-keywords" element={
                 <ProtectedRoute>
                   <MyKeywords />
+                </ProtectedRoute>
+              } />
+              <Route path="/business-development" element={
+                <ProtectedRoute>
+                  <BusinessDevelopment />
                 </ProtectedRoute>
               } />
               <Route path="/lead-discovery" element={

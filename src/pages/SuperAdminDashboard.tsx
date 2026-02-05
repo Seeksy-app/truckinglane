@@ -29,6 +29,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Briefcase,
 } from 'lucide-react';
 import {
   Table,
@@ -668,6 +669,25 @@ export default function SuperAdminDashboard() {
 
         {/* Platform Analytics */}
         <PlatformAnalytics />
+
+        {/* Business Development */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              Business Development
+            </CardTitle>
+            <CardDescription>
+              Strategic planning, projections, and go-to-market strategy
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/business-development')} className="gap-2">
+              <ArrowRight className="h-4 w-4" />
+              View Business Development Dashboard
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* System Health & Trust Page Admin */}
         <SystemHealthDashboard />

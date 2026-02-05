@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download, Briefcase } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -246,15 +246,6 @@ export function AppHeader() {
                   >
                     <BarChart3 className="h-4 w-4" />
                     <span className="hidden sm:inline">Analytics</span>
-                  </Button>
-                  <Button
-                    variant={location.pathname === '/business-development' ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => navigate('/business-development')}
-                    className="gap-2"
-                  >
-                    <Briefcase className="h-4 w-4" />
-                    <span className="hidden sm:inline">Biz Dev</span>
                   </Button>
                   
                   {/* Loads Dropdown - Import, Export, Converter */}

@@ -79,11 +79,24 @@ function mapEquipmentCode(trailerType: string | null | undefined, templateType?:
   return trailerType;
 }
 
+// Clean state field: strip anything after "/" (e.g. "IN/CHICAGO" → "IN")
+function cleanState(state: string | null | undefined): string {
+  if (!state) return "";
+  return state.split("/")[0].trim();
+}
+
+// Check if a load is a valid exportable load (not a template note/instruction row)
+function isExportableLoad(load: Load): boolean {
+  const city = (load.pickup_city || "").toUpperCase();
+  if (city.startsWith("PICK UP") || city.startsWith("NOTE") || city.startsWith("***")) return false;
+  if (!load.pickup_city && !load.dest_city) return false;
+  return true;
+}
+
 // Map a load to DAT row format
 function mapLoadToDAT(load: Load): Record<string, string> {
-  // Length: use trailer_footage if available, otherwise leave blank
-  const lengthValue = load.trailer_footage ? String(load.trailer_footage) : "";
-  
+  // Length: use trailer_footage if available, default to 48 (standard flatbed) if missing
+  const lengthValue = load.trailer_footage ? String(load.trailer_footage) : "48";
   // Commodity logic for Adelphia loads:
   // - If trailer_footage has a value → "rebar"
   // - If trailer_footage is blank/null → "COILS"
@@ -121,10 +134,10 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Use Extended Network": "no",
     "Contact Method*": "primary phone",
     "Origin City*": load.pickup_city || "",
-    "Origin State*": load.pickup_state || "",
+    "Origin State*": cleanState(load.pickup_state),
     "Origin Postal Code": load.pickup_zip || "",
     "Destination City*": load.dest_city || "",
-    "Destination State*": load.dest_state || "",
+    "Destination State*": cleanState(load.dest_state),
     "Destination Postal Code": load.dest_zip || "",
     "Comment": load.tarps ? `Tarps: ${load.tarps}` : "",
     "Commodity": commodityValue,
@@ -140,11 +153,12 @@ function escapeField(field: string): string {
   return field;
 }
 
-// Generate CSV string from loads
+// Generate CSV string from loads (filters out invalid/note rows)
 export function generateDATCsv(loads: Load[]): string {
+  const exportableLoads = loads.filter(isExportableLoad);
   const headerLine = DAT_COLUMNS.map(escapeField).join(",");
   
-  const dataLines = loads.map(load => {
+  const dataLines = exportableLoads.map(load => {
     const row = mapLoadToDAT(load);
     return DAT_COLUMNS.map(col => escapeField(row[col] || "")).join(",");
   });

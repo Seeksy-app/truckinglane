@@ -863,6 +863,194 @@ export type Database = {
           },
         ]
       }
+      demo_loads: {
+        Row: {
+          agency_id: string
+          archived_at: string | null
+          board_date: string
+          booked_at: string | null
+          booked_by: string | null
+          booked_call_id: string | null
+          booked_lead_id: string | null
+          booked_source: string | null
+          claimed_at: string | null
+          claimed_by: string | null
+          close_reason: string | null
+          closed_at: string | null
+          commission_max_pct: number
+          commission_target_pct: number
+          commodity: string | null
+          created_at: string
+          customer_invoice_total: number
+          delivery_date: string | null
+          dest_city: string | null
+          dest_location_raw: string | null
+          dest_state: string | null
+          dest_zip: string | null
+          dispatch_status: string | null
+          id: string
+          is_active: boolean
+          is_high_intent: boolean | null
+          is_per_ton: boolean
+          load_call_script: string | null
+          load_number: string
+          max_commission: number | null
+          max_pay: number
+          miles: string | null
+          pickup_city: string | null
+          pickup_location_raw: string | null
+          pickup_state: string | null
+          pickup_zip: string | null
+          rate_raw: number | null
+          ship_date: string | null
+          source_row: Json | null
+          status: string
+          target_commission: number | null
+          target_pay: number
+          tarp_required: boolean | null
+          tarp_size: string | null
+          tarps: string | null
+          template_type: string
+          trailer_footage: number | null
+          trailer_type: string | null
+          updated_at: string
+          weight_lbs: number | null
+        }
+        Insert: {
+          agency_id: string
+          archived_at?: string | null
+          board_date?: string
+          booked_at?: string | null
+          booked_by?: string | null
+          booked_call_id?: string | null
+          booked_lead_id?: string | null
+          booked_source?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          close_reason?: string | null
+          closed_at?: string | null
+          commission_max_pct?: number
+          commission_target_pct?: number
+          commodity?: string | null
+          created_at?: string
+          customer_invoice_total: number
+          delivery_date?: string | null
+          dest_city?: string | null
+          dest_location_raw?: string | null
+          dest_state?: string | null
+          dest_zip?: string | null
+          dispatch_status?: string | null
+          id?: string
+          is_active?: boolean
+          is_high_intent?: boolean | null
+          is_per_ton?: boolean
+          load_call_script?: string | null
+          load_number: string
+          max_commission?: number | null
+          max_pay: number
+          miles?: string | null
+          pickup_city?: string | null
+          pickup_location_raw?: string | null
+          pickup_state?: string | null
+          pickup_zip?: string | null
+          rate_raw?: number | null
+          ship_date?: string | null
+          source_row?: Json | null
+          status?: string
+          target_commission?: number | null
+          target_pay: number
+          tarp_required?: boolean | null
+          tarp_size?: string | null
+          tarps?: string | null
+          template_type: string
+          trailer_footage?: number | null
+          trailer_type?: string | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Update: {
+          agency_id?: string
+          archived_at?: string | null
+          board_date?: string
+          booked_at?: string | null
+          booked_by?: string | null
+          booked_call_id?: string | null
+          booked_lead_id?: string | null
+          booked_source?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          close_reason?: string | null
+          closed_at?: string | null
+          commission_max_pct?: number
+          commission_target_pct?: number
+          commodity?: string | null
+          created_at?: string
+          customer_invoice_total?: number
+          delivery_date?: string | null
+          dest_city?: string | null
+          dest_location_raw?: string | null
+          dest_state?: string | null
+          dest_zip?: string | null
+          dispatch_status?: string | null
+          id?: string
+          is_active?: boolean
+          is_high_intent?: boolean | null
+          is_per_ton?: boolean
+          load_call_script?: string | null
+          load_number?: string
+          max_commission?: number | null
+          max_pay?: number
+          miles?: string | null
+          pickup_city?: string | null
+          pickup_location_raw?: string | null
+          pickup_state?: string | null
+          pickup_zip?: string | null
+          rate_raw?: number | null
+          ship_date?: string | null
+          source_row?: Json | null
+          status?: string
+          target_commission?: number | null
+          target_pay?: number
+          tarp_required?: boolean | null
+          tarp_size?: string | null
+          tarps?: string | null
+          template_type?: string
+          trailer_footage?: number | null
+          trailer_type?: string | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_loads_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_loads_booked_call_id_fkey"
+            columns: ["booked_call_id"]
+            isOneToOne: false
+            referencedRelation: "phone_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_loads_booked_lead_id_fkey"
+            columns: ["booked_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_loads_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elevenlabs_post_calls: {
         Row: {
           agency_id: string | null

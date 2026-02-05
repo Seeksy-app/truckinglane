@@ -1022,13 +1022,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "demo_loads_agency_id_fkey"
-            columns: ["agency_id"]
-            isOneToOne: false
-            referencedRelation: "agencies"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "demo_loads_booked_call_id_fkey"
             columns: ["booked_call_id"]
             isOneToOne: false

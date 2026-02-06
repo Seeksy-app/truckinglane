@@ -69,9 +69,13 @@ export default function AdminDashboard() {
   const [loadingAgents, setLoadingAgents] = useState(true);
   const [agencyName, setAgencyName] = useState('');
   const [agencyAccountType, setAgencyAccountType] = useState<string>('agency');
+  const [agencyContactName, setAgencyContactName] = useState('');
+  const [agencyContactEmail, setAgencyContactEmail] = useState('');
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAccountType, setEditAccountType] = useState('agency');
+  const [editContactName, setEditContactName] = useState('');
+  const [editContactEmail, setEditContactEmail] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [resending, setResending] = useState<string | null>(null);
   const [sendingLoginEmail, setSendingLoginEmail] = useState<string | null>(null);
@@ -98,13 +102,15 @@ export default function AdminDashboard() {
         // Fetch agency name
         const { data: agency } = await supabase
           .from('agencies')
-          .select('name, account_type')
+          .select('name, account_type, main_contact_name, main_contact_email')
           .eq('id', agencyId)
           .single();
         
         if (agency) {
           setAgencyName(agency.name);
           setAgencyAccountType((agency as any).account_type || 'agency');
+          setAgencyContactName((agency as any).main_contact_name || '');
+          setAgencyContactEmail((agency as any).main_contact_email || '');
         }
 
         // Fetch agents
@@ -389,6 +395,8 @@ export default function AdminDashboard() {
             onClick={() => {
               setEditName(agencyName);
               setEditAccountType(agencyAccountType);
+              setEditContactName(agencyContactName);
+              setEditContactEmail(agencyContactEmail);
               setEditProfileOpen(true);
             }}
           >
@@ -635,7 +643,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Edit Agency Profile</DialogTitle>
             <DialogDescription>
-              Update your agency name and account type.
+              Update your agency profile, contact info, and account type.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -660,6 +668,25 @@ export default function AdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-contact-name">Main Contact Name</Label>
+              <Input
+                id="edit-contact-name"
+                value={editContactName}
+                onChange={(e) => setEditContactName(e.target.value)}
+                placeholder="e.g. John Smith"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-contact-email">Main Contact Email</Label>
+              <Input
+                id="edit-contact-email"
+                type="email"
+                value={editContactEmail}
+                onChange={(e) => setEditContactEmail(e.target.value)}
+                placeholder="e.g. dispatch@company.com"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditProfileOpen(false)}>
@@ -671,7 +698,13 @@ export default function AdminDashboard() {
                 setSavingProfile(true);
                 try {
                   const { data, error } = await supabase.functions.invoke('update-agency', {
-                    body: { agencyId, name: editName.trim(), account_type: editAccountType },
+                    body: { 
+                      agencyId, 
+                      name: editName.trim(), 
+                      account_type: editAccountType,
+                      main_contact_name: editContactName.trim() || null,
+                      main_contact_email: editContactEmail.trim() || null,
+                    },
                   });
                   if (error || data?.error) {
                     toast.error(data?.error || error?.message || 'Failed to update');
@@ -679,6 +712,8 @@ export default function AdminDashboard() {
                   }
                   setAgencyName(editName.trim());
                   setAgencyAccountType(editAccountType);
+                  setAgencyContactName(editContactName.trim());
+                  setAgencyContactEmail(editContactEmail.trim());
                   setEditProfileOpen(false);
                   toast.success('Agency profile updated!');
                 } catch (err) {

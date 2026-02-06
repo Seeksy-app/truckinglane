@@ -35,7 +35,7 @@ serve(async (req: Request) => {
     }
 
     // Check user is agency_admin or super_admin for this agency
-    const { agencyId, name, account_type } = await req.json();
+    const { agencyId, name, account_type, main_contact_name, main_contact_email } = await req.json();
 
     const { data: membership } = await supabaseAdmin
       .from("agency_members")
@@ -68,9 +68,11 @@ serve(async (req: Request) => {
       }
     }
 
-    const updates: Record<string, string> = {};
+    const updates: Record<string, string | null> = {};
     if (name !== undefined) updates.name = name;
     if (account_type !== undefined) updates.account_type = account_type;
+    if (main_contact_name !== undefined) updates.main_contact_name = main_contact_name;
+    if (main_contact_email !== undefined) updates.main_contact_email = main_contact_email;
 
     if (Object.keys(updates).length === 0) {
       return new Response(JSON.stringify({ error: "No fields to update" }), {

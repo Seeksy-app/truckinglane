@@ -132,6 +132,8 @@ export type Database = {
           id: string
           import_email_code: string | null
           logo_url: string | null
+          main_contact_email: string | null
+          main_contact_name: string | null
           name: string
           updated_at: string
         }
@@ -143,6 +145,8 @@ export type Database = {
           id?: string
           import_email_code?: string | null
           logo_url?: string | null
+          main_contact_email?: string | null
+          main_contact_name?: string | null
           name: string
           updated_at?: string
         }
@@ -154,6 +158,8 @@ export type Database = {
           id?: string
           import_email_code?: string | null
           logo_url?: string | null
+          main_contact_email?: string | null
+          main_contact_name?: string | null
           name?: string
           updated_at?: string
         }

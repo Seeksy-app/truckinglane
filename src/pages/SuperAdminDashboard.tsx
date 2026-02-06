@@ -65,6 +65,7 @@ interface Agency {
   lead_count?: number;
   import_email_code?: string | null;
   allowed_sender_domains?: string[] | null;
+  account_type?: string;
 }
 
 interface AgencyRequest {
@@ -136,7 +137,7 @@ export default function SuperAdminDashboard() {
     queryFn: async () => {
       const { data: agenciesData, error } = await supabase
         .from('agencies')
-        .select('id, name, created_at, import_email_code, allowed_sender_domains')
+        .select('id, name, created_at, import_email_code, allowed_sender_domains, account_type')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -606,6 +607,11 @@ export default function SuperAdminDashboard() {
                                 )}
                               </button>
                               {agency.name}
+                              {agency.account_type && (
+                                <Badge variant="outline" className="text-xs ml-2 capitalize">
+                                  {agency.account_type}
+                                </Badge>
+                              )}
                               {agency.import_email_code && (
                                 <Badge variant="outline" className="text-xs ml-2">
                                   Email Import

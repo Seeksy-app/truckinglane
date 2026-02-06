@@ -21,6 +21,7 @@ interface SubmitRequestBody {
   zip?: string;
   agentCount?: string;
   dailyLoadVolume?: string;
+  accountType?: string;
 }
 
 serve(async (req: Request) => {
@@ -47,6 +48,7 @@ serve(async (req: Request) => {
       zip,
       agentCount,
       dailyLoadVolume,
+      accountType,
     }: SubmitRequestBody = await req.json();
 
     // Validate inputs
@@ -111,6 +113,7 @@ serve(async (req: Request) => {
         zip: zip || null,
         agent_count: agentCount || null,
         daily_load_volume: dailyLoadVolume || null,
+        account_type: accountType || 'agency',
       })
       .select()
       .single();

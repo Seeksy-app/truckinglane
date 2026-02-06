@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { 
   Users, Plus, Copy, Check, 
-  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound
+  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -67,6 +68,11 @@ export default function AdminDashboard() {
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
   const [agencyName, setAgencyName] = useState('');
+  const [agencyAccountType, setAgencyAccountType] = useState<string>('agency');
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAccountType, setEditAccountType] = useState('agency');
+  const [savingProfile, setSavingProfile] = useState(false);
   const [resending, setResending] = useState<string | null>(null);
   const [sendingLoginEmail, setSendingLoginEmail] = useState<string | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -92,12 +98,13 @@ export default function AdminDashboard() {
         // Fetch agency name
         const { data: agency } = await supabase
           .from('agencies')
-          .select('name')
+          .select('name, account_type')
           .eq('id', agencyId)
           .single();
         
         if (agency) {
           setAgencyName(agency.name);
+          setAgencyAccountType((agency as any).account_type || 'agency');
         }
 
         // Fetch agents
@@ -369,9 +376,25 @@ export default function AdminDashboard() {
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Agency Info */}
-        <div className="flex items-center gap-3">
-          <Building2 className="h-6 w-6 text-muted-foreground" />
-          <h2 className="text-2xl font-bold">{agencyName || 'Your Agency'}</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-6 w-6 text-muted-foreground" />
+            <h2 className="text-2xl font-bold">{agencyName || 'Your Agency'}</h2>
+            <Badge variant="outline" className="capitalize">{agencyAccountType}</Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              setEditName(agencyName);
+              setEditAccountType(agencyAccountType);
+              setEditProfileOpen(true);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+            Edit Profile
+          </Button>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -605,6 +628,73 @@ export default function AdminDashboard() {
         )}
 
       </main>
+
+      {/* Edit Agency Profile Modal */}
+      <Dialog open={editProfileOpen} onOpenChange={setEditProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Agency Profile</DialogTitle>
+            <DialogDescription>
+              Update your agency name and account type.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-agency-name">Agency Name</Label>
+              <Input
+                id="edit-agency-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Agency name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-account-type">Account Type</Label>
+              <Select value={editAccountType} onValueChange={setEditAccountType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agency">Agency</SelectItem>
+                  <SelectItem value="broker">Broker</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditProfileOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editName.trim() || !agencyId) return;
+                setSavingProfile(true);
+                try {
+                  const { data, error } = await supabase.functions.invoke('update-agency', {
+                    body: { agencyId, name: editName.trim(), account_type: editAccountType },
+                  });
+                  if (error || data?.error) {
+                    toast.error(data?.error || error?.message || 'Failed to update');
+                    return;
+                  }
+                  setAgencyName(editName.trim());
+                  setAgencyAccountType(editAccountType);
+                  setEditProfileOpen(false);
+                  toast.success('Agency profile updated!');
+                } catch (err) {
+                  toast.error('Failed to update agency profile');
+                } finally {
+                  setSavingProfile(false);
+                }
+              }}
+              disabled={savingProfile || !editName.trim()}
+            >
+              {savingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Set Password Modal */}
       <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>

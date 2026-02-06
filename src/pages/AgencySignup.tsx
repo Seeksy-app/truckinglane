@@ -36,6 +36,11 @@ const requestFormSchema = z.object({
 
 type Step = 'request' | 'submitted';
 
+const ACCOUNT_TYPE_OPTIONS = [
+  { value: 'agency', label: 'Agency' },
+  { value: 'broker', label: 'Broker' },
+];
+
 const AGENT_COUNT_OPTIONS = [
   { value: '1-2', label: '1-2 agents' },
   { value: '3-5', label: '3-5 agents' },
@@ -71,6 +76,7 @@ export default function AgencySignup() {
   const [zip, setZip] = useState('');
   const [agentCount, setAgentCount] = useState('');
   const [dailyLoadVolume, setDailyLoadVolume] = useState('');
+  const [accountType, setAccountType] = useState('agency');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,6 +145,7 @@ export default function AgencySignup() {
             zip,
             agentCount,
             dailyLoadVolume,
+            accountType,
           }),
         }
       );
@@ -187,6 +194,22 @@ export default function AgencySignup() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="accountType">Account Type</Label>
+                <Select value={accountType} onValueChange={setAccountType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="agencyName">Agency Name</Label>
                 <Input

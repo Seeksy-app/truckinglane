@@ -67,6 +67,7 @@ serve(async (req: Request) => {
       .from("agencies")
       .insert({
         name: request.agency_name,
+        account_type: request.account_type || 'agency',
       })
       .select()
       .single();

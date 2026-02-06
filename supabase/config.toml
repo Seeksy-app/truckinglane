@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.lookup-load]
 verify_jwt = false
 
+[functions.lookup-demo-load]
+verify_jwt = false
+
 [functions.create-lead]
 verify_jwt = false
 
@@ -112,4 +115,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.post-load-to-x]
+verify_jwt = false
+
+[functions.update-agency]
+verify_jwt = false
+
+[functions.public-stats]
 verify_jwt = false

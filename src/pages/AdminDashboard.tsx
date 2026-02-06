@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { 
   Users, Plus, Copy, Check, 
-  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil
+  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil, Phone, User
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -77,6 +77,7 @@ export default function AdminDashboard() {
   const [editContactName, setEditContactName] = useState('');
   const [editContactEmail, setEditContactEmail] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [agencyPhone, setAgencyPhone] = useState('');
   const [resending, setResending] = useState<string | null>(null);
   const [sendingLoginEmail, setSendingLoginEmail] = useState<string | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -111,6 +112,19 @@ export default function AdminDashboard() {
           setAgencyAccountType((agency as any).account_type || 'agency');
           setAgencyContactName((agency as any).main_contact_name || '');
           setAgencyContactEmail((agency as any).main_contact_email || '');
+        }
+
+        // Fetch agency main phone
+        const { data: phoneData } = await supabase
+          .from('agency_phone_numbers')
+          .select('phone_number, label')
+          .eq('agency_id', agencyId)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (phoneData) {
+          setAgencyPhone(phoneData.phone_number);
         }
 
         // Fetch agents
@@ -381,29 +395,59 @@ export default function AdminDashboard() {
       <AppHeader />
 
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Agency Info */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-6 w-6 text-muted-foreground" />
-            <h2 className="text-2xl font-bold">{agencyName || 'Your Agency'}</h2>
-            <Badge variant="outline" className="capitalize">{agencyAccountType}</Badge>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => {
-              setEditName(agencyName);
-              setEditAccountType(agencyAccountType);
-              setEditContactName(agencyContactName);
-              setEditContactEmail(agencyContactEmail);
-              setEditProfileOpen(true);
-            }}
-          >
-            <Pencil className="h-4 w-4" />
-            Edit Profile
-          </Button>
-        </div>
+        {/* Broker/Agency Profile Card */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Building2 className="h-7 w-7 text-primary" />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-bold">{agencyName || 'Your Agency'}</h2>
+                    <Badge variant="outline" className="capitalize">{agencyAccountType}</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                    {agencyContactName && (
+                      <div className="flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5" />
+                        <span>{agencyContactName}</span>
+                      </div>
+                    )}
+                    {agencyContactEmail && (
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        <span>{agencyContactEmail}</span>
+                      </div>
+                    )}
+                    {agencyPhone && (
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        <span>{agencyPhone.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 shrink-0"
+                onClick={() => {
+                  setEditName(agencyName);
+                  setEditAccountType(agencyAccountType);
+                  setEditContactName(agencyContactName);
+                  setEditContactEmail(agencyContactEmail);
+                  setEditProfileOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit Profile
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Add Agent Form */}

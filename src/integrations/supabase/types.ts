@@ -125,6 +125,7 @@ export type Database = {
       }
       agencies: {
         Row: {
+          account_type: string
           allowed_sender_domains: string[] | null
           created_at: string
           description: string | null
@@ -135,6 +136,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_type?: string
           allowed_sender_domains?: string[] | null
           created_at?: string
           description?: string | null
@@ -145,6 +147,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_type?: string
           allowed_sender_domains?: string[] | null
           created_at?: string
           description?: string | null
@@ -238,6 +241,7 @@ export type Database = {
       }
       agency_requests: {
         Row: {
+          account_type: string
           address_line1: string | null
           address_line2: string | null
           agency_name: string
@@ -261,6 +265,7 @@ export type Database = {
           zip: string | null
         }
         Insert: {
+          account_type?: string
           address_line1?: string | null
           address_line2?: string | null
           agency_name: string
@@ -284,6 +289,7 @@ export type Database = {
           zip?: string | null
         }
         Update: {
+          account_type?: string
           address_line1?: string | null
           address_line2?: string | null
           agency_name?: string

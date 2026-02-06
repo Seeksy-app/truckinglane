@@ -3,10 +3,11 @@ import { cn } from "@/lib/utils";
 interface LogoProps {
   className?: string;
   iconOnly?: boolean;
+  textColor?: string;
   size?: "sm" | "md" | "lg";
 }
 
-export const Logo = ({ className, iconOnly = false, size = "md" }: LogoProps) => {
+export const Logo = ({ className, iconOnly = false, textColor = "white", size = "md" }: LogoProps) => {
   const sizeClasses = {
     sm: { icon: "w-8 h-8", text: "text-lg" },
     md: { icon: "w-10 h-10", text: "text-xl" },
@@ -73,7 +74,10 @@ export const Logo = ({ className, iconOnly = false, size = "md" }: LogoProps) =>
       </div>
 
       {!iconOnly && (
-        <span className={cn("font-bold tracking-tight text-white", sizeClasses[size].text)}>
+        <span
+          className={cn("font-bold tracking-tight", sizeClasses[size].text)}
+          style={{ color: textColor }}
+        >
           Trucking Lane
         </span>
       )}

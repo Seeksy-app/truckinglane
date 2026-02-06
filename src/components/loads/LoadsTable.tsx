@@ -33,12 +33,13 @@ type SortOption = "none" | "template_type" | "pickup_city" | "pickup_state" | "d
 interface LoadsTableProps {
   loads: Load[];
   loading: boolean;
+  isDemo?: boolean;
   onRefresh: () => void;
 }
 
 const INITIAL_DISPLAY_COUNT = 25;
 
-export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
+export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsTableProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
@@ -47,9 +48,18 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
 
-  const handleNavigateToDetail = (loadId: string, e?: React.MouseEvent) => {
+  const handleNavigateToDetail = (
+    loadId: string,
+    load?: Load,
+    e?: React.MouseEvent,
+  ) => {
     e?.stopPropagation();
-    navigate(`/loads/${loadId}`);
+    if (load && isDemo) {
+      // For demo mode, pass the load data via state
+      navigate(`/loads/${loadId}`, { state: { demoLoad: load } });
+    } else {
+      navigate(`/loads/${loadId}`);
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -364,7 +374,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={(e) => handleNavigateToDetail(load.id, e)}
+                          onClick={(e) => handleNavigateToDetail(load.id, load, e)}
                           className="h-7 w-7 p-0"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -377,7 +387,7 @@ export function LoadsTable({ loads, loading, onRefresh }: LoadsTableProps) {
                 {expandedId === load.id && (
                   <TableRow key={`${load.id}-expanded`}>
                     <TableCell colSpan={10} className="p-0">
-                      <LoadExpandedRow load={load} onStatusChange={onRefresh} />
+                      <LoadExpandedRow load={load} isDemo={isDemo} onStatusChange={onRefresh} />
                     </TableCell>
                   </TableRow>
                 )}

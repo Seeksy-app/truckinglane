@@ -13,10 +13,11 @@ type Load = Tables<"loads">;
 
 interface LoadExpandedRowProps {
   load: Load;
+  isDemo?: boolean;
   onStatusChange: () => void;
 }
 
-export function LoadExpandedRow({ load, onStatusChange }: LoadExpandedRowProps) {
+export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadExpandedRowProps) {
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [coveredDialogOpen, setCoveredDialogOpen] = useState(false);
@@ -242,7 +243,7 @@ export function LoadExpandedRow({ load, onStatusChange }: LoadExpandedRowProps) 
 
         {/* Action Bar */}
         <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-          {load.status === "open" && (
+          {load.status === "open" && !isDemo && (
             <>
               <Button
                 size="sm"

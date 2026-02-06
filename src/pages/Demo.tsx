@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { DemoDataProvider, useDemoData } from "@/contexts/DemoDataContext";
-import { DashboardStats, DashboardMode } from "@/components/dashboard/DashboardStats";
+import {
+  DashboardStats,
+  DashboardMode,
+} from "@/components/dashboard/DashboardStats";
 import { LoadsTable } from "@/components/loads/LoadsTable";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { DemoAnalytics } from "@/components/demo/DemoAnalytics";
@@ -14,14 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, 
-  ArrowLeft, 
-  Sparkles, 
-  Phone, 
-  Package, 
-  TrendingUp, 
-  BarChart3, 
+import {
+  Search,
+  ArrowLeft,
+  Sparkles,
+  Phone,
+  Package,
+  TrendingUp,
+  BarChart3,
   Plug,
   Bell,
   User,
@@ -47,7 +50,7 @@ function DemoDashboardContent() {
   const [mode, setMode] = useState<DashboardMode>("open");
   const [searchQuery, setSearchQuery] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
-  
+
   // Rails state
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
@@ -62,25 +65,31 @@ function DemoDashboardContent() {
   }, []);
 
   // Stats for KPIs - daily counts
-  const stats = useMemo(() => ({
-    openToday: loads.filter((l) => l.status === "open" && l.is_active).length,
-    claimedToday: leads.filter((l) => l.status === "claimed").length,
-    pendingToday: leads.filter((l) => l.status === "pending").length,
-    aiCallsToday: calls.filter((c) => new Date(c.created_at) >= today).length,
-    bookedToday: leads.filter((l) => l.booked_at && new Date(l.booked_at) >= today).length,
-  }), [loads, leads, calls, today]);
+  const stats = useMemo(
+    () => ({
+      openToday: loads.filter((l) => l.status === "open" && l.is_active).length,
+      claimedToday: leads.filter((l) => l.status === "claimed").length,
+      pendingToday: leads.filter((l) => l.status === "pending").length,
+      aiCallsToday: calls.filter((c) => new Date(c.created_at) >= today).length,
+      bookedToday: leads.filter(
+        (l) => l.booked_at && new Date(l.booked_at) >= today,
+      ).length,
+    }),
+    [loads, leads, calls, today],
+  );
 
   // Apply filters
   const filteredLoads = useMemo(() => {
     let result = loads.filter((l) => l.status === "open" && l.is_active);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((l) =>
-        l.load_number?.toLowerCase().includes(q) ||
-        l.pickup_city?.toLowerCase().includes(q) ||
-        l.pickup_state?.toLowerCase().includes(q) ||
-        l.dest_city?.toLowerCase().includes(q) ||
-        l.dest_state?.toLowerCase().includes(q)
+      result = result.filter(
+        (l) =>
+          l.load_number?.toLowerCase().includes(q) ||
+          l.pickup_city?.toLowerCase().includes(q) ||
+          l.pickup_state?.toLowerCase().includes(q) ||
+          l.dest_city?.toLowerCase().includes(q) ||
+          l.dest_state?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -90,10 +99,11 @@ function DemoDashboardContent() {
     let result = leads.filter((l) => l.status === "claimed");
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((l) =>
-        l.caller_name?.toLowerCase().includes(q) ||
-        l.caller_phone?.toLowerCase().includes(q) ||
-        l.caller_company?.toLowerCase().includes(q)
+      result = result.filter(
+        (l) =>
+          l.caller_name?.toLowerCase().includes(q) ||
+          l.caller_phone?.toLowerCase().includes(q) ||
+          l.caller_company?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -103,10 +113,11 @@ function DemoDashboardContent() {
     let result = leads.filter((l) => l.status === "pending");
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((l) =>
-        l.caller_name?.toLowerCase().includes(q) ||
-        l.caller_phone?.toLowerCase().includes(q) ||
-        l.caller_company?.toLowerCase().includes(q)
+      result = result.filter(
+        (l) =>
+          l.caller_name?.toLowerCase().includes(q) ||
+          l.caller_phone?.toLowerCase().includes(q) ||
+          l.caller_company?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -116,22 +127,26 @@ function DemoDashboardContent() {
     let result = calls.filter((c) => new Date(c.created_at) >= today);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((c) =>
-        c.caller_phone?.toLowerCase().includes(q) ||
-        c.receiver_phone?.toLowerCase().includes(q)
+      result = result.filter(
+        (c) =>
+          c.caller_phone?.toLowerCase().includes(q) ||
+          c.receiver_phone?.toLowerCase().includes(q),
       );
     }
     return result;
   }, [calls, today, searchQuery]);
 
   const filteredBookedLeads = useMemo(() => {
-    let result = leads.filter((l) => l.booked_at && new Date(l.booked_at) >= today);
+    let result = leads.filter(
+      (l) => l.booked_at && new Date(l.booked_at) >= today,
+    );
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((l) =>
-        l.caller_name?.toLowerCase().includes(q) ||
-        l.caller_phone?.toLowerCase().includes(q) ||
-        l.caller_company?.toLowerCase().includes(q)
+      result = result.filter(
+        (l) =>
+          l.caller_name?.toLowerCase().includes(q) ||
+          l.caller_phone?.toLowerCase().includes(q) ||
+          l.caller_company?.toLowerCase().includes(q),
       );
     }
     return result;
@@ -140,11 +155,16 @@ function DemoDashboardContent() {
   // Get current filtered data
   const getCurrentData = () => {
     switch (mode) {
-      case "open": return filteredLoads;
-      case "claimed": return filteredClaimedLeads;
-      case "pending": return filteredPendingLeads;
-      case "calls": return filteredCalls;
-      case "booked": return filteredBookedLeads;
+      case "open":
+        return filteredLoads;
+      case "claimed":
+        return filteredClaimedLeads;
+      case "pending":
+        return filteredPendingLeads;
+      case "calls":
+        return filteredCalls;
+      case "booked":
+        return filteredBookedLeads;
     }
   };
 
@@ -153,7 +173,11 @@ function DemoDashboardContent() {
     console.log("[Demo] Claim lead:", leadId);
   };
 
-  const handleUpdateStatus = (leadId: string, status: LeadStatus, action?: 'release' | 'reopen') => {
+  const handleUpdateStatus = (
+    leadId: string,
+    status: LeadStatus,
+    action?: "release" | "reopen",
+  ) => {
     console.log("[Demo] Update status:", leadId, status, action);
   };
 
@@ -178,14 +202,17 @@ function DemoDashboardContent() {
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">
               <Link to="/" className="flex items-center gap-2">
-                <Logo size="sm" />
+                <Logo size="sm" textColor="black" />
               </Link>
-              <Badge variant="outline" className="bg-[hsl(25,95%,53%)]/10 text-[hsl(25,95%,53%)] border-[hsl(25,95%,53%)]/30">
+              <Badge
+                variant="outline"
+                className="bg-[hsl(25,95%,53%)]/10 text-[hsl(25,95%,53%)] border-[hsl(25,95%,53%)]/30"
+              >
                 <Sparkles className="h-3 w-3 mr-1" />
                 Demo Mode
               </Badge>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
@@ -195,7 +222,10 @@ function DemoDashboardContent() {
                 <User className="h-5 w-5" />
               </Button>
               <Link to="/auth">
-                <Button variant="default" className="bg-[hsl(25,95%,53%)] hover:bg-[hsl(25,95%,45%)] text-white">
+                <Button
+                  variant="default"
+                  className="bg-[hsl(25,95%,53%)] hover:bg-[hsl(25,95%,45%)] text-white"
+                >
                   Get Started
                 </Button>
               </Link>
@@ -228,7 +258,11 @@ function DemoDashboardContent() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Main Tabs Navigation */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DemoTab)} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as DemoTab)}
+          className="space-y-6"
+        >
           <TabsList className="bg-card border border-border">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
@@ -238,7 +272,10 @@ function DemoDashboardContent() {
               <BarChart3 className="h-4 w-4" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="flex items-center gap-2">
+            <TabsTrigger
+              value="integrations"
+              className="flex items-center gap-2"
+            >
               <Plug className="h-4 w-4" />
               Integrations
             </TabsTrigger>
@@ -248,14 +285,20 @@ function DemoDashboardContent() {
           <TabsContent value="dashboard" className="space-y-4">
             {/* Welcome Banner with name + weather */}
             <DemoWelcomeBanner />
-            
+
             {/* KPI Cards as view toggles */}
-            <DashboardStats stats={stats} activeMode={mode} onModeChange={setMode} />
+            <DashboardStats
+              stats={stats}
+              activeMode={mode}
+              onModeChange={setMode}
+            />
 
             {/* Controls bar */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-foreground">{modeTitles[mode]}</h2>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {modeTitles[mode]}
+                </h2>
                 <span className="text-sm text-muted-foreground">
                   ({getCurrentData().length} items)
                 </span>
@@ -279,10 +322,16 @@ function DemoDashboardContent() {
                 onValueChange={(v) => v && setOwnerFilter(v as "all" | "my")}
                 className="border border-border rounded-md bg-card"
               >
-                <ToggleGroupItem value="all" className="px-4 text-sm data-[state=on]:bg-muted">
+                <ToggleGroupItem
+                  value="all"
+                  className="px-4 text-sm data-[state=on]:bg-muted"
+                >
                   {ownerLabels[mode].all}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="my" className="px-4 text-sm data-[state=on]:bg-muted">
+                <ToggleGroupItem
+                  value="my"
+                  className="px-4 text-sm data-[state=on]:bg-muted"
+                >
                   {ownerLabels[mode].my}
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -290,12 +339,21 @@ function DemoDashboardContent() {
 
             {/* Content based on mode */}
             {mode === "open" && (
-              <LoadsTable loads={filteredLoads} loading={false} onRefresh={handleRefresh} />
+              <LoadsTable
+                loads={filteredLoads}
+                loading={false}
+                isDemo={true}
+                onRefresh={handleRefresh}
+              />
             )}
 
             {(mode === "claimed" || mode === "pending") && (
               <LeadsTable
-                leads={mode === "claimed" ? filteredClaimedLeads : filteredPendingLeads}
+                leads={
+                  mode === "claimed"
+                    ? filteredClaimedLeads
+                    : filteredPendingLeads
+                }
                 isLoading={false}
                 currentUserId="demo-user"
                 onClaimLead={handleClaimLead}
@@ -307,38 +365,63 @@ function DemoDashboardContent() {
               <div className="rounded-lg border border-border bg-card overflow-hidden">
                 {filteredCalls.length === 0 ? (
                   <div className="p-12 text-center">
-                    <p className="text-lg font-medium text-foreground">No calls today</p>
-                    <p className="text-sm text-muted-foreground mt-1">AI calls will appear here as they come in</p>
+                    <p className="text-lg font-medium text-foreground">
+                      No calls today
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      AI calls will appear here as they come in
+                    </p>
                   </div>
                 ) : (
                   <table className="w-full">
                     <thead className="bg-muted/50 border-b border-border">
                       <tr className="text-left text-xs uppercase tracking-wide">
-                        <th className="px-4 py-3 font-medium text-muted-foreground">Caller</th>
-                        <th className="px-4 py-3 font-medium text-muted-foreground">Receiver</th>
-                        <th className="px-4 py-3 font-medium text-muted-foreground">Status</th>
-                        <th className="px-4 py-3 font-medium text-muted-foreground">Duration</th>
-                        <th className="px-4 py-3 font-medium text-muted-foreground">Time</th>
+                        <th className="px-4 py-3 font-medium text-muted-foreground">
+                          Caller
+                        </th>
+                        <th className="px-4 py-3 font-medium text-muted-foreground">
+                          Receiver
+                        </th>
+                        <th className="px-4 py-3 font-medium text-muted-foreground">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 font-medium text-muted-foreground">
+                          Duration
+                        </th>
+                        <th className="px-4 py-3 font-medium text-muted-foreground">
+                          Time
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {filteredCalls.map((call) => (
-                        <tr key={call.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-mono text-sm">{call.caller_phone}</td>
-                          <td className="px-4 py-3 font-mono text-sm">{call.receiver_phone}</td>
+                        <tr
+                          key={call.id}
+                          className="hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="px-4 py-3 font-mono text-sm">
+                            {call.caller_phone}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-sm">
+                            {call.receiver_phone}
+                          </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs font-medium rounded ${
-                              call.call_status === "completed" 
-                                ? "bg-[hsl(145,63%,42%)]/15 text-[hsl(145,63%,35%)]" 
-                                : call.call_status === "in_progress" 
-                                ? "bg-[hsl(210,80%,45%)]/15 text-[hsl(210,80%,40%)]" 
-                                : "bg-destructive/15 text-destructive"
-                            }`}>
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded ${
+                                call.call_status === "completed"
+                                  ? "bg-[hsl(145,63%,42%)]/15 text-[hsl(145,63%,35%)]"
+                                  : call.call_status === "in_progress"
+                                    ? "bg-[hsl(210,80%,45%)]/15 text-[hsl(210,80%,40%)]"
+                                    : "bg-destructive/15 text-destructive"
+                              }`}
+                            >
                               {call.call_status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {call.duration_seconds ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : "—"}
+                            {call.duration_seconds
+                              ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`
+                              : "—"}
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
                             {new Date(call.created_at).toLocaleTimeString()}
@@ -377,17 +460,27 @@ function DemoDashboardContent() {
       {/* Demo CTA Footer */}
       <div className="border-t border-border bg-gradient-to-r from-[hsl(220,15%,15%)] to-[hsl(220,15%,20%)] mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
-          <h3 className="text-2xl font-bold text-white mb-2">Ready to transform your brokerage?</h3>
+          <h3 className="text-2xl font-bold text-white mb-2">
+            Ready to transform your brokerage?
+          </h3>
           <p className="text-white/70 mb-6 max-w-xl mx-auto">
-            Let AI handle your calls 24/7, qualify leads automatically, and book more loads.
+            Let AI handle your calls 24/7, qualify leads automatically, and book
+            more loads.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/auth">
-              <Button size="lg" className="bg-[hsl(25,95%,53%)] hover:bg-[hsl(25,95%,45%)] text-white px-8">
+              <Button
+                size="lg"
+                className="bg-[hsl(25,95%,53%)] hover:bg-[hsl(25,95%,45%)] text-white px-8"
+              >
                 Start Free Trial
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10">
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/30 text-white hover:bg-white/10"
+            >
               Schedule a Demo
             </Button>
           </div>

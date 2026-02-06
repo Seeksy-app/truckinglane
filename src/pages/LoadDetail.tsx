@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -172,9 +172,12 @@ function LoadPermissionDenied({ onBack }: { onBack: () => void }) {
 function LoadDetailContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const demoLoad = (location.state as any)?.demoLoad as Load | undefined;
 
   // Debug logging (dev only)
   if (process.env.NODE_ENV === "development") {
@@ -193,6 +196,11 @@ function LoadDetailContent() {
   const { data: load, isLoading, error, isError } = useQuery({
     queryKey: ["load", id],
     queryFn: async () => {
+      if (demoLoad) {
+        console.log("[LoadDetail] Using demo load:", demoLoad.id);
+        return demoLoad;
+      }
+
       console.log("[LoadDetail] Fetching load:", id);
       
       const { data, error } = await supabase
@@ -213,7 +221,7 @@ function LoadDetailContent() {
       
       return data;
     },
-    enabled: !!user && !!id,
+    enabled: !!id && (!!user || !!demoLoad),
     retry: (failureCount, error) => {
       // Don't retry permission errors
       if (error instanceof Error && error.message === "PERMISSION_DENIED") {
@@ -334,6 +342,7 @@ function LoadDetailContent() {
           </div>
 
           {/* Actions */}
+          {!demoLoad && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-3">
@@ -374,6 +383,7 @@ function LoadDetailContent() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Route Details */}
           <Card>

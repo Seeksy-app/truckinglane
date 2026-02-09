@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";
 import { LoadsTable } from "@/components/loads/LoadsTable";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";

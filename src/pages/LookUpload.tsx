@@ -1,4 +1,3 @@
-export default LookUpload;
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";

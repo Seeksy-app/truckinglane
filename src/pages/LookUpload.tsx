@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";
-import { LoadsTable } from "@/components/loads/LoadsTable";
+import { LookUploadTable } from "@/components/lookupload/LookUploadTable";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +25,6 @@ const LookUpload = () => {
         const destCity = l.dest_city?.toLowerCase().trim() || "";
         const destState = l.dest_state?.toLowerCase().trim() || "";
         return searchTerms.some((term) => {
-          // For 2-letter state abbreviations, use exact match on state fields only
           if (isStateAbbr && term.length === 2) {
             return pickupState === term || destState === term;
           }
@@ -61,8 +60,8 @@ const LookUpload = () => {
           />
         </div>
 
-        {/* Open Loads Table - same as Dashboard */}
-        <LoadsTable loads={filteredOpenLoads} loading={loading} onRefresh={refetch} />
+        {/* Open Loads Table */}
+        <LookUploadTable loads={filteredOpenLoads} loading={loading} onRefresh={refetch} />
       </main>
     </div>
   );

@@ -3,10 +3,9 @@ import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadDetailsGrid, formatLoadNotes } from "./LoadNotes";
-import { Copy, Check, UserCheck, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Copy, Check, Smartphone, Bot } from "lucide-react";
 import { toast } from "sonner";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { AIAssistantDrawer } from "@/components/dashboard/AIAssistantDrawer";
 
 type Load = Tables<"loads">;
 
@@ -14,11 +13,9 @@ interface LookUploadExpandedRowProps {
   load: Load;
   onStatusChange: () => void;
 }
-
 export function LookUploadExpandedRow({ load, onStatusChange }: LookUploadExpandedRowProps) {
   const [copied, setCopied] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [coveredDialogOpen, setCoveredDialogOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const handleCopyNotes = async () => {
     const notes = formatLoadNotes(load);
@@ -28,71 +25,34 @@ export function LookUploadExpandedRow({ load, onStatusChange }: LookUploadExpand
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleClaimLoad = async () => {
-    setUpdating(true);
+  const handleCopyMobileNumber = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const now = new Date().toISOString();
-
-      const { error } = await supabase
-        .from("loads")
-        .update({
-          status: "claimed",
-          claimed_by: user.id,
-          claimed_at: now,
-        })
-        .eq("id", load.id);
-
-      if (error) throw error;
-      toast.success("Load claimed");
-      onStatusChange();
+      const candidates: unknown[] = [
+        load.load_call_script,
+        load.pickup_location_raw,
+        load.dest_location_raw,
+        load.source_row,
+      ];
+      let phone: string | null = null;
+      for (const c of candidates) {
+        phone = findPhoneInUnknown(c);
+        if (phone) break;
+      }
+      if (!phone) {
+        toast.error("No mobile number found for this load");
+        return;
+      }
+      await navigator.clipboard.writeText(phone);
+      toast.success("Mobile number copied");
     } catch (error) {
-      console.error("Claim load error:", error);
-      toast.error("Failed to claim load");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleCloseCovered = async () => {
-    setUpdating(true);
-    setCoveredDialogOpen(false);
-    try {
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from("loads")
-        .update({
-          status: "closed",
-          closed_at: now,
-          close_reason: "covered",
-        })
-        .eq("id", load.id);
-
-      if (error) throw error;
-
-      toast.success("Load closed as covered");
-      onStatusChange();
-    } catch (error) {
-      console.error("Close covered error:", error);
-      toast.error("Failed to close load");
-    } finally {
-      setUpdating(false);
+      console.error("Copy mobile number error:", error);
+      toast.error("Failed to copy mobile number");
     }
   };
 
   return (
     <>
-      <ConfirmDialog
-        open={coveredDialogOpen}
-        onOpenChange={setCoveredDialogOpen}
-        title="Close Load as Covered"
-        description="This load has been covered by another carrier. No callback is needed."
-        confirmLabel="Close as Covered"
-        onConfirm={handleCloseCovered}
-      />
+      <AIAssistantDrawer open={aiOpen} onOpenChange={setAiOpen} agencyId={load.agency_id ?? null} />
 
       <div className="bg-muted/20 border-t px-4 py-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
@@ -128,19 +88,13 @@ export function LookUploadExpandedRow({ load, onStatusChange }: LookUploadExpand
 
         {/* Action bar – only open-load buttons; change here without affecting Dashboard */}
         <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-          <Button size="sm" onClick={handleClaimLoad} disabled={updating} className="gap-1.5 h-8">
-            <UserCheck className="h-3.5 w-3.5" />
+          <Button size="sm" onClick={handleCopyMobileNumber} className="gap-1.5 h-8">
+            <Smartphone className="h-3.5 w-3.5" />
             Mobile Number
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setCoveredDialogOpen(true)}
-            disabled={updating}
-            className="gap-1.5 h-8 border-green-500/30 text-green-700 hover:bg-green-500/10"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Chat With AI
+          <Button size="sm" variant="outline" onClick={() => setAiOpen(true)} className="gap-1.5 h-8">
+            <Bot className="h-3.5 w-3.5" />
+            Chat with AI
           </Button>
         </div>
       </div>

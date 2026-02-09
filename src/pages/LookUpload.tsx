@@ -6,7 +6,7 @@ import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { useAuth } from "@/hooks/useAuth";
 
-const OpenLoadsPage = () => {
+const LookUpload = () => {
   const { user } = useAuth();
   const { loads, loading, refetch } = useLoads();
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,4 +69,4 @@ const OpenLoadsPage = () => {
   );
 };
 
-export default OpenLoadsPage;
+export default LookUpload;

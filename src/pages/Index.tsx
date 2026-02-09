@@ -106,7 +106,7 @@ function HeroSection() {
           <Logo size="md" />
           <div className="flex gap-3">
             <Button asChild variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10">
-              <Link to="">Look Up Loads</Link>
+              <Link to="/look-upload">Look Up Loads</Link>
             </Button>
             <Button asChild variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10">
               <Link to="/demo">Try Demo</Link>

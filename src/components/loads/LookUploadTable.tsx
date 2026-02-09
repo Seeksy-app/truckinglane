@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Package, ArrowUpDown, Filter, X, ExternalLink } from "lucide-react";
-import { OpenLoadExpandedRow } from "./LookUploadExpandedRow";
+import { LookUploadExpandedRow } from "./LookUploadExpandedRow";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -302,7 +302,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
               {expandedId === load.id && (
                 <TableRow key={`${load.id}-expanded`}>
                   <TableCell colSpan={10} className="p-0">
-                    <OpenLoadExpandedRow load={load} onStatusChange={onRefresh} />
+                    <LookUploadExpandedRow load={load} onStatusChange={onRefresh} />
                   </TableCell>
                 </TableRow>
               )}

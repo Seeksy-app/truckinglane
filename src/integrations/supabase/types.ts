@@ -899,6 +899,7 @@ export type Database = {
           id: string
           intent_reason_breakdown: Json | null
           intent_score: number | null
+          is_active: boolean | null
           is_high_intent: boolean | null
           last_contact_attempt_at: string | null
           load_id: string | null
@@ -932,6 +933,7 @@ export type Database = {
           id?: string
           intent_reason_breakdown?: Json | null
           intent_score?: number | null
+          is_active?: boolean | null
           is_high_intent?: boolean | null
           last_contact_attempt_at?: string | null
           load_id?: string | null
@@ -965,6 +967,7 @@ export type Database = {
           id?: string
           intent_reason_breakdown?: Json | null
           intent_score?: number | null
+          is_active?: boolean | null
           is_high_intent?: boolean | null
           last_contact_attempt_at?: string | null
           load_id?: string | null

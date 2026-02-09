@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";
-import { LookUploadTable } from "@/components/loads/LookUploadTable";
+import { OpenLoadsTable } from "@/components/loads/LookUploadTable";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { useAuth } from "@/hooks/useAuth";
@@ -61,7 +61,7 @@ const LookUpload = () => {
         </div>
 
         {/* Open Loads Table */}
-        <LookUploadTable loads={filteredOpenLoads} loading={loading} onRefresh={refetch} />
+        <OpenLoadsTable loads={filteredOpenLoads} loading={loading} onRefresh={refetch} />
       </main>
     </div>
   );

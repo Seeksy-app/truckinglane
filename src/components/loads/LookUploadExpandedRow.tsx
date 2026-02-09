@@ -9,6 +9,13 @@ import { AIAssistantDrawer } from "@/components/dashboard/AIAssistantDrawer";
 
 type Load = Tables<"loads">;
 
+function findPhoneInUnknown(value: unknown): string | null {
+  if (!value) return null;
+  const str = typeof value === "string" ? value : JSON.stringify(value);
+  const match = str.match(/(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4})/);
+  return match ? match[1].trim() : null;
+}
+
 interface LookUploadExpandedRowProps {
   load: Load;
   onStatusChange: () => void;

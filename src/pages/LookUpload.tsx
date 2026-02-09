@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";
 import { LoadsTable } from "@/components/loads/LoadsTable";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
@@ -49,7 +48,6 @@ const LookUpload = () => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-serif font-semibold">Open Loads</h1>
-          <p className="text-sm text-muted-foreground mt-1">All active open loads ready to be booked</p>
         </div>
 
         {/* Search bar - same as Dashboard */}

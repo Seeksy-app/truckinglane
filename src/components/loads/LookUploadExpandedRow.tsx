@@ -23,6 +23,7 @@ interface LookUploadExpandedRowProps {
   load: Load;
   onStatusChange: () => void;
 }
+
 export function LookUploadExpandedRow({ load, onStatusChange }: LookUploadExpandedRowProps) {
   const [copied, setCopied] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);

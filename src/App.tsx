@@ -34,6 +34,7 @@ import CompleteAgencySetup from "./pages/CompleteAgencySetup";
 import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
+import LookUpload from "./pages/LookUpload";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -225,6 +226,7 @@ const App = () => (
                   <ProspectingQueue />
                 </AdminRoute>
               } />
+              <Route path="/look-upload" element={<LookUpload />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

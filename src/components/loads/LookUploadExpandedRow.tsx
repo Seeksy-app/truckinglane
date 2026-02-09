@@ -76,7 +76,7 @@ export function LookUploadExpandedRow({ load }: LookUploadExpandedRowProps) {
                 className="gap-1.5 h-8"
               >
                 <UserCheck className="h-3.5 w-3.5" />
-                Claim Load
+                Mobile Number
               </Button>
               <Button
                 size="sm"
@@ -86,7 +86,7 @@ export function LookUploadExpandedRow({ load }: LookUploadExpandedRowProps) {
                 className="gap-1.5 h-8 border-green-500/30 text-green-700 hover:bg-green-500/10"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Close as Covered
+                Chat With AI
               </Button>
             </>
           )}

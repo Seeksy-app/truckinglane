@@ -46,12 +46,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   const isLoading = authLoading || roleLoading;
 
-  console.log('[ProtectedRoute] State:', { 
-    user: user?.id, 
-    role, 
-    authLoading, 
-    roleLoading, 
-    isLoading 
+  console.log("[ProtectedRoute] State:", {
+    user: user?.id,
+    role,
+    authLoading,
+    roleLoading,
+    isLoading,
   });
 
   if (isLoading) {
@@ -63,17 +63,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    console.log('[ProtectedRoute] No user, redirecting to /auth');
+    console.log("[ProtectedRoute] No user, redirecting to /auth");
     return <Navigate to="/auth" replace />;
   }
 
   // User is logged in but has no agency membership
   if (!role) {
-    console.log('[ProtectedRoute] No role found, redirecting to /access-denied');
+    console.log("[ProtectedRoute] No role found, redirecting to /access-denied");
     return <Navigate to="/access-denied" replace />;
   }
 
-  console.log('[ProtectedRoute] Access granted with role:', role);
+  console.log("[ProtectedRoute] Access granted with role:", role);
   return <>{children}</>;
 }
 
@@ -83,7 +83,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { role, loading: roleLoading } = useUserRole();
 
   const isLoading = authLoading || roleLoading;
-  const isAdmin = role === 'agency_admin' || role === 'super_admin';
+  const isAdmin = role === "agency_admin" || role === "super_admin";
 
   if (isLoading) {
     return (
@@ -98,7 +98,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAdmin) {
-    console.log('[AdminRoute] User is not admin, redirecting to /dashboard');
+    console.log("[AdminRoute] User is not admin, redirecting to /dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -124,7 +124,7 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (role !== 'super_admin') {
+  if (role !== "super_admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -141,6 +141,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/look-upload" element={<LookUpload />} />
               <Route path="/demo" element={<Demo />} />
               <Route path="/extension" element={<Extension />} />
               <Route path="/trust" element={<Trust />} />
@@ -156,77 +157,118 @@ const App = () => (
               <Route path="/access-denied" element={<AccessDenied />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Protected routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/platform" element={
-                <SuperAdminRoute>
-                  <SuperAdminDashboard />
-                </SuperAdminRoute>
-              } />
-              <Route path="/admin/dashboard" element={
-                <ProtectedRoute>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/leads/:id" element={
-                <ProtectedRoute>
-                  <LeadDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/loads/:id" element={
-                <ProtectedRoute>
-                  <LoadDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/analytics" element={
-                <ProtectedRoute>
-                  <Analytics />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings/notifications" element={
-                <ProtectedRoute>
-                  <NotificationSettings />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/my-keywords" element={
-                <ProtectedRoute>
-                  <MyKeywords />
-                </ProtectedRoute>
-              } />
-              <Route path="/business-development" element={
-                <ProtectedRoute>
-                  <BusinessDevelopment />
-                </ProtectedRoute>
-              } />
-              <Route path="/lead-discovery" element={
-                <AdminRoute>
-                  <LeadDiscovery />
-                </AdminRoute>
-              } />
-              <Route path="/accounts" element={
-                <AdminRoute>
-                  <Accounts />
-                </AdminRoute>
-              } />
-              <Route path="/accounts/:id" element={
-                <AdminRoute>
-                  <AccountDetail />
-                </AdminRoute>
-              } />
-              <Route path="/prospecting" element={
-                <AdminRoute>
-                  <ProspectingQueue />
-                </AdminRoute>
-              } />
-              <Route path="/look-upload" element={<LookUpload />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/platform"
+                element={
+                  <SuperAdminRoute>
+                    <SuperAdminDashboard />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/leads/:id"
+                element={
+                  <ProtectedRoute>
+                    <LeadDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/loads/:id"
+                element={
+                  <ProtectedRoute>
+                    <LoadDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute>
+                    <Analytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/notifications"
+                element={
+                  <ProtectedRoute>
+                    <NotificationSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-keywords"
+                element={
+                  <ProtectedRoute>
+                    <MyKeywords />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/business-development"
+                element={
+                  <ProtectedRoute>
+                    <BusinessDevelopment />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/lead-discovery"
+                element={
+                  <AdminRoute>
+                    <LeadDiscovery />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/accounts"
+                element={
+                  <AdminRoute>
+                    <Accounts />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/accounts/:id"
+                element={
+                  <AdminRoute>
+                    <AccountDetail />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/prospecting"
+                element={
+                  <AdminRoute>
+                    <ProspectingQueue />
+                  </AdminRoute>
+                }
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

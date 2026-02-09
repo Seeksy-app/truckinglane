@@ -1,36 +1,19 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tables } from "@/integrations/supabase/types";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Package, ArrowUpDown, Filter, X, ExternalLink } from "lucide-react";
-import { LookUploadExpandedRow } from "./LookUploadExpandedRow";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { OpenLoadExpandedRow } from "./LookUploadExpandedRow";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Load = Tables<"loads">;
 
 type SortOption = "none" | "template_type" | "pickup_city" | "pickup_state" | "dest_city" | "dest_state";
 
-interface LookUploadTableProps {
+interface OpenLoadsTableProps {
   loads: Load[];
   loading: boolean;
   onRefresh: () => void;
@@ -38,7 +21,7 @@ interface LookUploadTableProps {
 
 const INITIAL_DISPLAY_COUNT = 25;
 
-export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTableProps) {
+export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
@@ -46,6 +29,11 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
   const [pickupStateFilter, setPickupStateFilter] = useState<string>("all");
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+
+  // Defensive: even if parent passes mixed statuses, only render active open loads here.
+  const openLoads = useMemo(() => {
+    return loads.filter((l) => l.status === "open" && l.is_active);
+  }, [loads]);
 
   const handleNavigateToDetail = (loadId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -60,13 +48,11 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
     const pickupSet = new Set<string>();
     const destSet = new Set<string>();
     const clientSet = new Set<string>();
-
-    loads.forEach((load) => {
+    openLoads.forEach((load) => {
       if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
       if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
       if (load.template_type) clientSet.add(load.template_type);
     });
-
     return {
       pickupStates: Array.from(pickupSet).sort(),
       destStates: Array.from(destSet).sort(),
@@ -75,21 +61,15 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
         return (order[a] || 99) - (order[b] || 99);
       }),
     };
-  }, [loads]);
+  }, [openLoads]);
 
   const filteredAndSortedLoads = useMemo(() => {
-    let result = loads;
-
-    if (clientFilter !== "all") {
-      result = result.filter((l) => l.template_type === clientFilter);
-    }
-    if (pickupStateFilter !== "all") {
+    let result = openLoads;
+    if (clientFilter !== "all") result = result.filter((l) => l.template_type === clientFilter);
+    if (pickupStateFilter !== "all")
       result = result.filter((l) => l.pickup_state?.trim().toUpperCase() === pickupStateFilter);
-    }
-    if (destStateFilter !== "all") {
+    if (destStateFilter !== "all")
       result = result.filter((l) => l.dest_state?.trim().toUpperCase() === destStateFilter);
-    }
-
     if (sortBy !== "none") {
       result = [...result].sort((a, b) => {
         if (sortBy === "template_type") {
@@ -101,33 +81,17 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
         return aVal.localeCompare(bVal);
       });
     }
-
     return result;
-  }, [loads, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
+  }, [openLoads, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
 
   const hasActiveFilters = clientFilter !== "all" || pickupStateFilter !== "all" || destStateFilter !== "all";
-
   const clearFilters = () => {
     setClientFilter("all");
     setPickupStateFilter("all");
     setDestStateFilter("all");
   };
 
-  const formatRate = (load: Load): { display: string; isPerTon: boolean } => {
-    if (load.is_per_ton) {
-      if (load.rate_raw && load.rate_raw > 0) {
-        return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: true };
-      }
-      return { display: "TBD", isPerTon: false };
-    }
-    if (load.customer_invoice_total && load.customer_invoice_total > 0) {
-      return { display: `$${load.customer_invoice_total.toLocaleString()}`, isPerTon: false };
-    }
-    if (load.rate_raw && load.rate_raw > 0) {
-      return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: false };
-    }
-    return { display: "TBD", isPerTon: false };
-  };
+  const openBadgeClass = "bg-[hsl(25,95%,53%)]/15 text-[hsl(25,95%,40%)] border-[hsl(25,95%,53%)]/30";
 
   if (loading) {
     return (
@@ -137,19 +101,29 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
     );
   }
 
-  if (loads.length === 0) {
+  if (openLoads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Package className="h-12 w-12 mb-4 opacity-50" />
         <p className="text-lg font-medium">No open loads found</p>
-        <p className="text-sm">Import a CSV file to get started</p>
+        <p className="text-sm">Only active open loads are shown here</p>
       </div>
     );
   }
 
+  const formatRate = (load: Load): { display: string; isPerTon: boolean } => {
+    if (load.is_per_ton) {
+      if (load.rate_raw && load.rate_raw > 0) return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: true };
+      return { display: "TBD", isPerTon: false };
+    }
+    if (load.customer_invoice_total && load.customer_invoice_total > 0)
+      return { display: `$${load.customer_invoice_total.toLocaleString()}`, isPerTon: false };
+    if (load.rate_raw && load.rate_raw > 0) return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: false };
+    return { display: "TBD", isPerTon: false };
+  };
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      {/* Sort & Filter Controls */}
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -168,9 +142,7 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
             </SelectContent>
           </Select>
         </div>
-
         <div className="h-6 w-px bg-border hidden sm:block" />
-
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Client:</span>
@@ -188,7 +160,6 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
             </SelectContent>
           </Select>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
@@ -198,12 +169,13 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
             <SelectContent className="bg-popover max-h-[300px]">
               <SelectItem value="all">All States</SelectItem>
               {pickupStates.map((state) => (
-                <SelectItem key={state} value={state}>{state}</SelectItem>
+                <SelectItem key={state} value={state}>
+                  {state}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Delivery:</span>
           <Select value={destStateFilter} onValueChange={setDestStateFilter}>
@@ -213,22 +185,26 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
             <SelectContent className="bg-popover max-h-[300px]">
               <SelectItem value="all">All States</SelectItem>
               {destStates.map((state) => (
-                <SelectItem key={state} value={state}>{state}</SelectItem>
+                <SelectItem key={state} value={state}>
+                  {state}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-muted-foreground hover:text-foreground">
-            <X className="h-4 w-4 mr-1" />
-            Clear
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4 mr-1" /> Clear
           </Button>
         )}
-
         {hasActiveFilters && (
           <span className="text-xs text-muted-foreground">
-            Showing {filteredAndSortedLoads.length} of {loads.length}
+            Showing {filteredAndSortedLoads.length} of {openLoads.length}
           </span>
         )}
       </div>
@@ -239,12 +215,23 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
             <TableHead className="w-10"></TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Load #</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Client</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Ship Date</TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
+              Ship Date
+            </TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Pickup</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Delivery</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">Invoice</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">Target Pay</TableHead>
-            <TableHead className="w-[60px] text-xs uppercase tracking-wide font-medium text-muted-foreground">Actions</TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
+              Delivery
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">
+              Invoice
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">
+              Target Pay
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
+            <TableHead className="w-[60px] text-xs uppercase tracking-wide font-medium text-muted-foreground">
+              Actions
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -256,11 +243,7 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
                 onClick={() => toggleExpand(load.id)}
               >
                 <TableCell>
-                  {expandedId === load.id ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                  {expandedId === load.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>
                 <TableCell className="font-medium">{load.load_number || "—"}</TableCell>
                 <TableCell>
@@ -295,9 +278,10 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
                   })()}
                 </TableCell>
                 <TableCell className="text-right">
-                  {load.target_pay && load.target_pay > 0
-                    ? `$${load.target_pay.toLocaleString()}`
-                    : "TBD"}
+                  {load.target_pay && load.target_pay > 0 ? `$${load.target_pay.toLocaleString()}` : "TBD"}
+                </TableCell>
+                <TableCell>
+                  <Badge className={openBadgeClass}>Open</Badge>
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Tooltip>
@@ -317,8 +301,8 @@ export function LookUploadTable({ loads, loading, onRefresh }: LookUploadTablePr
               </TableRow>
               {expandedId === load.id && (
                 <TableRow key={`${load.id}-expanded`}>
-                  <TableCell colSpan={9} className="p-0">
-                    <LookUploadExpandedRow load={load} />
+                  <TableCell colSpan={10} className="p-0">
+                    <OpenLoadExpandedRow load={load} onStatusChange={onRefresh} />
                   </TableCell>
                 </TableRow>
               )}

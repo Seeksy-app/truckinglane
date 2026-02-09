@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLoads } from "@/hooks/useLoads";
-import { LookUploadTable } from "@/components/lookupload/LookUploadTable";
+import { LookUploadTable } from "@/components/loads/LookUploadTable";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { useAuth } from "@/hooks/useAuth";

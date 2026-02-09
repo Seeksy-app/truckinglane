@@ -875,6 +875,137 @@ export type Database = {
           },
         ]
       }
+      demo_leads: {
+        Row: {
+          agency_id: string
+          booked_at: string | null
+          booked_by: string | null
+          callback_requested_at: string | null
+          caller_company: string | null
+          caller_name: string | null
+          caller_phone: string
+          carrier_mc: string | null
+          carrier_name: string | null
+          carrier_usdot: string | null
+          carrier_verified_at: string | null
+          claimed_at: string | null
+          claimed_by: string | null
+          close_reason: string | null
+          closed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          equipment_type: string | null
+          follow_up_status: string | null
+          id: string
+          intent_reason_breakdown: Json | null
+          intent_score: number | null
+          is_high_intent: boolean | null
+          last_contact_attempt_at: string | null
+          load_id: string | null
+          notes: string | null
+          phone_call_id: string | null
+          resolved_at: string | null
+          shipper: string | null
+          status: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          booked_at?: string | null
+          booked_by?: string | null
+          callback_requested_at?: string | null
+          caller_company?: string | null
+          caller_name?: string | null
+          caller_phone: string
+          carrier_mc?: string | null
+          carrier_name?: string | null
+          carrier_usdot?: string | null
+          carrier_verified_at?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          close_reason?: string | null
+          closed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          equipment_type?: string | null
+          follow_up_status?: string | null
+          id?: string
+          intent_reason_breakdown?: Json | null
+          intent_score?: number | null
+          is_high_intent?: boolean | null
+          last_contact_attempt_at?: string | null
+          load_id?: string | null
+          notes?: string | null
+          phone_call_id?: string | null
+          resolved_at?: string | null
+          shipper?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          booked_at?: string | null
+          booked_by?: string | null
+          callback_requested_at?: string | null
+          caller_company?: string | null
+          caller_name?: string | null
+          caller_phone?: string
+          carrier_mc?: string | null
+          carrier_name?: string | null
+          carrier_usdot?: string | null
+          carrier_verified_at?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
+          close_reason?: string | null
+          closed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          equipment_type?: string | null
+          follow_up_status?: string | null
+          id?: string
+          intent_reason_breakdown?: Json | null
+          intent_score?: number | null
+          is_high_intent?: boolean | null
+          last_contact_attempt_at?: string | null
+          load_id?: string | null
+          notes?: string | null
+          phone_call_id?: string | null
+          resolved_at?: string | null
+          shipper?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_leads_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_leads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_leads_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_leads_phone_call_id_fkey"
+            columns: ["phone_call_id"]
+            isOneToOne: false
+            referencedRelation: "phone_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_loads: {
         Row: {
           agency_id: string

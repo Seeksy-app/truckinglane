@@ -106,7 +106,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Package className="h-12 w-12 mb-4 opacity-50" />
         <p className="text-lg font-medium">No open loads found</p>
-        <p className="text-sm">Only active open loads are shown here</p>
+        <p className="text-sm">Import a CSV file to get started</p>
       </div>
     );
   }

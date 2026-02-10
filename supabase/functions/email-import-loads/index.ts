@@ -577,25 +577,32 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Look up agency based on import type
-    let agencyQuery;
-    if (importType === "vms") {
-      agencyQuery = supabase
+    // Look up agency by sender domain in allowed_sender_domains
+    // This is the most reliable approach since domains are explicitly configured per agency
+    const { data: agencyByDomain } = await supabase
+      .from("agencies")
+      .select("id, name, allowed_sender_domains")
+      .contains("allowed_sender_domains", [senderDomain])
+      .limit(1)
+      .single();
+    
+    // Fallback: look up by import type name/code for backward compatibility
+    let agency = agencyByDomain;
+    if (!agency) {
+      console.log("No agency found by domain, falling back to name/code lookup");
+      const fallbackFilter = importType === "vms"
+        ? "name.ilike.%dl transport%,import_email_code.eq.VMS"
+        : "name.ilike.%adelphia%,import_email_code.eq.ADELPHIA";
+      const { data: agencyByCode } = await supabase
         .from("agencies")
         .select("id, name, allowed_sender_domains")
-        .or("name.ilike.%dl transport%,import_email_code.eq.VMS")
+        .or(fallbackFilter)
         .limit(1)
         .single();
-    } else {
-      agencyQuery = supabase
-        .from("agencies")
-        .select("id, name, allowed_sender_domains")
-        .or("name.ilike.%adelphia%,import_email_code.eq.ADELPHIA")
-        .limit(1)
-        .single();
+      agency = agencyByCode;
     }
     
-    const { data: agency, error: agencyError } = await agencyQuery;
+    const agencyError = !agency;
     
     if (agencyError || !agency) {
       console.error(`${importType.toUpperCase()} agency not found`);

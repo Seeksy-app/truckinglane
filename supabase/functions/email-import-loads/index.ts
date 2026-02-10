@@ -151,17 +151,17 @@ async function postLoadsToX(loads: Record<string, unknown>[]): Promise<void> {
       const postText = formatLoadForX(load);
       console.log(`Posting load ${load.load_number} to X`);
       
+      const formData = new FormData();
+      formData.append("user", "@TruckingLane");
+      formData.append("platforms", "x");
+      formData.append("text", postText);
+
       const response = await fetch("https://api.upload-post.com/api/upload_text", {
         method: "POST",
         headers: {
           "Authorization": `Apikey ${UPLOAD_POST_API_KEY}`,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          user: "@TruckingLane",
-          platforms: ["x"],
-          text: postText,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -297,7 +297,8 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
     // Also handles "$1400" without space before "$" and notes after rate
     // Format: COUNT - PICKUP_CITY, ST - COMMODITY - DEST_CITY, ST $RATE [- NOTES]
-    const match = line.match(/^(\d+)\s*-\s*([^,]+),\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
+    // The regex handles typos like "Jackson,. TN" (extra period/chars between comma and state)
+    const match = line.match(/^(\d+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*\.?\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
     
     if (!match) {
       console.log("VMS line did not match pattern:", line);

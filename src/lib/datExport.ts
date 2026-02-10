@@ -129,7 +129,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Allow Private Network Booking": "no",
     "Allow Private Network Bidding": "no",
     "Use DAT Loadboard*": "yes",
-    "DAT Loadboard Rate": load.customer_invoice_total ? String(load.customer_invoice_total) : "",
+    "DAT Loadboard Rate": "",
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
     "Contact Method*": "primary phone",

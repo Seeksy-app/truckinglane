@@ -31,6 +31,7 @@ export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadEx
   };
 
   const updateStatus = async (newStatus: string, additionalFields: Record<string, unknown> = {}) => {
+    if (updating) return; // Prevent double-clicks
     setUpdating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();

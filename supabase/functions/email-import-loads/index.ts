@@ -772,6 +772,23 @@ Deno.serve(async (req) => {
         
         importedCount = safeLoads.length;
         
+        // Re-archive any loads that the upsert brought back from old imports
+        // The upsert sets is_active=true on ALL matching load_numbers, including
+        // loads created on previous days. We only want TODAY's parsed loads active.
+        const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+        const { data: reactivated } = await supabase
+          .from("loads")
+          .update({ is_active: false, archived_at: new Date().toISOString() })
+          .eq("agency_id", agency.id)
+          .eq("template_type", "vms_email")
+          .eq("is_active", true)
+          .is("booked_at", null)
+          .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+          .select("id");
+        if (reactivated?.length) {
+          console.log(`Re-archived ${reactivated.length} stale loads not in current batch`);
+        }
+        
         // Post new loads to X
         await postLoadsToX(safeLoads);
       }

@@ -122,3 +122,6 @@ verify_jwt = false
 
 [functions.public-stats]
 verify_jwt = false
+
+[functions.redirect-call]
+verify_jwt = false

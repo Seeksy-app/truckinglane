@@ -44,14 +44,18 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const { pickupStates, destStates, clients } = useMemo(() => {
+  const { pickupStates, destStates, clients, clientCounts } = useMemo(() => {
     const pickupSet = new Set<string>();
     const destSet = new Set<string>();
     const clientSet = new Set<string>();
+    const countMap: Record<string, number> = {};
     openLoads.forEach((load) => {
       if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
       if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
-      if (load.template_type) clientSet.add(load.template_type);
+      if (load.template_type) {
+        clientSet.add(load.template_type);
+        countMap[load.template_type] = (countMap[load.template_type] || 0) + 1;
+      }
     });
     return {
       pickupStates: Array.from(pickupSet).sort(),
@@ -60,6 +64,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
         const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3 };
         return (order[a] || 99) - (order[b] || 99);
       }),
+      clientCounts: countMap,
     };
   }, [openLoads]);
 
@@ -151,10 +156,10 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="all">All ({openLoads.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
-                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : "Aljex"}
+                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : "Aljex"} ({clientCounts[client] ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>

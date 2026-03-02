@@ -25,8 +25,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
-import { UserPlus, XCircle, ChevronDown, RotateCcw, Building2, Truck, ExternalLink } from "lucide-react";
+import { UserPlus, XCircle, ChevronDown, RotateCcw, Building2, Truck, ExternalLink, Trash2 } from "lucide-react";
 import { LeadExpandedRow } from "./LeadExpandedRow";
 import { CarrierBadge } from "./CarrierBadge";
 import { LeadResolvePanel } from "./LeadResolvePanel";
@@ -96,6 +97,7 @@ export const LeadsTable = ({
   const [resolvePanelLead, setResolvePanelLead] = useState<Lead | null>(null);
   const [highlightedLeadId, setHighlightedLeadId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
   const handleNavigateToDetail = (leadId: string, e?: React.MouseEvent) => {
@@ -236,6 +238,68 @@ export const LeadsTable = ({
     updateFollowUpMutation.mutate({ leadId, followUpStatus });
   };
 
+  // Multi-select helpers
+  const visibleLeads = leads.slice(0, displayCount);
+  const allVisibleSelected = visibleLeads.length > 0 && visibleLeads.every(l => selectedIds.has(l.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(visibleLeads.map(l => l.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Delete mutation
+  const deleteLeadsMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Clear FK references first
+      const { error: loadErr } = await supabase
+        .from("loads")
+        .update({ booked_lead_id: null } as any)
+        .in("booked_lead_id", ids);
+      if (loadErr) console.warn("Failed to clear load FK refs:", loadErr);
+
+      // Delete lead events
+      const { error: evtErr } = await supabase
+        .from("lead_events")
+        .delete()
+        .in("lead_id", ids);
+      if (evtErr) console.warn("Failed to delete lead events:", evtErr);
+
+      // Delete leads
+      const { error } = await supabase
+        .from("leads")
+        .delete()
+        .in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      setSelectedIds(new Set());
+      toast({ title: `${ids.length} lead(s) deleted` });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete leads", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Permanently delete ${selectedIds.size} lead(s)?`)) return;
+    deleteLeadsMutation.mutate(Array.from(selectedIds));
+  };
+
   if (isLoading) {
     return (
       <Card className="p-8">
@@ -269,10 +333,42 @@ export const LeadsTable = ({
         />
       )}
 
+      {/* Delete selected bar */}
+      {someSelected && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-destructive/10 border-b border-border">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeleteSelected}
+            disabled={deleteLeadsMutation.isPending}
+            className="gap-1.5 h-7 text-xs"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {deleteLeadsMutation.isPending ? "Deleting..." : "Delete Selected"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+            className="h-7 text-xs"
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50 border-b border-border">
+            <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={allVisibleSelected}
+                onCheckedChange={toggleSelectAll}
+                aria-label="Select all"
+              />
+            </TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Date</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Phone</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Company</TableHead>
@@ -319,6 +415,13 @@ export const LeadsTable = ({
                   onClick={() => handleRowClick(lead.id)}
                   onFocus={() => handleRowFocus(index)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()} className="w-[40px]">
+                    <Checkbox
+                      checked={selectedIds.has(lead.id)}
+                      onCheckedChange={() => toggleSelect(lead.id)}
+                      aria-label={`Select lead ${lead.caller_phone}`}
+                    />
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
@@ -543,7 +646,7 @@ export const LeadsTable = ({
                 </TableRow>
                 {isExpanded && (
                   <TableRow key={`${lead.id}-expanded`}>
-                    <TableCell colSpan={10 + (showClaimedBy ? 1 : 0)} className="p-0">
+                    <TableCell colSpan={11 + (showClaimedBy ? 1 : 0)} className="p-0">
                       <LeadExpandedRow
                         lead={lead}
                         agencyId={agencyId || lead.agency_id}

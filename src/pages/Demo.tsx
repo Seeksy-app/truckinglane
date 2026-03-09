@@ -234,6 +234,22 @@ function DemoDashboardContent() {
         </div>
       </header>
 
+      {/* Call-to-Test Banner */}
+      <div className="bg-[hsl(25,95%,53%)] border-b border-[hsl(25,95%,45%)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-center gap-3 text-white text-sm sm:text-base font-medium">
+            <Phone className="h-5 w-5 animate-pulse" />
+            <span>
+              Call{" "}
+              <a href="tel:+18777066552" className="underline underline-offset-2 font-bold hover:opacity-90">
+                +1 877 706 6552
+              </a>{" "}
+              to test the AI Agent
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Feature Highlights Banner */}
       <div className="bg-gradient-to-r from-[hsl(220,15%,15%)] to-[hsl(220,15%,20%)] border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

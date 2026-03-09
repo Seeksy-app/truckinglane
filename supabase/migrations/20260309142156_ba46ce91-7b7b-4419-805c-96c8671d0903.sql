@@ -1,0 +1,1 @@
+UPDATE demo_loads SET load_number = LPAD(FLOOR(RANDOM() * 900000 + 100000)::text, 6, '0');

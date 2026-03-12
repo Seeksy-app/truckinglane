@@ -187,7 +187,7 @@ export function ImportLoadsModal({ onImportComplete }: ImportLoadsModalProps) {
         <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
           <p className="font-medium mb-1">Note:</p>
           <ul className="list-disc list-inside space-y-1">
-            <li>Active {templateType === "adelphia_xlsx" ? "Adelphia" : "Aljex"} loads will be archived</li>
+            <li>Active {templateType === "adelphia_xlsx" ? "Adelphia" : templateType === "oldcastle_gsheet" ? "Oldcastle" : "Aljex"} loads will be archived</li>
             <li>Booked loads are always retained</li>
             <li>Loads from other templates remain untouched</li>
           </ul>

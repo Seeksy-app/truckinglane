@@ -828,6 +828,10 @@ const Dashboard = () => {
         {mode === "booked" && (
           <LoadsTable loads={filteredBookedLoads} loading={loadsLoading} onRefresh={refetchLoads} />
         )}
+
+        {mode === "new" && (
+          <LoadsTable loads={filteredNewLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+        )}
       </div>
 
       {/* Only render rails after hydration to prevent flicker */}

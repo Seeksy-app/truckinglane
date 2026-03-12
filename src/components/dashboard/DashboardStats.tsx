@@ -82,6 +82,17 @@ export const DashboardStats = ({ stats, activeMode, onModeChange }: DashboardSta
       inactiveClass: "bg-card border-border hover:border-[hsl(145,63%,42%)]/50 hover:bg-[hsl(145,63%,42%)]/5",
       tooltip: { scope: "Agent", range: "Today (resets at midnight)", description: "Loads booked today. Resets daily at midnight." },
     },
+    {
+      key: "new",
+      label: "New",
+      value: stats.newLoads,
+      icon: Sparkles,
+      activeClass: "bg-[hsl(280,70%,50%)] border-[hsl(280,70%,42%)] text-white",
+      inactiveClass: stats.newLoads > 0
+        ? "bg-card border-[hsl(280,70%,50%)]/50 hover:border-[hsl(280,70%,50%)] hover:bg-[hsl(280,70%,50%)]/5 animate-pulse"
+        : "bg-card border-border hover:border-[hsl(280,70%,50%)]/50 hover:bg-[hsl(280,70%,50%)]/5",
+      tooltip: { scope: "Agency", range: "Since last view", description: "New Oldcastle loads you haven't seen yet." },
+    },
   ];
 
   return (

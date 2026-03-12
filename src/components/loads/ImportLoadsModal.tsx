@@ -160,6 +160,7 @@ export function ImportLoadsModal({ onImportComplete }: ImportLoadsModalProps) {
             <SelectContent>
               <SelectItem value="aljex_flat">Aljex Flat (CSV)</SelectItem>
               <SelectItem value="adelphia_xlsx">Adelphia (XLSX)</SelectItem>
+              <SelectItem value="oldcastle_gsheet">Oldcastle (XLSX)</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -42,6 +42,7 @@ const modeTitles: Record<DashboardMode, string> = {
   pending: "Leads",
   calls: "AI Calls",
   booked: "Booked",
+  new: "New Loads",
 };
 
 function DemoDashboardContent() {
@@ -74,6 +75,7 @@ function DemoDashboardContent() {
       bookedToday: leads.filter(
         (l) => l.booked_at && new Date(l.booked_at) >= today,
       ).length,
+      newLoads: 0,
     }),
     [loads, leads, calls, today],
   );
@@ -192,6 +194,7 @@ function DemoDashboardContent() {
     pending: { all: "All Leads", my: "My Leads" },
     calls: { all: "All Calls", my: "My Calls" },
     booked: { all: "All Booked", my: "My Booked" },
+    new: { all: "All New", my: "My New" },
   };
 
   return (

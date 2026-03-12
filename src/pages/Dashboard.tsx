@@ -42,6 +42,7 @@ const modeTitles: Record<DashboardMode, string> = {
   pending: "Leads",
   calls: "AI Calls",
   booked: "Booked Loads",
+  new: "New Loads",
 };
 
 const Dashboard = () => {
@@ -61,6 +62,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
+  const LAST_VIEWED_KEY = "oldcastle_loads_last_viewed";
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);
@@ -416,12 +418,21 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
+    // New Oldcastle loads since last view
+    const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
+    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
+    const newLoadsCount = loads.filter((l) => {
+      if (!l.is_active || l.template_type !== "oldcastle_gsheet") return false;
+      return new Date(l.created_at) > lastViewedDate;
+    }).length;
+    
     return {
       openToday: openLoadsCount,
       claimedToday: claimedTodayCount,
       pendingToday: pendingLeadsTodayCount,
       aiCallsToday: aiCallsTodayCount,
       bookedToday: bookedTodayCount,
+      newLoads: newLoadsCount,
     };
   }, [loads, leads, calls, todayWindow]);
 
@@ -585,6 +596,44 @@ const Dashboard = () => {
     return result;
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
+  // New loads filtered
+  const filteredNewLoads = useMemo(() => {
+    const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
+    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
+    let result = loads.filter((l) => {
+      if (!l.is_active || l.template_type !== "oldcastle_gsheet") return false;
+      return new Date(l.created_at) > lastViewedDate;
+    });
+    if (searchQuery.trim()) {
+      const searchTerms = normalizeStateSearch(searchQuery);
+      const isStateAbbr = searchQuery.trim().length === 2 && /^[a-zA-Z]{2}$/.test(searchQuery.trim());
+      result = result.filter((l) => {
+        const loadNumber = l.load_number?.toLowerCase() || "";
+        const pickupState = l.pickup_state?.toLowerCase().trim() || "";
+        const destState = l.dest_state?.toLowerCase().trim() || "";
+        const pickupCity = l.pickup_city?.toLowerCase().trim() || "";
+        const destCity = l.dest_city?.toLowerCase().trim() || "";
+        return searchTerms.some((term) => {
+          if (isStateAbbr && term.length === 2) return pickupState === term || destState === term;
+          return loadNumber.includes(term) || pickupCity.includes(term) || pickupState.includes(term) || destCity.includes(term) || destState.includes(term);
+        });
+      });
+    }
+    return result;
+  }, [loads, searchQuery, LAST_VIEWED_KEY]);
+
+  // Mark new loads as seen when viewing the "new" tab
+  useEffect(() => {
+    if (mode === "new" && filteredNewLoads.length > 0) {
+      // Mark as seen after a brief delay so the user can see the count
+      const timer = setTimeout(() => {
+        localStorage.setItem(LAST_VIEWED_KEY, new Date().toISOString());
+        queryClient.invalidateQueries({ queryKey: ["loads"] });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [mode, filteredNewLoads.length, queryClient, LAST_VIEWED_KEY]);
+
   // Get current filtered data based on mode
   const getCurrentData = () => {
     switch (mode) {
@@ -593,6 +642,7 @@ const Dashboard = () => {
       case "pending": return filteredPendingLeads;
       case "calls": return filteredCalls;
       case "booked": return filteredBookedLoads;
+      case "new": return filteredNewLoads;
     }
   };
 
@@ -603,6 +653,7 @@ const Dashboard = () => {
     pending: { all: "All Leads", my: "My Leads" },
     calls: { all: "All Calls", my: "My Calls" },
     booked: { all: "All Booked", my: "My Booked" },
+    new: { all: "All New", my: "My New" },
   };
 
   if (authLoading) {
@@ -776,6 +827,10 @@ const Dashboard = () => {
 
         {mode === "booked" && (
           <LoadsTable loads={filteredBookedLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+        )}
+
+        {mode === "new" && (
+          <LoadsTable loads={filteredNewLoads} loading={loadsLoading} onRefresh={refetchLoads} />
         )}
       </div>
 

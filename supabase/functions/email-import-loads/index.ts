@@ -523,9 +523,11 @@ Deno.serve(async (req) => {
     const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia") || subjectLower.includes("adlephia");
     // Support both "VMS" and "MVS" (common typo)
     const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
+    // Oldcastle keywords
+    const containsOldcastle = subjectLower.includes("oldcastle") || subjectLower.includes("old castle");
     
     // Determine import type from subject line first
-    if (!containsAdelphia && !containsVMS) {
+    if (!containsAdelphia && !containsVMS && !containsOldcastle) {
       console.error("Subject line does not match any known import type:", subject);
       
       // Log the failed attempt
@@ -533,19 +535,19 @@ Deno.serve(async (req) => {
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Subject must contain "adelphia", "VMS", or "MVS"`,
+        error_message: `Subject must contain "adelphia", "VMS", "MVS", or "oldcastle"`,
         raw_headers: emailHeaders,
       });
       
       return new Response(JSON.stringify({ 
-        error: `Subject must contain "adelphia", "VMS", or "MVS"` 
+        error: `Subject must contain "adelphia", "VMS", "MVS", or "oldcastle"` 
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     
-    const importType = containsVMS ? "vms" : "adelphia";
+    const importType = containsVMS ? "vms" : containsOldcastle ? "oldcastle" : "adelphia";
     console.log(`Subject line matches - processing ${importType.toUpperCase()} import`);
     
     // For VMS imports, we need to fetch the email body from Resend API

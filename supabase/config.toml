@@ -125,3 +125,6 @@ verify_jwt = false
 
 [functions.redirect-call]
 verify_jwt = false
+
+[functions.sync-google-loads]
+verify_jwt = false

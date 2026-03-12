@@ -87,7 +87,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
       destStates: Array.from(destSet).sort(),
       clients: Array.from(clientSet).sort((a, b) => {
         // Custom order: VMS first, then Adelphia, then Aljex
-        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3 };
+        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, oldcastle_gsheet: 4 };
         return (order[a] || 99) - (order[b] || 99);
       }),
       clientCounts: countMap,

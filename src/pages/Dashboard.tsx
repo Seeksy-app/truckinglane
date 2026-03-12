@@ -42,6 +42,7 @@ const modeTitles: Record<DashboardMode, string> = {
   pending: "Leads",
   calls: "AI Calls",
   booked: "Booked Loads",
+  new: "New Loads",
 };
 
 const Dashboard = () => {

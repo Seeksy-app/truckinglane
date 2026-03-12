@@ -18,6 +18,7 @@ interface DashboardStatsProps {
     pendingToday: number;
     aiCallsToday: number;
     bookedToday: number;
+    newLoads: number;
   };
   activeMode: DashboardMode;
   onModeChange: (mode: DashboardMode) => void;

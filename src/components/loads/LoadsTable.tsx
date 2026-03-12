@@ -126,6 +126,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
             vms_email: 1,
             adelphia_xlsx: 2,
             aljex_flat: 3,
+            oldcastle_gsheet: 4,
           };
           const aOrder = templateOrder[a.template_type] || 99;
           const bOrder = templateOrder[b.template_type] || 99;

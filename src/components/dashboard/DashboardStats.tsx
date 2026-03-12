@@ -9,7 +9,7 @@ import {
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getTimezoneLabel } from "@/lib/dateWindows";
 
-export type DashboardMode = "open" | "claimed" | "pending" | "calls" | "booked";
+export type DashboardMode = "open" | "claimed" | "pending" | "calls" | "booked" | "new";
 
 interface DashboardStatsProps {
   stats: {

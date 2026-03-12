@@ -257,7 +257,9 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                       ? "Adelphia"
                       : load.template_type === "vms_email"
                         ? "VMS"
-                        : "Aljex"}
+                        : load.template_type === "oldcastle_gsheet"
+                          ? "Oldcastle"
+                          : "Aljex"}
                   </Badge>
                 </TableCell>
                 <TableCell>{load.ship_date || "—"}</TableCell>

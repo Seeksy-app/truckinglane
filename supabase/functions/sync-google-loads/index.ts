@@ -3,12 +3,13 @@ import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-openclaw-key",
 };
 
-const SPREADSHEET_ID = "154T6F7tIMfaG0-8Bw1aKtGAnwpQJvXuLNDbz6Lx1LA8";
 const AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323";
 const TEMPLATE_TYPE = "oldcastle_gsheet";
+
+// ---------- helpers ----------
 
 function parseNumber(value: string | undefined | null): number | null {
   if (!value) return null;
@@ -26,7 +27,6 @@ function parseDate(value: string | undefined | null): string | null {
     const year = y.length === 2 ? `20${y}` : y;
     return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  // Excel serial date
   const serial = parseFloat(str);
   if (!isNaN(serial) && serial > 40000 && serial < 60000) {
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -65,6 +65,8 @@ function calculateRateFields(rateRaw: number | null) {
   };
 }
 
+// ---------- parsing ----------
+
 interface ParsedLoad {
   equipment: string;
   shipper_city: string;
@@ -87,7 +89,6 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
 
     const range = XLSX.utils.decode_range(sheet["!ref"]);
 
-    // Find header row by looking for "equipment" in column A (rows 0-5)
     let headerRow = -1;
     for (let r = 0; r <= Math.min(5, range.e.r); r++) {
       const cell = sheet[XLSX.utils.encode_cell({ r, c: 0 })];
@@ -101,25 +102,21 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       continue;
     }
 
-    // Read headers
     const headers: string[] = [];
     for (let c = range.s.c; c <= range.e.c; c++) {
       const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
       headers.push(cell ? String(cell.v).toLowerCase().trim() : "");
     }
 
-    // Find column indices
     const colMap: Record<string, number> = {};
     const targetCols = ["equipment", "shipper city", "shipper state", "delivery city", "delivery state", "ready date", "rate"];
     for (const target of targetCols) {
       const idx = headers.findIndex(h => h.includes(target) || h === target);
       if (idx >= 0) colMap[target] = idx;
     }
-    // Also look for weight
     const weightIdx = headers.findIndex(h => h.includes("weight"));
     if (weightIdx >= 0) colMap["weight"] = weightIdx;
 
-    // Parse data rows
     for (let r = headerRow + 1; r <= range.e.r; r++) {
       const getVal = (col: string): string => {
         const idx = colMap[col];
@@ -130,14 +127,14 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
 
       const equipment = getVal("equipment");
       const deliveryCity = getVal("delivery city");
-      if (!equipment || !deliveryCity) continue; // Skip empty rows
+      if (!equipment || !deliveryCity) continue;
 
       allLoads.push({
         equipment,
         shipper_city: getVal("shipper city"),
         shipper_state: getVal("shipper state"),
         delivery_city: deliveryCity,
-        delivery_state: getVal("delivery state") || getVal("shipper state"), // fallback
+        delivery_state: getVal("delivery state") || getVal("shipper state"),
         ready_date: getVal("ready date") || null,
         rate: parseNumber(getVal("rate")),
         weight: parseNumber(getVal("weight")),
@@ -150,6 +147,8 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
 
   return allLoads;
 }
+
+// ---------- mapping ----------
 
 function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
   const pickupRaw = [parsed.shipper_city, parsed.shipper_state].filter(Boolean).join(", ");
@@ -184,11 +183,94 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
     source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment },
   };
 
-  // Simple call script
   load.load_call_script = `Load ${loadNumber}: ${parsed.equipment} from ${pickupRaw} to ${destRaw}. Rate $${parsed.rate || 'TBD'}.`;
-
   return load;
 }
+
+// ---------- core sync logic ----------
+
+async function syncLoads(buffer: ArrayBuffer, source: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const parsedLoads = parseAllSheets(buffer);
+  console.log(`[${source}] Parsed ${parsedLoads.length} total loads`);
+
+  if (parsedLoads.length === 0) {
+    return { success: true, imported: 0, message: "No loads found in sheet", source };
+  }
+
+  const mappedLoads = parsedLoads.map(mapToLoad);
+
+  const loadsByNumber = new Map<string, Record<string, unknown>>();
+  for (const load of mappedLoads) {
+    loadsByNumber.set(load.load_number as string, load);
+  }
+  const safeLoads = Array.from(loadsByNumber.values());
+  console.log(`[${source}] ${safeLoads.length} unique loads after dedup`);
+
+  // Archive existing active non-booked oldcastle loads
+  const { data: archivedData, error: archiveError } = await supabase
+    .from("loads")
+    .update({ is_active: false, archived_at: new Date().toISOString() })
+    .eq("agency_id", AGENCY_ID)
+    .eq("template_type", TEMPLATE_TYPE)
+    .eq("is_active", true)
+    .is("booked_at", null)
+    .select("id");
+
+  if (archiveError) {
+    console.error("Archive error:", archiveError);
+    throw new Error(archiveError.message);
+  }
+
+  const archivedCount = archivedData?.length || 0;
+  console.log(`[${source}] Archived ${archivedCount} existing loads`);
+
+  // Upsert new loads
+  const today = new Date().toISOString().split("T")[0];
+  const loadsWithMeta = safeLoads.map(load => ({
+    ...load,
+    is_active: true,
+    board_date: today,
+    archived_at: null,
+  }));
+
+  const { error: upsertError } = await supabase
+    .from("loads")
+    .upsert(loadsWithMeta, {
+      onConflict: "agency_id,template_type,load_number",
+      ignoreDuplicates: false,
+    });
+
+  if (upsertError) {
+    console.error("Upsert error:", upsertError);
+    throw new Error(upsertError.message);
+  }
+
+  // Also save the uploaded file to storage for audit
+  if (source === "openclaw-upload") {
+    await supabase.storage
+      .from("load-imports")
+      .upload(`oldcastle-latest.xlsx`, new Blob([buffer]), {
+        upsert: true,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+  }
+
+  console.log(`[${source}] Upserted ${safeLoads.length} loads. Done!`);
+
+  return {
+    success: true,
+    imported: safeLoads.length,
+    archived: archivedCount,
+    sheets_processed: new Set(parsedLoads.map(l => l.sheet_name)).size,
+    source,
+  };
+}
+
+// ---------- handler ----------
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -196,20 +278,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth: accept either cron secret or service role
-    const authHeader = req.headers.get("Authorization") || "";
-    const cronSecret = Deno.env.get("CRON_SECRET");
-    const body = req.method === "POST" ? await req.text() : "";
-
-    // Allow cron invocation (Authorization: Bearer ANON_KEY) or manual trigger
-    // For cron, we just check the function is called - it uses service role internally
     console.log("=== SYNC-GOOGLE-LOADS START ===");
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const openclawKey = req.headers.get("x-openclaw-key");
+    const expectedKey = Deno.env.get("OPENCLAW_UPLOAD_KEY");
+    const contentType = req.headers.get("content-type") || "";
 
-    // Fetch the Google Sheet as XLSX
+    // ── MODE 1: OpenClaw uploads .xlsx via POST ──
+    if (openclawKey && expectedKey && openclawKey === expectedKey) {
+      console.log("Mode: OpenClaw upload");
+
+      const buffer = await req.arrayBuffer();
+      if (buffer.byteLength < 100) {
+        return new Response(JSON.stringify({ error: "Empty or invalid file" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log(`Received ${buffer.byteLength} bytes from OpenClaw`);
+      const result = await syncLoads(buffer, "openclaw-upload");
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── MODE 2: Legacy Google Sheets fetch (cron / manual) ──
+    console.log("Mode: Google Sheets fetch");
+    const SPREADSHEET_ID = "154T6F7tIMfaG0-8Bw1aKtGAnwpQJvXuLNDbz6Lx1LA8";
     const exportUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=xlsx`;
     console.log("Fetching:", exportUrl);
 
@@ -224,82 +321,10 @@ Deno.serve(async (req) => {
     }
 
     const buffer = await fetchRes.arrayBuffer();
-    console.log(`Downloaded ${buffer.byteLength} bytes`);
+    console.log(`Downloaded ${buffer.byteLength} bytes from Google`);
+    const result = await syncLoads(buffer, "google-fetch");
 
-    // Parse all sheets
-    const parsedLoads = parseAllSheets(buffer);
-    console.log(`Parsed ${parsedLoads.length} total loads across all sheets`);
-
-    if (parsedLoads.length === 0) {
-      return new Response(JSON.stringify({ success: true, imported: 0, message: "No loads found in sheet" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Map to load records
-    const mappedLoads = parsedLoads.map(mapToLoad);
-
-    // Deduplicate by load_number
-    const loadsByNumber = new Map<string, Record<string, unknown>>();
-    for (const load of mappedLoads) {
-      loadsByNumber.set(load.load_number as string, load);
-    }
-    const safeLoads = Array.from(loadsByNumber.values());
-    console.log(`${safeLoads.length} unique loads after dedup`);
-
-    // Archive existing active oldcastle loads (except booked)
-    const { data: archivedData, error: archiveError } = await supabase
-      .from("loads")
-      .update({ is_active: false, archived_at: new Date().toISOString() })
-      .eq("agency_id", AGENCY_ID)
-      .eq("template_type", TEMPLATE_TYPE)
-      .eq("is_active", true)
-      .is("booked_at", null)
-      .select("id");
-
-    if (archiveError) {
-      console.error("Archive error:", archiveError);
-      return new Response(JSON.stringify({ error: archiveError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const archivedCount = archivedData?.length || 0;
-    console.log(`Archived ${archivedCount} existing oldcastle loads`);
-
-    // Upsert new loads
-    const today = new Date().toISOString().split("T")[0];
-    const loadsWithMeta = safeLoads.map(load => ({
-      ...load,
-      is_active: true,
-      board_date: today,
-      archived_at: null,
-    }));
-
-    const { error: upsertError } = await supabase
-      .from("loads")
-      .upsert(loadsWithMeta, {
-        onConflict: "agency_id,template_type,load_number",
-        ignoreDuplicates: false,
-      });
-
-    if (upsertError) {
-      console.error("Upsert error:", upsertError);
-      return new Response(JSON.stringify({ error: upsertError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log(`Upserted ${safeLoads.length} loads. Done!`);
-
-    return new Response(JSON.stringify({
-      success: true,
-      imported: safeLoads.length,
-      archived: archivedCount,
-      sheets_processed: new Set(parsedLoads.map(l => l.sheet_name)).size,
-    }), {
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

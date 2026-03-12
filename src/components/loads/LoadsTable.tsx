@@ -236,7 +236,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
               <SelectItem value="all">All ({loads.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
-                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : "Aljex"} ({clientCounts[client] ?? 0})
+                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : client === "oldcastle_gsheet" ? "Oldcastle" : "Aljex"} ({clientCounts[client] ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>

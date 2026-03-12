@@ -604,6 +604,7 @@ const Dashboard = () => {
     pending: { all: "All Leads", my: "My Leads" },
     calls: { all: "All Calls", my: "My Calls" },
     booked: { all: "All Booked", my: "My Booked" },
+    new: { all: "All New", my: "My New" },
   };
 
   if (authLoading) {

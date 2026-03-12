@@ -418,12 +418,21 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
+    // New Oldcastle loads since last view
+    const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
+    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
+    const newLoadsCount = loads.filter((l) => {
+      if (!l.is_active || l.template_type !== "oldcastle_gsheet") return false;
+      return new Date(l.created_at) > lastViewedDate;
+    }).length;
+    
     return {
       openToday: openLoadsCount,
       claimedToday: claimedTodayCount,
       pendingToday: pendingLeadsTodayCount,
       aiCallsToday: aiCallsTodayCount,
       bookedToday: bookedTodayCount,
+      newLoads: newLoadsCount,
     };
   }, [loads, leads, calls, todayWindow]);
 

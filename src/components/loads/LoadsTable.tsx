@@ -87,7 +87,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
       destStates: Array.from(destSet).sort(),
       clients: Array.from(clientSet).sort((a, b) => {
         // Custom order: VMS first, then Adelphia, then Aljex
-        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3 };
+        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, oldcastle_gsheet: 4 };
         return (order[a] || 99) - (order[b] || 99);
       }),
       clientCounts: countMap,
@@ -126,6 +126,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
             vms_email: 1,
             adelphia_xlsx: 2,
             aljex_flat: 3,
+            oldcastle_gsheet: 4,
           };
           const aOrder = templateOrder[a.template_type] || 99;
           const bOrder = templateOrder[b.template_type] || 99;
@@ -235,7 +236,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
               <SelectItem value="all">All ({loads.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
-                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : "Aljex"} ({clientCounts[client] ?? 0})
+                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : client === "oldcastle_gsheet" ? "Oldcastle" : "Aljex"} ({clientCounts[client] ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -338,7 +339,9 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
                         ? "Adelphia" 
                         : load.template_type === "vms_email" 
                           ? "VMS" 
-                          : "Aljex"}
+                          : load.template_type === "oldcastle_gsheet"
+                            ? "Oldcastle"
+                            : "Aljex"}
                     </Badge>
                   </TableCell>
                   <TableCell>{load.ship_date || "—"}</TableCell>

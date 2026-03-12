@@ -695,6 +695,8 @@ Deno.serve(async (req) => {
       console.log("No agency found by domain, falling back to name/code lookup");
       const fallbackFilter = importType === "vms"
         ? "name.ilike.%dl transport%,import_email_code.eq.VMS"
+        : importType === "oldcastle"
+        ? "name.ilike.%oldcastle%,import_email_code.eq.OLDCASTLE"
         : "name.ilike.%adelphia%,import_email_code.eq.ADELPHIA";
       const { data: agencyByCode } = await supabase
         .from("agencies")

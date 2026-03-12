@@ -921,6 +921,164 @@ Deno.serve(async (req) => {
       });
     }
     
+    // ============= OLDCASTLE XLSX IMPORT =============
+    if (importType === "oldcastle") {
+      console.log("Processing Oldcastle XLSX email import");
+      
+      // Find XLSX attachment
+      const ocAttachment = attachments.find((att: { filename?: string; content?: string; id?: string }) => 
+        att.filename?.toLowerCase().endsWith(".xlsx") || att.filename?.toLowerCase().endsWith(".xls")
+      );
+      
+      if (!ocAttachment) {
+        console.error("No XLSX attachment found for Oldcastle import");
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "No XLSX attachment found in Oldcastle email",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "No XLSX attachment found" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      console.log("Processing Oldcastle attachment:", ocAttachment.filename);
+      
+      // Fetch attachment content
+      let ocBuffer: ArrayBuffer;
+      if (ocAttachment.content) {
+        const fileContent = decodeBase64(ocAttachment.content);
+        ocBuffer = new Uint8Array(fileContent).buffer as ArrayBuffer;
+      } else if (ocAttachment.id && resendApiKey) {
+        const emailId = payload.data?.email_id || payload.email_id;
+        if (!emailId) throw new Error("No email_id found in payload to fetch attachment");
+        
+        const listResponse = await fetch(
+          `https://api.resend.com/emails/receiving/${emailId}/attachments`,
+          { headers: { "Authorization": `Bearer ${resendApiKey}` } }
+        );
+        if (!listResponse.ok) throw new Error(`Failed to list attachments: ${listResponse.status}`);
+        
+        const attachmentsList = await listResponse.json();
+        const attachmentData = attachmentsList.data?.find((a: { id: string }) => a.id === ocAttachment.id);
+        if (!attachmentData?.download_url) throw new Error("Attachment download_url not found");
+        
+        const fileResponse = await fetch(attachmentData.download_url);
+        if (!fileResponse.ok) throw new Error(`Failed to download attachment: ${fileResponse.status}`);
+        ocBuffer = await fileResponse.arrayBuffer();
+      } else {
+        throw new Error("No attachment content or ID available");
+      }
+      
+      // Parse using Oldcastle multi-sheet parser
+      const mappedLoads = parseOldcastleAllSheets(ocBuffer, agency.id);
+      console.log(`Parsed ${mappedLoads.length} Oldcastle loads`);
+      
+      if (mappedLoads.length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "No valid Oldcastle loads found after parsing",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "No valid loads found" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      // Create import batch record
+      await supabase.from("load_import_runs").insert({
+        agency_id: agency.id,
+        template_type: "oldcastle_gsheet",
+        file_name: ocAttachment.filename,
+        row_count: mappedLoads.length,
+        replaced_count: 0,
+      });
+      
+      // Archive existing active Oldcastle loads (except booked)
+      const { data: archivedData } = await supabase
+        .from("loads")
+        .update({ is_active: false, archived_at: new Date().toISOString() })
+        .eq("agency_id", agency.id)
+        .eq("template_type", "oldcastle_gsheet")
+        .eq("is_active", true)
+        .is("booked_at", null)
+        .select("id");
+      
+      const archivedCount = archivedData?.length || 0;
+      console.log(`Archived ${archivedCount} existing Oldcastle loads`);
+      
+      // Deduplicate
+      const loadsByNumber = new Map<string, Record<string, unknown>>();
+      for (const load of mappedLoads) {
+        loadsByNumber.set(load.load_number as string, load);
+      }
+      const safeLoads = Array.from(loadsByNumber.values());
+      
+      let importedCount = 0;
+      if (safeLoads.length > 0) {
+        const today = new Date().toISOString().split("T")[0];
+        const loadsWithBoardDate = safeLoads.map(load => ({
+          ...load,
+          is_active: true,
+          board_date: today,
+          archived_at: null,
+        }));
+        
+        const { error: insertError } = await supabase
+          .from("loads")
+          .upsert(loadsWithBoardDate, {
+            onConflict: "agency_id,template_type,load_number",
+            ignoreDuplicates: false,
+          });
+        
+        if (insertError) {
+          console.error("Oldcastle upsert error:", insertError);
+          await supabase.from("email_import_logs").insert({
+            agency_id: agency.id,
+            sender_email: senderEmail,
+            subject: subject,
+            status: "failed",
+            error_message: insertError.message,
+            raw_headers: emailHeaders,
+          });
+          return new Response(JSON.stringify({ error: insertError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        importedCount = safeLoads.length;
+        await postLoadsToX(safeLoads);
+      }
+      
+      await supabase.from("email_import_logs").insert({
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject: subject,
+        status: "success",
+        imported_count: importedCount,
+        raw_headers: emailHeaders,
+      });
+      
+      return new Response(JSON.stringify({
+        success: true,
+        imported: importedCount,
+        archived: archivedCount,
+        agency: agency.name,
+        import_type: "oldcastle_gsheet",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
     // ============= ADELPHIA XLSX IMPORT =============
     // Find XLSX attachment
     const xlsxAttachment = attachments.find((att: { filename?: string; content?: string; id?: string }) => 

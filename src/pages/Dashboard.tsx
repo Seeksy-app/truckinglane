@@ -62,6 +62,7 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
+  const LAST_VIEWED_KEY = "oldcastle_loads_last_viewed";
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);

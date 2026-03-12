@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Package, UserCheck, Users, Phone, CheckCircle, Info } from "lucide-react";
+import { Package, UserCheck, Users, Phone, CheckCircle, Info, Sparkles } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,

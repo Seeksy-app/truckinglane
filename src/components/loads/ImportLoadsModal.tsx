@@ -160,18 +160,19 @@ export function ImportLoadsModal({ onImportComplete }: ImportLoadsModalProps) {
             <SelectContent>
               <SelectItem value="aljex_flat">Aljex Flat (CSV)</SelectItem>
               <SelectItem value="adelphia_xlsx">Adelphia (XLSX)</SelectItem>
+              <SelectItem value="oldcastle_gsheet">Oldcastle (XLSX)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">
-            {templateType === "adelphia_xlsx" ? "XLSX File" : "CSV File"}
+            {templateType === "aljex_flat" ? "CSV File" : "XLSX File"}
           </label>
           <div className="flex items-center gap-2">
             <input
               type="file"
-              accept={templateType === "adelphia_xlsx" ? ".xlsx,.xls" : ".csv"}
+              accept={templateType === "aljex_flat" ? ".csv" : ".xlsx,.xls"}
               onChange={handleFileChange}
               className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
             />
@@ -186,7 +187,7 @@ export function ImportLoadsModal({ onImportComplete }: ImportLoadsModalProps) {
         <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
           <p className="font-medium mb-1">Note:</p>
           <ul className="list-disc list-inside space-y-1">
-            <li>Active {templateType === "adelphia_xlsx" ? "Adelphia" : "Aljex"} loads will be archived</li>
+            <li>Active {templateType === "adelphia_xlsx" ? "Adelphia" : templateType === "oldcastle_gsheet" ? "Oldcastle" : "Aljex"} loads will be archived</li>
             <li>Booked loads are always retained</li>
             <li>Loads from other templates remain untouched</li>
           </ul>

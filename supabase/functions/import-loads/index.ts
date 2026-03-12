@@ -418,6 +418,106 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
   return baseLoad;
 }
 
+// ============= OLDCASTLE GSHEET XLSX MAPPING =============
+function parseOldcastleAllSheets(buffer: ArrayBuffer, agencyId: string): Record<string, unknown>[] {
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const allLoads: Record<string, unknown>[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet || !sheet["!ref"]) continue;
+
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+
+    // Find header row by looking for "equipment" in column A (rows 0-5)
+    let headerRow = -1;
+    for (let r = 0; r <= Math.min(5, range.e.r); r++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c: 0 })];
+      if (cell && String(cell.v).toLowerCase().trim() === "equipment") {
+        headerRow = r;
+        break;
+      }
+    }
+    if (headerRow === -1) {
+      console.log(`Skipping sheet "${sheetName}" - no equipment header found`);
+      continue;
+    }
+
+    // Read headers
+    const headers: string[] = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
+      headers.push(cell ? String(cell.v).toLowerCase().trim() : "");
+    }
+
+    // Map header names to column indices
+    const colMap: Record<string, number> = {};
+    const targets = ["equipment", "shipper city", "shipper state", "delivery city", "delivery state", "ready date", "rate", "weight"];
+    for (const target of targets) {
+      const idx = headers.findIndex(h => h.includes(target) || h === target);
+      if (idx >= 0) colMap[target] = idx;
+    }
+
+    for (let r = headerRow + 1; r <= range.e.r; r++) {
+      const getVal = (col: string): string => {
+        const idx = colMap[col];
+        if (idx === undefined) return "";
+        const cell = sheet[XLSX.utils.encode_cell({ r, c: idx })];
+        return cell ? String(cell.v).trim() : "";
+      };
+
+      const equipment = getVal("equipment");
+      const deliveryCity = getVal("delivery city");
+      if (!equipment || !deliveryCity) continue;
+
+      const shipperCity = getVal("shipper city");
+      const shipperState = getVal("shipper state");
+      const deliveryState = getVal("delivery state") || shipperState;
+      const pickupRaw = [shipperCity, shipperState].filter(Boolean).join(", ");
+      const destRaw = [deliveryCity, deliveryState].filter(Boolean).join(", ");
+      const rateNumeric = parseNumber(getVal("rate"));
+      const weightLbs = parseNumber(getVal("weight"));
+
+      const contentKey = `${pickupRaw}|${destRaw}|${rateNumeric}|${equipment}|${sheetName}`;
+      const loadNumber = `OC-${simpleHash(contentKey)}`;
+      const rateFields = calculateRateFields(rateNumeric, weightLbs, false);
+
+      const trailerType = equipment.toUpperCase().includes("VAN") ? "Van"
+        : equipment.toUpperCase().includes("FLAT") ? "Flatbed"
+        : equipment || null;
+
+      const load: Record<string, unknown> = {
+        agency_id: agencyId,
+        template_type: "oldcastle_gsheet",
+        load_number: loadNumber,
+        pickup_city: shipperCity || null,
+        pickup_state: shipperState || null,
+        pickup_location_raw: pickupRaw || null,
+        dest_city: deliveryCity || null,
+        dest_state: deliveryState || null,
+        dest_location_raw: destRaw || null,
+        ship_date: parseDate(getVal("ready date")),
+        delivery_date: parseDate(getVal("ready date")),
+        trailer_type: trailerType,
+        weight_lbs: weightLbs,
+        ...rateFields,
+        commodity: null,
+        miles: null,
+        tarp_required: false,
+        status: "open",
+        source_row: { sheet: sheetName, equipment },
+      };
+
+      load.load_call_script = `Load ${loadNumber}: ${equipment} from ${pickupRaw} to ${destRaw}. Rate $${rateNumeric || 'TBD'}.`;
+      allLoads.push(load);
+    }
+
+    console.log(`Sheet "${sheetName}": ${allLoads.length} loads so far`);
+  }
+
+  return allLoads;
+}
+
 // ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   console.log("=== IMPORT-LOADS FUNCTION CALLED ===");
@@ -545,6 +645,13 @@ Deno.serve(async (req) => {
         const hasDestCity = load.dest_city && String(load.dest_city).trim().length > 0;
         return hasPickupCity && hasDestCity;
       });
+      
+    } else if (templateType === "oldcastle_gsheet") {
+      // Multi-sheet XLSX parsing for Oldcastle
+      const buffer = await file.arrayBuffer();
+      mappedLoads = parseOldcastleAllSheets(buffer, agencyId);
+      
+      console.log(`Parsed ${mappedLoads.length} loads from Oldcastle XLSX`);
       
     } else {
       return new Response(JSON.stringify({ error: `Unknown template: ${templateType}` }), {

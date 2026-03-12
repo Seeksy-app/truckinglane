@@ -646,6 +646,13 @@ Deno.serve(async (req) => {
         return hasPickupCity && hasDestCity;
       });
       
+    } else if (templateType === "oldcastle_gsheet") {
+      // Multi-sheet XLSX parsing for Oldcastle
+      const buffer = await file.arrayBuffer();
+      mappedLoads = parseOldcastleAllSheets(buffer, agencyId);
+      
+      console.log(`Parsed ${mappedLoads.length} loads from Oldcastle XLSX`);
+      
     } else {
       return new Response(JSON.stringify({ error: `Unknown template: ${templateType}` }), {
         status: 400,

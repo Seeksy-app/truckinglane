@@ -75,6 +75,7 @@ function DemoDashboardContent() {
       bookedToday: leads.filter(
         (l) => l.booked_at && new Date(l.booked_at) >= today,
       ).length,
+      newLoads: 0,
     }),
     [loads, leads, calls, today],
   );

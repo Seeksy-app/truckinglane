@@ -98,14 +98,15 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       }
     }
     if (headerRow === -1) {
-      // Debug: log first 3 rows to understand sheet structure
-      for (let r = 0; r <= Math.min(2, range.e.r); r++) {
+      // Debug: log rows 0-10 to find header row
+      for (let r = 0; r <= Math.min(10, range.e.r); r++) {
         const rowCells: string[] = [];
         for (let c = 0; c <= Math.min(15, range.e.c); c++) {
           const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-          rowCells.push(cell ? String(cell.v) : "");
+          rowCells.push(cell ? String(cell.v).substring(0, 30) : "");
         }
-        console.log(`Sheet "${sheetName}" row ${r}: [${rowCells.join(" | ")}]`);
+        const nonEmpty = rowCells.filter(c => c).join(" | ");
+        if (nonEmpty) console.log(`Sheet "${sheetName}" row ${r}: [${nonEmpty}]`);
       }
       console.log(`Skipping sheet "${sheetName}" - no equipment header found`);
       continue;

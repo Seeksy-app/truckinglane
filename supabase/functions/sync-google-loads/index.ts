@@ -175,12 +175,10 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       
       // Skip rows that are clearly labels, not data
       const firstCellVal = getVal("due_date") || cityVal;
-      if (firstCellVal.toUpperCase().includes("FLATBED ONLY") || 
-          firstCellVal.toUpperCase().includes("MUST HAVE") ||
-          firstCellVal.toUpperCase().includes("SHIPPING HOURS")) continue;
-      // Also skip if city value is an instruction
-      if (cityVal.toUpperCase().includes("FLATBED ONLY") || 
-          cityVal.toUpperCase().includes("MUST HAVE")) continue;
+      const upperFirst = firstCellVal.toUpperCase();
+      const upperCity = cityVal.toUpperCase();
+      const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "ASAP", "HOT LOAD", "CONTACT"];
+      if (skipPatterns.some(p => upperFirst.includes(p) || upperCity.includes(p))) continue;
 
       const equipment = getVal("equipment") || "";
       const deliveryCity = cityVal;

@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { downloadDATExport } from '@/lib/datExport';
+import { downloadDATExport, getNewLoadsSinceLastExport, markDATExportComplete, getLastDATExportTimestamp } from '@/lib/datExport';
 import { useLoads } from '@/hooks/useLoads';
 type ImportState = "idle" | "loading" | "success" | "error";
 

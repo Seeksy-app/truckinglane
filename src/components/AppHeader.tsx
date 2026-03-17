@@ -256,11 +256,14 @@ export function AppHeader() {
                       <Button
                         variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
                         size="sm"
-                        className="gap-2"
+                        className="gap-2 relative"
                       >
                         <FileSpreadsheet className="h-4 w-4" />
                         <span className="hidden sm:inline">Loads</span>
                         <ChevronDown className="h-3 w-3" />
+                        {hasNewExport && (
+                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="bg-popover">

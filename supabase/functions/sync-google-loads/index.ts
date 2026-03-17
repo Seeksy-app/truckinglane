@@ -222,9 +222,18 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
   const loadNumber = `OC-${simpleHash(contentKey)}`;
   const rateFields = calculateRateFields(parsed.rate);
 
-  const trailerType = parsed.equipment.toUpperCase().includes("VAN") ? "Van"
-    : parsed.equipment.toUpperCase().includes("FLAT") ? "Flatbed"
-    : parsed.equipment || null;
+  let trailerType: string | null = null;
+  if (parsed.equipment) {
+    const eq = parsed.equipment.toUpperCase();
+    trailerType = eq.includes("VAN") ? "Van"
+      : eq.includes("FLAT") ? "Flatbed"
+      : parsed.equipment;
+  }
+
+  // Build notes from sheet notes + any extra context
+  const noteParts: string[] = [];
+  if (parsed.notes) noteParts.push(parsed.notes);
+  const commodity = null;
 
   const load: Record<string, unknown> = {
     agency_id: AGENCY_ID,
@@ -241,14 +250,15 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
     trailer_type: trailerType,
     weight_lbs: parsed.weight,
     ...rateFields,
-    commodity: null,
+    commodity,
     miles: null,
     tarp_required: false,
     status: "open",
-    source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment },
+    source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment, notes: parsed.notes },
   };
 
-  load.load_call_script = `Load ${loadNumber}: ${parsed.equipment} from ${pickupRaw} to ${destRaw}. Rate $${parsed.rate || 'TBD'}.`;
+  const eqLabel = parsed.equipment || trailerType || "Load";
+  load.load_call_script = `Load ${loadNumber}: ${eqLabel} from ${pickupRaw} to ${destRaw}. Rate $${parsed.rate || 'TBD'}.`;
   return load;
 }
 

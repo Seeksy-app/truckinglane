@@ -272,8 +272,16 @@ export function AppHeader() {
                             toast.error("No active loads to export");
                             return;
                           }
-                          downloadDATExport(loads);
-                          toast.success(`Exported ${loads.length} loads to DAT format`);
+                          const newLoads = getNewLoadsSinceLastExport(loads);
+                          if (newLoads.length === 0) {
+                            const lastTs = getLastDATExportTimestamp();
+                            const since = lastTs ? new Date(lastTs).toLocaleString() : "unknown";
+                            toast.error(`No new loads since last export (${since})`);
+                            return;
+                          }
+                          downloadDATExport(newLoads);
+                          markDATExportComplete();
+                          toast.success(`Exported ${newLoads.length} new loads to DAT format`);
                         }}
                       >
                         <Download className="h-4 w-4 mr-2" />

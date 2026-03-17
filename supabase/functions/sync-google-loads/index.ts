@@ -77,6 +77,37 @@ interface ParsedLoad {
   rate: number | null;
   weight: number | null;
   sheet_name: string;
+  notes: string;
+}
+
+// Extract city and state from a sheet tab name like "Archbold, OH" or "ZEELAND MI"
+function parseSheetLocation(sheetName: string): { city: string; state: string } {
+  const cleaned = sheetName.trim();
+  // Try "City, ST" format
+  const commaMatch = cleaned.match(/^(.+),\s*([A-Za-z]{2})$/);
+  if (commaMatch) return { city: commaMatch[1].trim(), state: commaMatch[2].toUpperCase() };
+  // Try "CITY ST" format (last 2-char word is state)
+  const spaceMatch = cleaned.match(/^(.+)\s+([A-Za-z]{2})$/);
+  if (spaceMatch) return { city: spaceMatch[1].trim(), state: spaceMatch[2].toUpperCase() };
+  return { city: cleaned, state: "" };
+}
+
+// Known header keywords to detect the header row
+const HEADER_KEYWORDS = ["due date", "city", "state", "rate", "equipment", "pick up", "deliver"];
+
+function findHeaderRow(sheet: XLSX.WorkSheet, range: XLSX.Range): number {
+  for (let r = 0; r <= Math.min(15, range.e.r); r++) {
+    const rowTexts: string[] = [];
+    for (let c = 0; c <= Math.min(10, range.e.c); c++) {
+      const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+      if (cell) rowTexts.push(String(cell.v).toLowerCase().trim());
+    }
+    const joined = rowTexts.join(" ");
+    // Need at least 2 header keywords to confirm it's a header row
+    const matches = HEADER_KEYWORDS.filter(kw => joined.includes(kw));
+    if (matches.length >= 2) return r;
+  }
+  return -1;
 }
 
 function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
@@ -87,36 +118,48 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet || !sheet["!ref"]) continue;
 
-    const range = XLSX.utils.decode_range(sheet["!ref"]);
-
-    let headerRow = -1;
-    for (let r = 0; r <= Math.min(5, range.e.r); r++) {
-      const cell = sheet[XLSX.utils.encode_cell({ r, c: 0 })];
-      if (cell && String(cell.v).toLowerCase().trim() === "equipment") {
-        headerRow = r;
-        break;
-      }
-    }
-    if (headerRow === -1) {
-      console.log(`Skipping sheet "${sheetName}" - no equipment header found`);
+    // Skip meta/summary sheets
+    const lowerName = sheetName.toLowerCase();
+    if (lowerName.includes("available loads at other") || lowerName.includes("summary") || lowerName.includes("template")) {
+      console.log(`Skipping meta sheet "${sheetName}"`);
       continue;
     }
 
+    const range = XLSX.utils.decode_range(sheet["!ref"]);
+    const headerRow = findHeaderRow(sheet, range);
+
+    if (headerRow === -1) {
+      console.log(`Skipping sheet "${sheetName}" - no recognizable header row`);
+      continue;
+    }
+
+    // Read headers
     const headers: string[] = [];
     for (let c = range.s.c; c <= range.e.c; c++) {
       const cell = sheet[XLSX.utils.encode_cell({ r: headerRow, c })];
       headers.push(cell ? String(cell.v).toLowerCase().trim() : "");
     }
+    console.log(`Sheet "${sheetName}" headers (row ${headerRow}): [${headers.filter(Boolean).join(", ")}]`);
 
+    // Map columns flexibly
     const colMap: Record<string, number> = {};
-    const targetCols = ["equipment", "shipper city", "shipper state", "delivery city", "delivery state", "ready date", "rate"];
-    for (const target of targetCols) {
-      const idx = headers.findIndex(h => h.includes(target) || h === target);
-      if (idx >= 0) colMap[target] = idx;
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      if (!h) continue;
+      if (h.includes("due date") || h === "date") colMap["due_date"] = i;
+      else if (h === "city" && colMap["city"] === undefined) colMap["city"] = i;
+      else if (h === "city" && colMap["city"] !== undefined) colMap["city2"] = i; // second city column (Waterloo format)
+      else if (h === "state") colMap["state"] = i;
+      else if (h.includes("rate")) colMap["rate"] = i;
+      else if (h.includes("equipment")) colMap["equipment"] = i;
+      else if (h.includes("note")) colMap["notes"] = i;
+      else if (h.includes("weight")) colMap["weight"] = i;
     }
-    const weightIdx = headers.findIndex(h => h.includes("weight"));
-    if (weightIdx >= 0) colMap["weight"] = weightIdx;
 
+    // Pickup location from sheet tab name
+    const pickup = parseSheetLocation(sheetName);
+
+    let sheetLoadCount = 0;
     for (let r = headerRow + 1; r <= range.e.r; r++) {
       const getVal = (col: string): string => {
         const idx = colMap[col];
@@ -125,24 +168,44 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
         return cell ? String(cell.v).trim() : "";
       };
 
-      const equipment = getVal("equipment");
-      const deliveryCity = getVal("delivery city");
-      if (!equipment || !deliveryCity) continue;
+      // Skip instruction/label rows (e.g., "FLATBED ONLY", "Must have delivery appointment")
+      const cityVal = getVal("city");
+      const rateVal = getVal("rate");
+      if (!cityVal && !rateVal) continue;
+      
+      // Skip rows that are clearly labels, not data
+      const firstCellVal = getVal("due_date") || cityVal;
+      const upperFirst = firstCellVal.toUpperCase();
+      const upperCity = cityVal.toUpperCase();
+      const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "ASAP", "HOT LOAD", "CONTACT"];
+      if (skipPatterns.some(p => upperFirst.includes(p) || upperCity.includes(p))) continue;
+
+      const equipment = getVal("equipment") || "";
+      const deliveryCity = cityVal;
+      const deliveryState = getVal("state") || getVal("city2") || "";
+      const dueDateVal = getVal("due_date");
+      const rate = parseNumber(rateVal);
+      const notes = getVal("notes") || "";
+
+      // Need at least a city or rate to be a valid load row
+      if (!deliveryCity && rate === null) continue;
 
       allLoads.push({
         equipment,
-        shipper_city: getVal("shipper city"),
-        shipper_state: getVal("shipper state"),
+        shipper_city: pickup.city,
+        shipper_state: pickup.state,
         delivery_city: deliveryCity,
-        delivery_state: getVal("delivery state") || getVal("shipper state"),
-        ready_date: getVal("ready date") || null,
-        rate: parseNumber(getVal("rate")),
+        delivery_state: deliveryState,
+        ready_date: dueDateVal || null,
+        rate,
         weight: parseNumber(getVal("weight")),
         sheet_name: sheetName,
+        notes,
       });
+      sheetLoadCount++;
     }
 
-    console.log(`Sheet "${sheetName}": found ${allLoads.length} loads so far`);
+    console.log(`Sheet "${sheetName}": found ${sheetLoadCount} loads`);
   }
 
   return allLoads;
@@ -157,9 +220,18 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
   const loadNumber = `OC-${simpleHash(contentKey)}`;
   const rateFields = calculateRateFields(parsed.rate);
 
-  const trailerType = parsed.equipment.toUpperCase().includes("VAN") ? "Van"
-    : parsed.equipment.toUpperCase().includes("FLAT") ? "Flatbed"
-    : parsed.equipment || null;
+  let trailerType: string | null = null;
+  if (parsed.equipment) {
+    const eq = parsed.equipment.toUpperCase();
+    trailerType = eq.includes("VAN") ? "Van"
+      : eq.includes("FLAT") ? "Flatbed"
+      : parsed.equipment;
+  }
+
+  // Build notes from sheet notes + any extra context
+  const noteParts: string[] = [];
+  if (parsed.notes) noteParts.push(parsed.notes);
+  const commodity = null;
 
   const load: Record<string, unknown> = {
     agency_id: AGENCY_ID,
@@ -176,14 +248,15 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
     trailer_type: trailerType,
     weight_lbs: parsed.weight,
     ...rateFields,
-    commodity: null,
+    commodity,
     miles: null,
     tarp_required: false,
     status: "open",
-    source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment },
+    source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment, notes: parsed.notes },
   };
 
-  load.load_call_script = `Load ${loadNumber}: ${parsed.equipment} from ${pickupRaw} to ${destRaw}. Rate $${parsed.rate || 'TBD'}.`;
+  const eqLabel = parsed.equipment || trailerType || "Load";
+  load.load_call_script = `Load ${loadNumber}: ${eqLabel} from ${pickupRaw} to ${destRaw}. Rate $${parsed.rate || 'TBD'}.`;
   return load;
 }
 

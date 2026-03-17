@@ -166,6 +166,26 @@ export function generateDATCsv(loads: Load[]): string {
   return [headerLine, ...dataLines].join("\n");
 }
 
+const DAT_EXPORT_TIMESTAMP_KEY = "dat_last_export_timestamp";
+
+// Get loads added since the last DAT export
+export function getNewLoadsSinceLastExport(loads: Load[]): Load[] {
+  const lastExport = localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+  if (!lastExport) return loads; // First export ever — include all
+  const lastExportDate = new Date(lastExport);
+  return loads.filter(load => new Date(load.created_at) > lastExportDate);
+}
+
+// Save the current timestamp as last export time
+export function markDATExportComplete(): void {
+  localStorage.setItem(DAT_EXPORT_TIMESTAMP_KEY, new Date().toISOString());
+}
+
+// Get the last export timestamp for display
+export function getLastDATExportTimestamp(): string | null {
+  return localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+}
+
 // Download the CSV file
 export function downloadDATExport(loads: Load[], filename?: string): void {
   const csvContent = generateDATCsv(loads);

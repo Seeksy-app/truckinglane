@@ -40,6 +40,8 @@ export function AppHeader() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { loads } = useLoads();
+  const newLoadsForExport = getNewLoadsSinceLastExport(loads);
+  const hasNewExport = newLoadsForExport.length > 0;
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
   const [templateType, setTemplateType] = useState<string>("aljex_flat");

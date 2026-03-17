@@ -291,6 +291,11 @@ export function AppHeader() {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Export to DAT
+                        {hasNewExport && (
+                          <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
+                            {newLoadsForExport.length}
+                          </Badge>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate('/csv-converter')}>

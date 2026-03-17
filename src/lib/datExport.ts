@@ -58,7 +58,7 @@ function getCurrentDate(): string {
 function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
   // Default Adelphia and VMS to Flatbed if no trailer type specified
   if (!trailerType) {
-    if (templateType === "adelphia_xlsx" || templateType === "vms_email") {
+    if (templateType === "adelphia_xlsx" || templateType === "vms_email" || templateType === "oldcastle_gsheet") {
       return "F"; // Flatbed
     }
     return "";

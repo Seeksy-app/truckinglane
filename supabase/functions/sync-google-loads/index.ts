@@ -306,7 +306,7 @@ Deno.serve(async (req) => {
 
     // ── MODE 2: Legacy Google Sheets fetch (cron / manual) ──
     console.log("Mode: Google Sheets fetch");
-    const SPREADSHEET_ID = "154T6F7tIMfaG0-8Bw1aKtGAnwpQJvXuLNDbz6Lx1LA8";
+    const SPREADSHEET_ID = "1GkWErUwHLU6x51kRntqTKCi2t6djIl1d25287_IStr0";
     const exportUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=xlsx`;
     console.log("Fetching:", exportUrl);
 

@@ -40,6 +40,8 @@ export function AppHeader() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { loads } = useLoads();
+  const newLoadsForExport = getNewLoadsSinceLastExport(loads);
+  const hasNewExport = newLoadsForExport.length > 0;
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
   const [templateType, setTemplateType] = useState<string>("aljex_flat");
@@ -254,11 +256,14 @@ export function AppHeader() {
                       <Button
                         variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
                         size="sm"
-                        className="gap-2"
+                        className="gap-2 relative"
                       >
                         <FileSpreadsheet className="h-4 w-4" />
                         <span className="hidden sm:inline">Loads</span>
                         <ChevronDown className="h-3 w-3" />
+                        {hasNewExport && (
+                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="bg-popover">
@@ -286,6 +291,11 @@ export function AppHeader() {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Export to DAT
+                        {hasNewExport && (
+                          <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
+                            {newLoadsForExport.length}
+                          </Badge>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate('/csv-converter')}>

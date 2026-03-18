@@ -422,7 +422,7 @@ const Dashboard = () => {
     const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
     const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
     const newLoadsCount = loads.filter((l) => {
-      if (!l.is_active || l.template_type !== "oldcastle_gsheet") return false;
+      if (!l.is_active) return false;
       return new Date(l.created_at) > lastViewedDate;
     }).length;
     
@@ -601,7 +601,7 @@ const Dashboard = () => {
     const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
     const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
     let result = loads.filter((l) => {
-      if (!l.is_active || l.template_type !== "oldcastle_gsheet") return false;
+      if (!l.is_active) return false;
       return new Date(l.created_at) > lastViewedDate;
     });
     if (searchQuery.trim()) {

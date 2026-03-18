@@ -93,7 +93,7 @@ function parseSheetLocation(sheetName: string): { city: string; state: string } 
 }
 
 // Known header keywords to detect the header row
-const HEADER_KEYWORDS = ["due date", "city", "state", "rate", "equipment", "pick up", "deliver"];
+const HEADER_KEYWORDS = ["due date", "ready date", "city", "state", "rate", "equipment", "pick up", "deliver", "shipper", "truck", "trailer type"];
 
 function findHeaderRow(sheet: XLSX.WorkSheet, range: XLSX.Range): number {
   for (let r = 0; r <= Math.min(15, range.e.r); r++) {

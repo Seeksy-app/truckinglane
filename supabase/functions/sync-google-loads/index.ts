@@ -178,21 +178,26 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       };
 
       // Gather all values from the row
-      const cityVal = getVal("city");
       const rateVal = getVal("rate");
       const equipment = getVal("equipment") || "";
       const dueDateVal = getVal("due_date");
       const notes = getVal("notes") || "";
-      const stateVal = getVal("state") || getVal("city2") || "";
       const rate = parseNumber(rateVal);
 
+      // Resolve delivery city/state: prefer explicit columns, fall back to generic
+      const delCity = getVal("delivery_city") || getVal("city") || "";
+      const delState = getVal("delivery_state") || getVal("state") || getVal("city2") || "";
+
+      // Resolve shipper city/state: prefer explicit columns, fall back to tab name
+      const shipCity = getVal("shipper_city") || tabLocation.city;
+      const shipState = getVal("shipper_state") || tabLocation.state;
+
       // Check if row has ANY meaningful data across all columns
-      const hasAnyData = cityVal || rateVal || equipment || dueDateVal || stateVal;
+      const hasAnyData = delCity || rateVal || equipment || dueDateVal || delState || shipCity;
       if (!hasAnyData) continue;
 
       // Skip rows that are clearly labels/instructions, not data
-      // Only check city and due_date fields for instruction patterns (not equipment/notes)
-      const labelText = `${dueDateVal} ${cityVal}`.toUpperCase();
+      const labelText = `${dueDateVal} ${delCity}`.toUpperCase();
       const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "CONTACT US", "PLEASE CALL"];
       const isLabel = skipPatterns.some(p => labelText.includes(p));
       if (isLabel && !rate && !equipment) {
@@ -200,25 +205,17 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
         continue;
       }
 
-      // Extra debug: log skipped-looking rows
-      if (sheetLoadCount === 0 && !cityVal && !rateVal) {
-        console.log(`  [debug] Row ${r} empty-ish: date="${dueDateVal}" city="${cityVal}" state="${stateVal}" rate="${rateVal}" equip="${equipment}" notes="${notes.substring(0,40)}"`);
-      }
-
       // Debug: log first few rows per sheet
       if (sheetLoadCount < 3) {
-        console.log(`  Row ${r}: date="${dueDateVal}" city="${cityVal}" state="${stateVal}" rate="${rateVal}" equip="${equipment}"`);
+        console.log(`  Row ${r}: ship="${shipCity}, ${shipState}" del="${delCity}, ${delState}" rate="${rateVal}" equip="${equipment}"`);
       }
-
-      const deliveryCity = cityVal || null;
-      const deliveryState = stateVal || null;
 
       allLoads.push({
         equipment,
-        shipper_city: pickup.city,
-        shipper_state: pickup.state,
-        delivery_city: deliveryCity as string,
-        delivery_state: deliveryState as string,
+        shipper_city: shipCity || "",
+        shipper_state: shipState || "",
+        delivery_city: delCity || "",
+        delivery_state: delState || "",
         ready_date: dueDateVal || null,
         rate,
         weight: parseNumber(getVal("weight")),

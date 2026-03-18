@@ -183,11 +183,18 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       if (!hasAnyData) continue;
 
       // Skip rows that are clearly labels/instructions, not data
-      const allText = `${dueDateVal} ${cityVal} ${equipment} ${notes}`.toUpperCase();
+      // Only check city and due_date fields for instruction patterns (not equipment/notes)
+      const labelText = `${dueDateVal} ${cityVal}`.toUpperCase();
       const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "CONTACT US", "PLEASE CALL"];
-      if (skipPatterns.some(p => allText.includes(p)) && !rate) {
+      const isLabel = skipPatterns.some(p => labelText.includes(p));
+      if (isLabel && !rate && !equipment) {
         skippedRows++;
         continue;
+      }
+
+      // Extra debug: log skipped-looking rows
+      if (sheetLoadCount === 0 && !cityVal && !rateVal) {
+        console.log(`  [debug] Row ${r} empty-ish: date="${dueDateVal}" city="${cityVal}" state="${stateVal}" rate="${rateVal}" equip="${equipment}" notes="${notes.substring(0,40)}"`);
       }
 
       // Debug: log first few rows per sheet

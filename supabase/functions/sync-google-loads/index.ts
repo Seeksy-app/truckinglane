@@ -202,8 +202,8 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
         equipment,
         shipper_city: pickup.city,
         shipper_state: pickup.state,
-        delivery_city: deliveryCity,
-        delivery_state: deliveryState,
+        delivery_city: deliveryCity as string,
+        delivery_state: deliveryState as string,
         ready_date: dueDateVal || null,
         rate,
         weight: parseNumber(getVal("weight")),
@@ -213,7 +213,7 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
       sheetLoadCount++;
     }
 
-    console.log(`Sheet "${sheetName}": found ${sheetLoadCount} loads`);
+    console.log(`Sheet "${sheetName}": found ${sheetLoadCount} loads (skipped ${skippedRows} instruction rows)`);
   }
 
   return allLoads;

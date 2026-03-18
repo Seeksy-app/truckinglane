@@ -160,6 +160,7 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
     const pickup = parseSheetLocation(sheetName);
 
     let sheetLoadCount = 0;
+    let skippedRows = 0;
     for (let r = headerRow + 1; r <= range.e.r; r++) {
       const getVal = (col: string): string => {
         const idx = colMap[col];
@@ -168,27 +169,34 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
         return cell ? String(cell.v).trim() : "";
       };
 
-      // Skip instruction/label rows (e.g., "FLATBED ONLY", "Must have delivery appointment")
+      // Gather all values from the row
       const cityVal = getVal("city");
       const rateVal = getVal("rate");
-      if (!cityVal && !rateVal) continue;
-      
-      // Skip rows that are clearly labels, not data
-      const firstCellVal = getVal("due_date") || cityVal;
-      const upperFirst = firstCellVal.toUpperCase();
-      const upperCity = cityVal.toUpperCase();
-      const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "ASAP", "HOT LOAD", "CONTACT"];
-      if (skipPatterns.some(p => upperFirst.includes(p) || upperCity.includes(p))) continue;
-
       const equipment = getVal("equipment") || "";
-      const deliveryCity = cityVal;
-      const deliveryState = getVal("state") || getVal("city2") || "";
       const dueDateVal = getVal("due_date");
-      const rate = parseNumber(rateVal);
       const notes = getVal("notes") || "";
+      const stateVal = getVal("state") || getVal("city2") || "";
+      const rate = parseNumber(rateVal);
 
-      // Need at least a city or rate to be a valid load row
-      if (!deliveryCity && rate === null) continue;
+      // Check if row has ANY meaningful data across all columns
+      const hasAnyData = cityVal || rateVal || equipment || dueDateVal || stateVal;
+      if (!hasAnyData) continue;
+
+      // Skip rows that are clearly labels/instructions, not data
+      const allText = `${dueDateVal} ${cityVal} ${equipment} ${notes}`.toUpperCase();
+      const skipPatterns = ["FLATBED ONLY", "MUST HAVE", "SHIPPING HOURS", "ALL LOADS ARE", "CONTACT US", "PLEASE CALL"];
+      if (skipPatterns.some(p => allText.includes(p)) && !rate) {
+        skippedRows++;
+        continue;
+      }
+
+      // Debug: log first few rows per sheet
+      if (sheetLoadCount < 3) {
+        console.log(`  Row ${r}: date="${dueDateVal}" city="${cityVal}" state="${stateVal}" rate="${rateVal}" equip="${equipment}"`);
+      }
+
+      const deliveryCity = cityVal || null;
+      const deliveryState = stateVal || null;
 
       allLoads.push({
         equipment,

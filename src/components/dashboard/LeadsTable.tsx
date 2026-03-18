@@ -406,7 +406,7 @@ export const LeadsTable = ({
             return (
               <React.Fragment key={lead.id}>
                 <TableRow 
-                  ref={(el) => (rowRefs.current[index] = el)}
+                  ref={(el: HTMLTableRowElement | null) => { if (el) rowRefs.current[index] = el; }}
                   tabIndex={0}
                   role="row"
                   aria-selected={isFocused}

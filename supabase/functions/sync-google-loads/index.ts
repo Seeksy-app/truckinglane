@@ -146,18 +146,26 @@ function parseAllSheets(buffer: ArrayBuffer): ParsedLoad[] {
     for (let i = 0; i < headers.length; i++) {
       const h = headers[i];
       if (!h) continue;
-      if (h.includes("due date") || h === "date") colMap["due_date"] = i;
+      if (h.includes("due date") || h === "date" || h === "ready date") colMap["due_date"] = i;
+      else if (h === "delivery city") colMap["delivery_city"] = i;
+      else if (h === "delivery state") colMap["delivery_state"] = i;
+      else if (h === "shipper city") colMap["shipper_city"] = i;
+      else if (h === "shipper state") colMap["shipper_state"] = i;
       else if (h === "city" && colMap["city"] === undefined) colMap["city"] = i;
-      else if (h === "city" && colMap["city"] !== undefined) colMap["city2"] = i; // second city column (Waterloo format)
+      else if (h === "city" && colMap["city"] !== undefined) colMap["city2"] = i;
       else if (h === "state") colMap["state"] = i;
       else if (h.includes("rate")) colMap["rate"] = i;
-      else if (h.includes("equipment")) colMap["equipment"] = i;
-      else if (h.includes("note")) colMap["notes"] = i;
+      else if (h.includes("equipment") || h === "truck" || h === "trailer type") colMap["equipment"] = i;
+      else if (h.includes("note") || h.includes("load notes")) colMap["notes"] = i;
       else if (h.includes("weight")) colMap["weight"] = i;
+      else if (h === "customer") colMap["customer"] = i;
     }
 
-    // Pickup location from sheet tab name
-    const pickup = parseSheetLocation(sheetName);
+    // Pickup location: prefer explicit shipper columns, fall back to tab name
+    const tabLocation = parseSheetLocation(sheetName);
+    const hasExplicitShipper = colMap["shipper_city"] !== undefined;
+    // Delivery: prefer explicit delivery columns, fall back to generic city/state
+    const hasExplicitDelivery = colMap["delivery_city"] !== undefined;
 
     let sheetLoadCount = 0;
     let skippedRows = 0;

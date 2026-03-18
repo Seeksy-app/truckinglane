@@ -1,5 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@2.89.0";
-import * as XLSX from "npm:xlsx@0.18.5";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

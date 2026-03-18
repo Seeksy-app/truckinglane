@@ -281,7 +281,7 @@ export function AppHeader() {
                           if (newLoads.length === 0) {
                             const lastTs = getLastDATExportTimestamp();
                             const since = lastTs ? new Date(lastTs).toLocaleString() : "unknown";
-                            toast.error(`No new loads since last export (${since})`);
+                            toast.warning(`No new loads since last export (${since})`, { duration: 5000 });
                             return;
                           }
                           downloadDATExport(newLoads);

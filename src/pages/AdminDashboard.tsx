@@ -25,7 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import { AppHeader } from '@/components/AppHeader';
 import { TrustPageAdmin } from '@/components/admin/TrustPageAdmin';
 import { SystemHealthDashboard } from '@/components/admin/SystemHealthDashboard';
-import { EmailImportLogs } from '@/components/admin/EmailImportLogs';
+import { LoadActivityLogs } from '@/components/admin/LoadActivityLogs';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,

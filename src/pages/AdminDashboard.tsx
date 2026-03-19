@@ -669,8 +669,8 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Email Import Logs - visible to agency admins */}
-        {agencyId && <EmailImportLogs agencyId={agencyId} />}
+        {/* Load Activity Logs - visible to agency admins */}
+        {agencyId && <LoadActivityLogs agencyId={agencyId} />}
 
         {/* Super Admin Only Sections */}
         {isSuperAdmin && (

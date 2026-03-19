@@ -865,6 +865,16 @@ export default function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Delete Team Member Confirm */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Remove Team Member"
+        description={`Are you sure you want to remove ${deletingAgent?.profile?.full_name || deletingAgent?.profile?.email || 'this member'} from the team? They will lose access immediately.`}
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={handleDeleteAgent}
+      />
     </div>
   );
 }

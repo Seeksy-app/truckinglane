@@ -85,6 +85,8 @@ export default function AdminDashboard() {
   const [passwordAgent, setPasswordAgent] = useState<Agent | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [settingPassword, setSettingPassword] = useState(false);
+  const [deletingAgent, setDeletingAgent] = useState<Agent | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const isSuperAdmin = role === 'super_admin';
 

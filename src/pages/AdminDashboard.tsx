@@ -692,6 +692,20 @@ export default function AdminDashboard() {
                                   <Copy className="h-3 w-3" />
                                 )}
                               </Button>
+                              {agent.user_id !== user?.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setDeletingAgent(agent);
+                                    setDeleteConfirmOpen(true);
+                                  }}
+                                  className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Remove member"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           )}
                         </TableCell>

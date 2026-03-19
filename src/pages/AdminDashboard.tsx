@@ -385,6 +385,39 @@ export default function AdminDashboard() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleDeleteAgent = async () => {
+    if (!deletingAgent || !agencyId) return;
+    
+    // Don't let admins delete themselves
+    if (deletingAgent.user_id === user?.id) {
+      toast.error("You can't remove yourself");
+      setDeleteConfirmOpen(false);
+      setDeletingAgent(null);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('agency_members')
+        .delete()
+        .eq('id', deletingAgent.id);
+
+      if (error) {
+        toast.error(error.message || 'Failed to remove team member');
+        return;
+      }
+
+      toast.success(`${deletingAgent.profile?.full_name || deletingAgent.profile?.email || 'Member'} removed`);
+      setAgents(prev => prev.filter(a => a.id !== deletingAgent.id));
+    } catch (err) {
+      console.error('Error deleting agent:', err);
+      toast.error('Failed to remove team member');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingAgent(null);
+    }
+  };
+
   if (roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

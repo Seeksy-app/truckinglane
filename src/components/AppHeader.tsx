@@ -295,7 +295,21 @@ export function AppHeader() {
                           <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
                             {newLoadsForExport.length}
                           </Badge>
-                        )}
+                         )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (loads.length === 0) {
+                            toast.error("No active loads to export");
+                            return;
+                          }
+                          downloadDATExport(loads);
+                          markDATExportComplete();
+                          toast.success(`Exported ALL ${loads.length} loads to DAT format (one-time)`);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export All to DAT (one-time)
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate('/csv-converter')}>

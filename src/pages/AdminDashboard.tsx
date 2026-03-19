@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { 
   Users, Plus, Copy, Check, 
-  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil, Phone, User
+  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil, Phone, User, Trash2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {

@@ -290,7 +290,19 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
   const parsedLoads = parseAllSheets(buffer);
   console.log(`[${source}] Parsed ${parsedLoads.length} total loads`);
 
+  const senderLabel = source === "openclaw-upload" ? "openclaw@oldcastle-sync" : "google-sheets@oldcastle-sync";
+  const subjectLabel = `Oldcastle Sync (${source})`;
+
   if (parsedLoads.length === 0) {
+    // Log empty import
+    await supabase.from("email_import_logs").insert({
+      agency_id: AGENCY_ID,
+      sender_email: senderLabel,
+      subject: subjectLabel,
+      status: "success",
+      imported_count: 0,
+      error_message: "No loads found in sheet",
+    });
     return { success: true, imported: 0, message: "No loads found in sheet", source };
   }
 
@@ -314,6 +326,15 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     .select("id");
 
   if (archiveError) {
+    // Log failure
+    await supabase.from("email_import_logs").insert({
+      agency_id: AGENCY_ID,
+      sender_email: senderLabel,
+      subject: subjectLabel,
+      status: "failed",
+      imported_count: 0,
+      error_message: `Archive error: ${archiveError.message}`,
+    });
     console.error("Archive error:", archiveError);
     throw new Error(archiveError.message);
   }
@@ -338,6 +359,15 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     });
 
   if (upsertError) {
+    // Log failure
+    await supabase.from("email_import_logs").insert({
+      agency_id: AGENCY_ID,
+      sender_email: senderLabel,
+      subject: subjectLabel,
+      status: "failed",
+      imported_count: 0,
+      error_message: `Upsert error: ${upsertError.message}`,
+    });
     console.error("Upsert error:", upsertError);
     throw new Error(upsertError.message);
   }
@@ -352,13 +382,23 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
       });
   }
 
+  // Log success to import logs
+  const sheetsProcessed = new Set(parsedLoads.map(l => l.sheet_name)).size;
+  await supabase.from("email_import_logs").insert({
+    agency_id: AGENCY_ID,
+    sender_email: senderLabel,
+    subject: `${subjectLabel} — ${sheetsProcessed} sheets`,
+    status: "success",
+    imported_count: safeLoads.length,
+  });
+
   console.log(`[${source}] Upserted ${safeLoads.length} loads. Done!`);
 
   return {
     success: true,
     imported: safeLoads.length,
     archived: archivedCount,
-    sheets_processed: new Set(parsedLoads.map(l => l.sheet_name)).size,
+    sheets_processed: sheetsProcessed,
     source,
   };
 }

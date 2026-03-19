@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { 
   Users, Plus, Copy, Check, 
-  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil, Phone, User
+  Loader2, UserPlus, Mail, Building2, RefreshCw, Clock, KeyRound, Pencil, Phone, User, Trash2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -25,7 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import { AppHeader } from '@/components/AppHeader';
 import { TrustPageAdmin } from '@/components/admin/TrustPageAdmin';
 import { SystemHealthDashboard } from '@/components/admin/SystemHealthDashboard';
-import { EmailImportLogs } from '@/components/admin/EmailImportLogs';
+import { LoadActivityLogs } from '@/components/admin/LoadActivityLogs';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -84,6 +85,8 @@ export default function AdminDashboard() {
   const [passwordAgent, setPasswordAgent] = useState<Agent | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [settingPassword, setSettingPassword] = useState(false);
+  const [deletingAgent, setDeletingAgent] = useState<Agent | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const isSuperAdmin = role === 'super_admin';
 
@@ -382,6 +385,39 @@ export default function AdminDashboard() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleDeleteAgent = async () => {
+    if (!deletingAgent || !agencyId) return;
+    
+    // Don't let admins delete themselves
+    if (deletingAgent.user_id === user?.id) {
+      toast.error("You can't remove yourself");
+      setDeleteConfirmOpen(false);
+      setDeletingAgent(null);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('agency_members')
+        .delete()
+        .eq('id', deletingAgent.id);
+
+      if (error) {
+        toast.error(error.message || 'Failed to remove team member');
+        return;
+      }
+
+      toast.success(`${deletingAgent.profile?.full_name || deletingAgent.profile?.email || 'Member'} removed`);
+      setAgents(prev => prev.filter(a => a.id !== deletingAgent.id));
+    } catch (err) {
+      console.error('Error deleting agent:', err);
+      toast.error('Failed to remove team member');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setDeletingAgent(null);
+    }
+  };
+
   if (roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -656,6 +692,20 @@ export default function AdminDashboard() {
                                   <Copy className="h-3 w-3" />
                                 )}
                               </Button>
+                              {agent.user_id !== user?.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setDeletingAgent(agent);
+                                    setDeleteConfirmOpen(true);
+                                  }}
+                                  className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Remove member"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           )}
                         </TableCell>
@@ -668,8 +718,8 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Email Import Logs - visible to agency admins */}
-        {agencyId && <EmailImportLogs agencyId={agencyId} />}
+        {/* Load Activity Logs - visible to agency admins */}
+        {agencyId && <LoadActivityLogs agencyId={agencyId} />}
 
         {/* Super Admin Only Sections */}
         {isSuperAdmin && (
@@ -815,6 +865,16 @@ export default function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Delete Team Member Confirm */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Remove Team Member"
+        description={`Are you sure you want to remove ${deletingAgent?.profile?.full_name || deletingAgent?.profile?.email || 'this member'} from the team? They will lose access immediately.`}
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={handleDeleteAgent}
+      />
     </div>
   );
 }

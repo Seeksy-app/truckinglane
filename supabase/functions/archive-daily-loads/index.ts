@@ -27,7 +27,7 @@ serve(async (req: Request) => {
       })
       .eq("is_active", true)
       .neq("status", "booked")
-      .select("id");
+      .select("id, agency_id, template_type");
 
     if (error) {
       console.error("Error archiving loads:", error);
@@ -38,7 +38,32 @@ serve(async (req: Request) => {
     }
 
     const archivedCount = data?.length ?? 0;
-    console.log(`Archived ${archivedCount} loads at 6pm CST`);
+    console.log(`Archived ${archivedCount} loads at midnight ET`);
+
+    // Log the archive event per agency to email_import_logs for visibility
+    if (archivedCount > 0) {
+      const byAgency = new Map<string, number>();
+      for (const load of data!) {
+        const agencyId = load.agency_id as string;
+        byAgency.set(agencyId, (byAgency.get(agencyId) || 0) + 1);
+      }
+
+      const logEntries = Array.from(byAgency.entries()).map(([agencyId, count]) => ({
+        agency_id: agencyId,
+        sender_email: "system@daily-archive",
+        subject: `Nightly Archive — ${count} loads cleared`,
+        status: "success",
+        imported_count: count,
+      }));
+
+      const { error: logError } = await supabaseAdmin
+        .from("email_import_logs")
+        .insert(logEntries);
+
+      if (logError) {
+        console.error("Error logging archive:", logError);
+      }
+    }
 
     return new Response(
       JSON.stringify({ 

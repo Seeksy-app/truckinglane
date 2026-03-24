@@ -988,19 +988,6 @@ Deno.serve(async (req) => {
         replaced_count: 0,
       });
       
-      // Archive existing active Oldcastle loads (except booked)
-      const { data: archivedData } = await supabase
-        .from("loads")
-        .update({ is_active: false, archived_at: new Date().toISOString() })
-        .eq("agency_id", agency.id)
-        .eq("template_type", "oldcastle_gsheet")
-        .eq("is_active", true)
-        .is("booked_at", null)
-        .select("id");
-      
-      const archivedCount = archivedData?.length || 0;
-      console.log(`Archived ${archivedCount} existing Oldcastle loads`);
-      
       // Deduplicate
       const loadsByNumber = new Map<string, Record<string, unknown>>();
       for (const load of mappedLoads) {

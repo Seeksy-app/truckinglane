@@ -812,22 +812,6 @@ Deno.serve(async (req) => {
         replaced_count: 0,
       });
       
-      // Archive ALL existing active VMS loads (except booked) - replaced by new import
-      const { data: archivedData } = await supabase
-        .from("loads")
-        .update({
-          is_active: false,
-          archived_at: new Date().toISOString(),
-        })
-        .eq("agency_id", agency.id)
-        .eq("template_type", "vms_email")
-        .eq("is_active", true)
-        .is("booked_at", null)
-        .select("id");
-      
-      const archivedCount = archivedData?.length || 0;
-      console.log(`Archived ${archivedCount} existing VMS loads`);
-      
       // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
       // Keep the last occurrence of each load_number (in case of duplicates)
       const loadsByNumber = new Map<string, Record<string, unknown>>();
@@ -915,7 +899,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imported: importedCount,
-        archived: archivedCount,
+        archived: reactivated?.length || 0,
         agency: agency.name,
         import_type: "vms_email",
       }), {
@@ -1004,19 +988,6 @@ Deno.serve(async (req) => {
         replaced_count: 0,
       });
       
-      // Archive existing active Oldcastle loads (except booked)
-      const { data: archivedData } = await supabase
-        .from("loads")
-        .update({ is_active: false, archived_at: new Date().toISOString() })
-        .eq("agency_id", agency.id)
-        .eq("template_type", "oldcastle_gsheet")
-        .eq("is_active", true)
-        .is("booked_at", null)
-        .select("id");
-      
-      const archivedCount = archivedData?.length || 0;
-      console.log(`Archived ${archivedCount} existing Oldcastle loads`);
-      
       // Deduplicate
       const loadsByNumber = new Map<string, Record<string, unknown>>();
       for (const load of mappedLoads) {
@@ -1058,6 +1029,22 @@ Deno.serve(async (req) => {
         }
         
         importedCount = safeLoads.length;
+        
+        // Archive loads NOT in the new batch
+        const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+        const { data: archivedData } = await supabase
+          .from("loads")
+          .update({ is_active: false, archived_at: new Date().toISOString() })
+          .eq("agency_id", agency.id)
+          .eq("template_type", "oldcastle_gsheet")
+          .eq("is_active", true)
+          .is("booked_at", null)
+          .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+          .select("id");
+        
+        const archivedCount = archivedData?.length || 0;
+        console.log(`Archived ${archivedCount} Oldcastle loads not in current batch`);
+        
         await postLoadsToX(safeLoads);
       }
       
@@ -1073,7 +1060,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imported: importedCount,
-        archived: archivedCount,
         agency: agency.name,
         import_type: "oldcastle_gsheet",
       }), {
@@ -1233,22 +1219,6 @@ Deno.serve(async (req) => {
       replaced_count: 0,
     });
     
-    // Archive ALL existing active Adelphia loads (except booked) - replaced by new import
-    const { data: archivedData } = await supabase
-      .from("loads")
-      .update({
-        is_active: false,
-        archived_at: new Date().toISOString(),
-      })
-      .eq("agency_id", agency.id)
-      .eq("template_type", "adelphia_xlsx")
-      .eq("is_active", true)
-      .is("booked_at", null)
-      .select("id");
-    
-    const archivedCount = archivedData?.length || 0;
-    console.log(`Archived ${archivedCount} existing Adelphia loads`);
-    
     // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
     const loadsByNumber = new Map<string, Record<string, unknown>>();
     for (const load of mappedLoads) {
@@ -1296,6 +1266,21 @@ Deno.serve(async (req) => {
       
       importedCount = safeLoads.length;
       
+      // Archive loads NOT in the new batch
+      const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+      const { data: archivedData } = await supabase
+        .from("loads")
+        .update({ is_active: false, archived_at: new Date().toISOString() })
+        .eq("agency_id", agency.id)
+        .eq("template_type", "adelphia_xlsx")
+        .eq("is_active", true)
+        .is("booked_at", null)
+        .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+        .select("id");
+      
+      const archivedCount = archivedData?.length || 0;
+      console.log(`Archived ${archivedCount} Adelphia loads not in current batch`);
+      
       // Post new loads to X
       await postLoadsToX(safeLoads);
     }
@@ -1317,7 +1302,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       imported: importedCount,
-      archived: archivedCount,
       agency: agency.name,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

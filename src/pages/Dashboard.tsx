@@ -418,12 +418,13 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New Oldcastle loads since last view
+    // New loads since last view - use updated_at because upserts refresh it
+    // while created_at stays from the original insert (may be days old)
     const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
     const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
     const newLoadsCount = loads.filter((l) => {
       if (!l.is_active) return false;
-      return new Date(l.created_at) > lastViewedDate;
+      return new Date(l.updated_at) > lastViewedDate;
     }).length;
     
     return {
@@ -602,7 +603,7 @@ const Dashboard = () => {
     const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
     let result = loads.filter((l) => {
       if (!l.is_active) return false;
-      return new Date(l.created_at) > lastViewedDate;
+      return new Date(l.updated_at) > lastViewedDate;
     });
     if (searchQuery.trim()) {
       const searchTerms = normalizeStateSearch(searchQuery);

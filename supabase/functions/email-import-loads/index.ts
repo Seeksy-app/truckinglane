@@ -899,7 +899,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imported: importedCount,
-        archived: archivedCount,
+        archived: reactivated?.length || 0,
         agency: agency.name,
         import_type: "vms_email",
       }), {

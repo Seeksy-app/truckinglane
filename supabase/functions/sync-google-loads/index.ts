@@ -315,34 +315,7 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
   const safeLoads = Array.from(loadsByNumber.values());
   console.log(`[${source}] ${safeLoads.length} unique loads after dedup`);
 
-  // Archive existing active non-booked oldcastle loads
-  const { data: archivedData, error: archiveError } = await supabase
-    .from("loads")
-    .update({ is_active: false, archived_at: new Date().toISOString() })
-    .eq("agency_id", AGENCY_ID)
-    .eq("template_type", TEMPLATE_TYPE)
-    .eq("is_active", true)
-    .is("booked_at", null)
-    .select("id");
-
-  if (archiveError) {
-    // Log failure
-    await supabase.from("email_import_logs").insert({
-      agency_id: AGENCY_ID,
-      sender_email: senderLabel,
-      subject: subjectLabel,
-      status: "failed",
-      imported_count: 0,
-      error_message: `Archive error: ${archiveError.message}`,
-    });
-    console.error("Archive error:", archiveError);
-    throw new Error(archiveError.message);
-  }
-
-  const archivedCount = archivedData?.length || 0;
-  console.log(`[${source}] Archived ${archivedCount} existing loads`);
-
-  // Upsert new loads
+  // Upsert new loads FIRST (smart trigger only bumps updated_at if data changed)
   const today = new Date().toISOString().split("T")[0];
   const loadsWithMeta = safeLoads.map(load => ({
     ...load,

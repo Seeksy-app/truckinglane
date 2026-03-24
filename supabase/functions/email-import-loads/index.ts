@@ -812,22 +812,6 @@ Deno.serve(async (req) => {
         replaced_count: 0,
       });
       
-      // Archive ALL existing active VMS loads (except booked) - replaced by new import
-      const { data: archivedData } = await supabase
-        .from("loads")
-        .update({
-          is_active: false,
-          archived_at: new Date().toISOString(),
-        })
-        .eq("agency_id", agency.id)
-        .eq("template_type", "vms_email")
-        .eq("is_active", true)
-        .is("booked_at", null)
-        .select("id");
-      
-      const archivedCount = archivedData?.length || 0;
-      console.log(`Archived ${archivedCount} existing VMS loads`);
-      
       // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
       // Keep the last occurrence of each load_number (in case of duplicates)
       const loadsByNumber = new Map<string, Record<string, unknown>>();

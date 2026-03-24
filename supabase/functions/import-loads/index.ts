@@ -724,6 +724,21 @@ Deno.serve(async (req) => {
       }
       
       console.log(`Upserted ${loadsWithBoardDate.length} loads`);
+      
+      // Archive loads NOT in the new batch (removed from source file)
+      const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+      const { data: archivedData } = await supabase
+        .from("loads")
+        .update({ is_active: false, archived_at: new Date().toISOString() })
+        .eq("agency_id", agencyId)
+        .eq("template_type", templateType)
+        .eq("is_active", true)
+        .is("booked_at", null)
+        .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+        .select("id");
+      
+      const archivedCount = archivedData?.length || 0;
+      console.log(`Archived ${archivedCount} loads not in current batch`);
     }
     
     const importedCount = safeLoads.length;
@@ -735,14 +750,13 @@ Deno.serve(async (req) => {
     if (batchData?.id) {
       await supabase
         .from("load_import_runs")
-        .update({ replaced_count: archivedCount })
+        .update({ replaced_count: 0 })
         .eq("id", batchData.id);
     }
     
     return new Response(JSON.stringify({
       success: true,
       imported: importedCount,
-      archived: archivedCount,
       skipped: skippedCount,
       template: templateType,
     }), {

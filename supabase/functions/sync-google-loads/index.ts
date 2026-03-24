@@ -345,6 +345,21 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     throw new Error(upsertError.message);
   }
 
+  // Archive loads NOT in the new batch (loads removed from the sheet)
+  const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+  const { data: archivedData } = await supabase
+    .from("loads")
+    .update({ is_active: false, archived_at: new Date().toISOString() })
+    .eq("agency_id", AGENCY_ID)
+    .eq("template_type", TEMPLATE_TYPE)
+    .eq("is_active", true)
+    .is("booked_at", null)
+    .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+    .select("id");
+
+  const archivedCount = archivedData?.length || 0;
+  console.log(`[${source}] Archived ${archivedCount} loads not in current batch`);
+
   // Also save the uploaded file to storage for audit
   if (source === "openclaw-upload") {
     await supabase.storage

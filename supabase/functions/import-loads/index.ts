@@ -687,30 +687,6 @@ Deno.serve(async (req) => {
       console.error("Batch insert error:", batchError);
     }
     
-    // Archive ALL existing active loads (except booked) - replaced by new import
-    const { data: archivedData, error: archiveError } = await supabase
-      .from("loads")
-      .update({
-        is_active: false,
-        archived_at: new Date().toISOString(),
-      })
-      .eq("agency_id", agencyId)
-      .eq("template_type", templateType)
-      .eq("is_active", true)
-      .is("booked_at", null) // Don't archive booked loads
-      .select("id");
-    
-    if (archiveError) {
-      console.error("Archive error:", archiveError);
-      return new Response(JSON.stringify({ error: archiveError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    
-    const archivedCount = archivedData?.length || 0;
-    console.log(`Archived ${archivedCount} existing ${templateType} loads`);
-    
     // Deduplicate by load_number to prevent "ON CONFLICT DO UPDATE cannot affect row a second time" error
     const loadsByNumber = new Map<string, Record<string, unknown>>();
     for (const load of mappedLoads) {

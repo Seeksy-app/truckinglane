@@ -1029,6 +1029,22 @@ Deno.serve(async (req) => {
         }
         
         importedCount = safeLoads.length;
+        
+        // Archive loads NOT in the new batch
+        const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+        const { data: archivedData } = await supabase
+          .from("loads")
+          .update({ is_active: false, archived_at: new Date().toISOString() })
+          .eq("agency_id", agency.id)
+          .eq("template_type", "oldcastle_gsheet")
+          .eq("is_active", true)
+          .is("booked_at", null)
+          .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+          .select("id");
+        
+        const archivedCount = archivedData?.length || 0;
+        console.log(`Archived ${archivedCount} Oldcastle loads not in current batch`);
+        
         await postLoadsToX(safeLoads);
       }
       
@@ -1044,7 +1060,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imported: importedCount,
-        archived: archivedCount,
         agency: agency.name,
         import_type: "oldcastle_gsheet",
       }), {

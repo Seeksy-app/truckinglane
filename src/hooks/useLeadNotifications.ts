@@ -79,11 +79,21 @@ export function useLeadNotifications() {
             ? `${parts.join(" • ")}\n${summary}${newLead.notes && newLead.notes.length > 100 ? "..." : ""}`
             : parts.join(" • ");
 
-          // Show in-app toast notification
+          // Show in-app toast notification (clickable — opens lead in dashboard)
           toast({
             title,
             description: body,
             duration: 8000,
+            action: (
+              <button
+                onClick={() => {
+                  window.location.href = `/dashboard?lead=${encodeURIComponent(newLead.caller_phone || newLead.id)}`;
+                }}
+                className="shrink-0 rounded-md border border-current px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+              >
+                View Lead
+              </button>
+            ) as any,
           });
 
           // Play sound if enabled

@@ -28,6 +28,7 @@ import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
+import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -704,6 +705,9 @@ const Dashboard = () => {
         
         {/* KPI Cards as view toggles */}
         <DashboardStats stats={stats} activeMode={mode} onModeChange={setMode} />
+
+        {/* DAT Status Card */}
+        <DATStatusCard />
 
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">

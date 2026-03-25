@@ -31,13 +31,27 @@ export function DATStatusCard() {
   const { data: stats } = useQuery({
     queryKey: ["dat-stats"],
     queryFn: async () => {
+      // Use supabase client (carries user auth session, respects RLS)
+      // select('*') returns dat_posted_at at runtime even if not in TS types
+      const { data } = await supabase
+        .from("loads")
+        .select("id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type")
+        .eq("is_active", true);
+      
+      // Separately fetch dat_posted_at using raw query via RPC workaround
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
       const resp = await fetch(
-        `${supabaseUrl}/rest/v1/loads?is_active=eq.true&select=id,load_number,pickup_city,pickup_state,dest_city,dest_state,template_type,dat_posted_at`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+        `${supabaseUrl}/rest/v1/loads?is_active=eq.true&select=id,dat_posted_at`,
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` } }
       );
-      const loads: any[] = await resp.json();
+      const datStatus: any[] = await resp.json();
+      const datMap = new Map(datStatus.map((l: any) => [l.id, l.dat_posted_at]));
+      
+      const loads: any[] = (data || []).map(l => ({ ...l, dat_posted_at: datMap.get(l.id) ?? null }));
       const posted = loads.filter(l => l.dat_posted_at);
       const failed = loads.filter(l => !l.dat_posted_at && (!l.pickup_city || !l.dest_city));
       const pending = loads.filter(l => !l.dat_posted_at && l.pickup_city && l.dest_city);

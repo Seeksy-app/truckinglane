@@ -703,8 +703,8 @@ const Dashboard = () => {
         {/* Agent Performance Banner */}
         <AgentPerformanceBanner userId={user.id} agencyId={agencyMember?.agency_id} />
         
-        {/* KPI Cards as view toggles (DAT card included as first card) */}
-        <DashboardStats stats={stats} activeMode={mode} onModeChange={setMode} />
+        {/* KPI Cards as view toggles (DAT card + Cost card for admins) */}
+        <DashboardStats stats={stats} activeMode={mode} onModeChange={setMode} isAdmin={isAdmin} />
 
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">

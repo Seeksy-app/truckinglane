@@ -169,15 +169,15 @@ export function generateDATCsv(loads: Load[]): string {
 const DAT_EXPORT_TIMESTAMP_KEY = "dat_last_export_timestamp";
 
 // Get loads that have NOT yet been posted to DAT (dat_posted_at is null)
-// Falls back to localStorage timestamp if column doesn't exist
 export function getNewLoadsSinceLastExport(loads: Load[]): Load[] {
-  // Primary: use dat_posted_at column (server-side, shared across all devices)
-  const unpostedLoads = loads.filter(load => !(load as any).dat_posted_at);
-  if (unpostedLoads.length < loads.length) {
-    // dat_posted_at column exists and has data — use it
-    return unpostedLoads;
+  // Use dat_posted_at column — server-side, shared across all devices
+  // A load with dat_posted_at = null has not been posted to DAT yet
+  const hasPostedAny = loads.some(load => (load as any).dat_posted_at != null);
+  if (hasPostedAny) {
+    // Column is populated — use it as source of truth
+    return loads.filter(load => (load as any).dat_posted_at == null);
   }
-  // Fallback: localStorage timestamp (legacy, per-device)
+  // Column not yet populated (fresh install) — fall back to localStorage
   const lastExport = localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
   if (!lastExport) return loads;
   const lastExportDate = new Date(lastExport);

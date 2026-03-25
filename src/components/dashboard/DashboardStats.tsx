@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { DATStatusCard } from "./DATStatusCard";
-import { CostCard } from "./CostCard";
 import { Package, UserCheck, Users, Phone, CheckCircle, Info, Sparkles } from "lucide-react";
 import {
   Tooltip,
@@ -101,7 +100,6 @@ export const DashboardStats = ({ stats, activeMode, onModeChange, isAdmin = fals
     <TooltipProvider>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
         <DATStatusCard />
-        {isAdmin && <CostCard />}
         {statCards.map((stat) => {
           const isActive = activeMode === stat.key;
           const Icon = stat.icon;

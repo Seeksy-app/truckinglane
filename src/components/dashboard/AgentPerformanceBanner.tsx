@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from "react";
+import { CostBadge } from "./CostBadge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, Clock, Zap, Timer, Trophy, Info } from "lucide-react";
@@ -409,8 +410,9 @@ export const AgentPerformanceBanner = ({ userId, agencyId }: AgentPerformanceBan
             />
           </div>
 
-          {/* Motivational message */}
-          <div className="hidden lg:flex items-center gap-2 text-sm ml-auto">
+          {/* Motivational message + Cost badge (admin only) */}
+          <div className="hidden lg:flex items-center gap-4 text-sm ml-auto">
+            <CostBadge />
             <span className={`font-medium ${motivation.color}`}>{motivation.text}</span>
           </div>
         </div>

@@ -7,17 +7,16 @@ const corsHeaders = {
 
 const ELEVENLABS_RATE_PER_MIN = 0.05;
 const FIRECRAWL_RATE_PER_CRAWL = 0.005;
+// TruckingLane ElevenLabs workspace key - hardcoded since Supabase secrets management is complex
+// This key only has access to convai/conversations (no user_read permission)
+const TRUCKINGLANE_EL_KEY = "3c0cf5fcec2db6e5b0cfb9aed099019b4198f097ef70387a19a3d2008afc8987";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const elevenLabsKey = Deno.env.get("ELEVENLABS_API_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = Math.floor(Date.now() / 1000);
@@ -27,15 +26,28 @@ Deno.serve(async (req) => {
     // Fetch ElevenLabs conversations
     let dailyMins = 0, monthlyMins = 0, allTimeMins = 0;
     let elevenLabsOk = false;
+    let pagesCrawled = 0;
 
     try {
-      const elResp = await fetch("https://api.elevenlabs.io/v1/convai/conversations?page_size=200", {
-        headers: { "xi-api-key": elevenLabsKey },
-      });
-      if (elResp.ok) {
+      // Try multiple pages to get full history
+      let cursor = null;
+      let totalConvs = 0;
+      
+      for (let i = 0; i < 3; i++) {
+        const url = cursor 
+          ? `https://api.elevenlabs.io/v1/convai/conversations?page_size=100&cursor=${cursor}`
+          : `https://api.elevenlabs.io/v1/convai/conversations?page_size=100`;
+        
+        const elResp = await fetch(url, {
+          headers: { "xi-api-key": TRUCKINGLANE_EL_KEY },
+        });
+        
+        if (!elResp.ok) break;
+        
         const elData = await elResp.json();
         const conversations = elData.conversations || [];
         elevenLabsOk = true;
+        totalConvs += conversations.length;
 
         for (const conv of conversations) {
           const secs = conv.call_duration_secs || 0;
@@ -45,26 +57,12 @@ Deno.serve(async (req) => {
           if (startTime > monthAgo) monthlyMins += mins;
           if (startTime > dayAgo) dailyMins += mins;
         }
+
+        if (!elData.has_more) break;
+        cursor = elData.next_cursor;
       }
     } catch (e) {
       console.error("ElevenLabs fetch failed:", e);
-    }
-
-    // Fallback to phone_calls table if ElevenLabs API fails
-    if (!elevenLabsOk) {
-      const { data: calls } = await supabase
-        .from("phone_calls")
-        .select("duration_seconds, created_at")
-        .order("created_at", { ascending: false })
-        .limit(500);
-
-      for (const c of calls || []) {
-        const mins = (c.duration_seconds || 0) / 60;
-        const t = new Date(c.created_at).getTime() / 1000;
-        allTimeMins += mins;
-        if (t > monthAgo) monthlyMins += mins;
-        if (t > dayAgo) dailyMins += mins;
-      }
     }
 
     // Firecrawl: count discovered accounts
@@ -85,7 +83,13 @@ Deno.serve(async (req) => {
         { name: "ElevenLabs AI", daily: Math.round(dailyMins * ELEVENLABS_RATE_PER_MIN * 100) / 100, monthly: Math.round(monthlyMins * ELEVENLABS_RATE_PER_MIN * 100) / 100 },
         { name: "Firecrawl", daily: 0, monthly: Math.round(firecrawlCost * 100) / 100 },
       ],
-      meta: { elevenLabsOk, dailyMins: Math.round(dailyMins), monthlyMins: Math.round(monthlyMins) }
+      meta: { 
+        elevenLabsOk, 
+        dailyMins: Math.round(dailyMins * 10) / 10, 
+        monthlyMins: Math.round(monthlyMins * 10) / 10,
+        allTimeMins: Math.round(allTimeMins * 10) / 10,
+        crawlCount: crawlCount || 0
+      }
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {

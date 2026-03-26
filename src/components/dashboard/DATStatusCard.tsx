@@ -48,7 +48,10 @@ export function DATStatusCard() {
       const datStatus: any[] = await resp.json();
       const datMap = new Map(datStatus.map((l: any) => [l.id, l.dat_posted_at]));
 
-      const loads: any[] = (data || []).map(l => ({ ...l, dat_posted_at: datMap.get(l.id) ?? null }));
+      // Only Oldcastle + Adelphia + VMS are DAT-eligible (not Aljex or Spot)
+      const DAT_ELIGIBLE = ["oldcastle_gsheet", "adelphia_xlsx", "vms_email"];
+      const allLoads: any[] = (data || []).map(l => ({ ...l, dat_posted_at: datMap.get(l.id) ?? null }));
+      const loads = allLoads.filter(l => DAT_ELIGIBLE.includes(l.template_type));
       const posted = loads.filter(l => l.dat_posted_at);
       const failed = loads.filter(l => !l.dat_posted_at && (!l.pickup_city || !l.dest_city));
       const pending = loads.filter(l => !l.dat_posted_at && l.pickup_city && l.dest_city);

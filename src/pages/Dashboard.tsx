@@ -419,13 +419,13 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New loads since last view - use updated_at because upserts refresh it
-    // while created_at stays from the original insert (may be days old)
-    const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
-    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
+    // New loads = loads with board_date = TODAY (added to the board today)
+    // Resets to 0 at midnight when nightly archive clears yesterday's loads
+    // and fresh loads come in with today's board_date
+    const todayStr = new Date(todayWindow.startTs).toISOString().split("T")[0];
     const newLoadsCount = loads.filter((l) => {
       if (!l.is_active) return false;
-      return new Date(l.updated_at) > lastViewedDate;
+      return l.board_date === todayStr;
     }).length;
     
     return {

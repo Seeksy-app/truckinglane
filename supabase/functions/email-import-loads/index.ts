@@ -619,10 +619,10 @@ Deno.serve(async (req) => {
     
     // Determine import type from subject line
     const subjectLower = (subject || "").toLowerCase();
-    // Support common typos: "adelphia", "aldelphia", "adlephia"
-    const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia") || subjectLower.includes("adlephia");
-    // Support both "VMS" and "MVS" (common typo)
-    const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs");
+    // Support common typos: "adelphia", "aldelphia", "adlephia", "adelphoa", "adelpha"
+    const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia") || subjectLower.includes("adlephia") || subjectLower.includes("adelphoa") || subjectLower.includes("adelpha");
+    // Support both "VMS" and "MVS" (common typo), and "Re:" prefix stripping
+    const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs") || subjectLower.includes("vsm");
     // Oldcastle keywords
     const containsOldcastle = subjectLower.includes("oldcastle") || subjectLower.includes("old castle");
     

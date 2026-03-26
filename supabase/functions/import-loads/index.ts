@@ -238,6 +238,67 @@ function generateLoadCallScript(load: Record<string, unknown>): string {
 
 // ============= TEMPLATE MAPPERS =============
 
+// Aljex Spot Loads mapping (scraped from Aljex homepage spot board)
+// Columns: Spot #, Customer, Post, Customer Ref #, Origin (State City), Destination (State City),
+//          Weight, Type, Office, Ship Date, Purge Date, Customer $, Carrier $
+function mapAljexSpotRow(row: Record<string, string>, agencyId: string): Record<string, unknown> {
+  const spotNum = row["Spot #"] || row["Spot#"] || row["SpotNum"] || "";
+  if (!spotNum) return {};
+
+  // Origin: "TX DALLAS" or "TX, DALLAS" format — state first then city
+  const originRaw = row["Origin"] || "";
+  const originParts = originRaw.trim().split(/[\s,]+/);
+  const pickupState = originParts[0]?.toUpperCase() || "";
+  const pickupCity = originParts.slice(1).join(" ") || "";
+
+  // Destination: same format
+  const destRaw = row["Destination"] || "";
+  const destParts = destRaw.trim().split(/[\s,]+/);
+  const destState = destParts[0]?.toUpperCase() || "";
+  const destCity = destParts.slice(1).join(" ") || "";
+
+  const rateRaw = parseNumber(row["Customer $"] || row["Customer$"] || "");
+  const weightLbs = parseNumber(row["Weight"] || "");
+  const trailerType = row["Type"] || null;
+  const shipDate = row["Ship Date"] || row["ShipDate"] || null;
+  const purgeDate = row["Purge Date"] || row["PurgeDate"] || null;
+
+  const loadNumber = `SPOT-${spotNum}`;
+  const pickupLocationRaw = [pickupCity, pickupState].filter(Boolean).join(", ");
+  const destLocationRaw = [destCity, destState].filter(Boolean).join(", ");
+
+  const today = new Date().toISOString().split("T")[0];
+
+  return {
+    agency_id: agencyId,
+    template_type: "aljex_spot",
+    load_number: loadNumber,
+    pickup_city: pickupCity || null,
+    pickup_state: pickupState || null,
+    pickup_location_raw: pickupLocationRaw || null,
+    dest_city: destCity || null,
+    dest_state: destState || null,
+    dest_location_raw: destLocationRaw || null,
+    ship_date: shipDate || today,
+    delivery_date: purgeDate || today,
+    trailer_type: trailerType,
+    weight_lbs: weightLbs,
+    rate_raw: rateRaw,
+    customer_invoice_total: rateRaw || 0,
+    target_pay: rateRaw ? Math.round(rateRaw * 0.8) : 0,
+    target_commission: rateRaw ? Math.round(rateRaw * 0.2) : 0,
+    max_pay: rateRaw ? Math.round(rateRaw * 0.85) : 0,
+    max_commission: rateRaw ? Math.round(rateRaw * 0.15) : 0,
+    commission_target_pct: 0.20,
+    commission_max_pct: 0.15,
+    status: "open",
+    is_active: true,
+    board_date: today,
+    source_row: { customer: row["Customer"] || "", ref: row["Customer Ref #"] || "", purge_date: purgeDate },
+    load_call_script: `Spot Load ${spotNum}: ${trailerType || "Load"} from ${pickupLocationRaw} to ${destLocationRaw}. Rate $${rateRaw || "TBD"}.`,
+  };
+}
+
 // Aljex Flat CSV mapping
 function mapAljexFlatRow(row: Record<string, string>, agencyId: string): Record<string, unknown> {
   const loadNumber = row["Pro #"] || "";
@@ -605,7 +666,19 @@ Deno.serve(async (req) => {
     let mappedLoads: Record<string, unknown>[];
     
     // Parse based on template type
-    if (templateType === "aljex_flat") {
+    if (templateType === "aljex_spot") {
+      // Spot loads scraped from Aljex homepage via bookmarklet
+      const csvText = await file.text();
+      const rows = parseCSV(csvText);
+      if (rows.length === 0) {
+        return new Response(JSON.stringify({ error: "No spot load rows found" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.log(`Parsed ${rows.length} spot load rows`);
+      mappedLoads = rows.map(row => mapAljexSpotRow(row, agencyId)).filter(l => l.load_number);
+
+    } else if (templateType === "aljex_flat") {
       // CSV parsing
       const csvText = await file.text();
       const rows = parseCSV(csvText);

@@ -3,8 +3,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, CheckCircle, XCircle, Archive, Upload, Clock } from 'lucide-react';
+import { Package, CheckCircle, XCircle, Archive, Upload, Clock, TrendingUp, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+
+interface Breakdown {
+  new?: number;
+  updated?: number;
+  archived?: number;
+  duplicates_removed?: number;
+  sheets?: number;
+  source?: string;
+  // DAT export fields
+  posted?: number;
+  already_on_dat?: number;
+  failed?: number;
+  failed_load_numbers?: string[];
+  mode?: string;
+}
 
 interface LogEntry {
   id: string;
@@ -13,6 +28,7 @@ interface LogEntry {
   status: string;
   error_message: string | null;
   imported_count: number | null;
+  raw_headers: Breakdown | null;
   created_at: string;
 }
 
@@ -26,10 +42,10 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('email_import_logs')
-        .select('*')
+        .select('id, sender_email, subject, status, error_message, imported_count, raw_headers, created_at')
         .eq('agency_id', agencyId)
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(50);
 
       if (error) throw error;
       return data as LogEntry[];
@@ -46,21 +62,61 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
 
   const getEventLabel = (senderEmail: string) => {
     if (senderEmail.includes('daily-archive')) return 'Nightly Clear';
+    if (senderEmail.includes('dat-export')) return 'DAT Export';
     if (senderEmail.includes('oldcastle')) return 'Oldcastle Sync';
+    if (senderEmail.includes('aljex')) return 'Aljex Sync';
     if (senderEmail.includes('email-import')) return 'Email Import';
-    if (senderEmail.includes('adelphia') || senderEmail.includes('vms') || senderEmail.includes('aljex')) {
-      const source = senderEmail.split('@')[0].replace(/-/g, ' ');
-      return source.charAt(0).toUpperCase() + source.slice(1);
-    }
+    if (senderEmail.includes('adelphia')) return 'Adelphia Import';
+    if (senderEmail.includes('vms')) return 'VMS Import';
     return 'Load Import';
   };
 
   const getBadgeVariant = (senderEmail: string, status: string) => {
     if (status === 'failed') return <Badge variant="destructive">Failed</Badge>;
+    if (status === 'partial') return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Partial</Badge>;
     if (senderEmail.includes('daily-archive')) {
       return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Archive</Badge>;
     }
+    if (senderEmail.includes('dat-export')) {
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Export</Badge>;
+    }
     return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Import</Badge>;
+  };
+
+  const renderBreakdown = (log: LogEntry) => {
+    const b = log.raw_headers;
+    if (!b) return null;
+
+    // DAT export breakdown
+    if (log.sender_email.includes('dat-export')) {
+      const parts = [];
+      if (b.posted !== undefined) parts.push(
+        <span key="posted" className="flex items-center gap-0.5 text-green-600"><CheckCircle className="h-3 w-3" />{b.posted} posted</span>
+      );
+      if (b.already_on_dat !== undefined && b.already_on_dat > 0) parts.push(
+        <span key="skip" className="flex items-center gap-0.5 text-muted-foreground"><RefreshCw className="h-3 w-3" />{b.already_on_dat} already on board</span>
+      );
+      if (b.failed !== undefined && b.failed > 0) parts.push(
+        <span key="fail" className="flex items-center gap-0.5 text-amber-600"><XCircle className="h-3 w-3" />{b.failed} failed</span>
+      );
+      return parts.length > 0 ? <div className="flex items-center gap-3 flex-wrap mt-1.5">{parts}</div> : null;
+    }
+
+    // Import breakdown
+    const parts = [];
+    if (b.new !== undefined && b.new > 0) parts.push(
+      <span key="new" className="flex items-center gap-0.5 text-green-600"><TrendingUp className="h-3 w-3" />{b.new} new</span>
+    );
+    if (b.updated !== undefined && b.updated > 0) parts.push(
+      <span key="upd" className="flex items-center gap-0.5 text-blue-600"><RefreshCw className="h-3 w-3" />{b.updated} updated</span>
+    );
+    if (b.archived !== undefined && b.archived > 0) parts.push(
+      <span key="arch" className="flex items-center gap-0.5 text-amber-600"><Archive className="h-3 w-3" />{b.archived} removed from sheet</span>
+    );
+    if (b.duplicates_removed !== undefined && b.duplicates_removed > 0) parts.push(
+      <span key="dup" className="flex items-center gap-0.5 text-muted-foreground"><Trash2 className="h-3 w-3" />{b.duplicates_removed} dupes dropped</span>
+    );
+    return parts.length > 0 ? <div className="flex items-center gap-3 flex-wrap mt-1.5">{parts}</div> : null;
   };
 
   return (
@@ -101,22 +157,20 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
                       {getEventLabel(log.sender_email)}
                     </span>
                     {getBadgeVariant(log.sender_email, log.status)}
-                    {log.imported_count !== null && log.imported_count > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {log.imported_count} loads
-                      </Badge>
-                    )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <span className="truncate max-w-[250px]">
-                      {log.subject || 'No details'}
-                    </span>
-                    <span>•</span>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                     </span>
+                    {log.imported_count !== null && log.imported_count > 0 && !log.sender_email.includes('dat-export') && (
+                      <>
+                        <span>•</span>
+                        <span>{log.imported_count} loads total</span>
+                      </>
+                    )}
                   </div>
+                  {renderBreakdown(log)}
                   {log.error_message && (
                     <p className="mt-1 text-xs text-destructive line-clamp-2">
                       {log.error_message}

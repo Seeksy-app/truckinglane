@@ -324,6 +324,20 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     archived_at: null,
   }));
 
+  // Pre-fetch existing load numbers so we can diff new vs updated
+  const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+  const { data: existingData } = await supabase
+    .from("loads")
+    .select("load_number")
+    .eq("agency_id", AGENCY_ID)
+    .eq("template_type", TEMPLATE_TYPE)
+    .in("load_number", currentLoadNumbers);
+
+  const existingSet = new Set((existingData || []).map((r: { load_number: string }) => r.load_number));
+  const newCount = currentLoadNumbers.filter(n => !existingSet.has(n)).length;
+  const updatedCount = currentLoadNumbers.filter(n => existingSet.has(n)).length;
+  const dedupedCount = mappedLoads.length - safeLoads.length; // dupes removed within sheet
+
   const { error: upsertError } = await supabase
     .from("loads")
     .upsert(loadsWithMeta, {
@@ -332,7 +346,6 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     });
 
   if (upsertError) {
-    // Log failure
     await supabase.from("email_import_logs").insert({
       agency_id: AGENCY_ID,
       sender_email: senderLabel,
@@ -346,7 +359,6 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
   }
 
   // Archive loads NOT in the new batch (loads removed from the sheet)
-  const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
   const { data: archivedData } = await supabase
     .from("loads")
     .update({ is_active: false, archived_at: new Date().toISOString() })
@@ -358,7 +370,7 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
     .select("id");
 
   const archivedCount = archivedData?.length || 0;
-  console.log(`[${source}] Archived ${archivedCount} loads not in current batch`);
+  console.log(`[${source}] ${newCount} new, ${updatedCount} updated, ${archivedCount} archived, ${dedupedCount} sheet dupes removed`);
 
   // Also save the uploaded file to storage for audit
   if (source === "openclaw-upload") {
@@ -370,22 +382,31 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
       });
   }
 
-  // Log success to import logs
+  // Log with full breakdown in raw_headers
   const sheetsProcessed = new Set(parsedLoads.map(l => l.sheet_name)).size;
+  const breakdown = { new: newCount, updated: updatedCount, archived: archivedCount, duplicates_removed: dedupedCount, sheets: sheetsProcessed, source };
+  const summaryParts = [`${newCount} new`, `${updatedCount} updated`];
+  if (archivedCount > 0) summaryParts.push(`${archivedCount} removed`);
+  if (dedupedCount > 0) summaryParts.push(`${dedupedCount} dupes dropped`);
+
   await supabase.from("email_import_logs").insert({
     agency_id: AGENCY_ID,
     sender_email: senderLabel,
-    subject: `${subjectLabel} — ${sheetsProcessed} sheets`,
+    subject: `Oldcastle: ${safeLoads.length} total — ${summaryParts.join(", ")}`,
     status: "success",
     imported_count: safeLoads.length,
+    raw_headers: breakdown,
   });
 
-  console.log(`[${source}] Upserted ${safeLoads.length} loads. Done!`);
+  console.log(`[${source}] Done. ${safeLoads.length} total (${summaryParts.join(", ")})`);
 
   return {
     success: true,
     imported: safeLoads.length,
+    new: newCount,
+    updated: updatedCount,
     archived: archivedCount,
+    duplicates_removed: dedupedCount,
     sheets_processed: sheetsProcessed,
     source,
   };

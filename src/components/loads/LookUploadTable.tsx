@@ -61,7 +61,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
       pickupStates: Array.from(pickupSet).sort(),
       destStates: Array.from(destSet).sort(),
       clients: Array.from(clientSet).sort((a, b) => {
-        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, oldcastle_gsheet: 4 };
+        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, aljex_spot: 4, oldcastle_gsheet: 5 };
         return (order[a] || 99) - (order[b] || 99);
       }),
       clientCounts: countMap,
@@ -78,7 +78,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
     if (sortBy !== "none") {
       result = [...result].sort((a, b) => {
         if (sortBy === "template_type") {
-          const templateOrder: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, oldcastle_gsheet: 4 };
+          const templateOrder: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, aljex_spot: 4, oldcastle_gsheet: 5 };
           return (templateOrder[a.template_type] || 99) - (templateOrder[b.template_type] || 99);
         }
         const aVal = (a[sortBy] || "").toLowerCase();

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Upload, AlertTriangle, CheckCircle2, MapPin } from "lucide-react";
+import { Upload, AlertTriangle, MapPin, CheckCircle2, Clock, XCircle } from "lucide-react";
 
 interface FailedLoad {
   id: string;
@@ -31,31 +31,34 @@ export function DATStatusCard() {
   const { data: stats } = useQuery({
     queryKey: ["dat-stats"],
     queryFn: async () => {
-      // Use supabase client (carries user auth session, respects RLS)
-      // select('*') returns dat_posted_at at runtime even if not in TS types
       const { data } = await supabase
         .from("loads")
         .select("id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type")
         .eq("is_active", true);
-      
-      // Separately fetch dat_posted_at using raw query via RPC workaround
+
       const { data: session } = await supabase.auth.getSession();
       const token = session?.session?.access_token;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
+
       const resp = await fetch(
         `${supabaseUrl}/rest/v1/loads?is_active=eq.true&select=id,dat_posted_at`,
         { headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` } }
       );
       const datStatus: any[] = await resp.json();
       const datMap = new Map(datStatus.map((l: any) => [l.id, l.dat_posted_at]));
-      
+
       const loads: any[] = (data || []).map(l => ({ ...l, dat_posted_at: datMap.get(l.id) ?? null }));
       const posted = loads.filter(l => l.dat_posted_at);
       const failed = loads.filter(l => !l.dat_posted_at && (!l.pickup_city || !l.dest_city));
       const pending = loads.filter(l => !l.dat_posted_at && l.pickup_city && l.dest_city);
-      return { total: loads.length, posted: posted.length, failed: failed.length, pending: pending.length, failedLoads: failed as FailedLoad[] };
+      return {
+        total: loads.length,
+        posted: posted.length,
+        failed: failed.length,
+        pending: pending.length,
+        failedLoads: failed as FailedLoad[],
+      };
     },
     refetchInterval: 60000,
   });
@@ -81,8 +84,9 @@ export function DATStatusCard() {
     }
   };
 
-  const posted = stats?.posted ?? 0;
-  const failed = stats?.failed ?? 0;
+  const total   = stats?.total   ?? 0;
+  const posted  = stats?.posted  ?? 0;
+  const failed  = stats?.failed  ?? 0;
   const pending = stats?.pending ?? 0;
 
   return (
@@ -95,27 +99,51 @@ export function DATStatusCard() {
               onClick={() => failed > 0 && setShowFailed(true)}
             >
               <CardContent className="pt-4 pb-3 px-4">
-                <div className="flex items-center justify-between mb-1">
-                  <Upload className="h-4 w-4 text-blue-500" />
-                  {failed > 0 && (
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                  )}
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Upload className="h-4 w-4 text-blue-500" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">DAT Board</span>
+                  </div>
+                  {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                 </div>
-                <div className="text-2xl font-bold text-foreground">{posted}</div>
-                <div className="flex items-center gap-1.5 text-muted-foreground mt-1">
-                  <span className="text-xs">DAT Board</span>
-                  {failed > 0 && (
-                    <span className="text-xs text-amber-500 font-medium">{failed} failed</span>
-                  )}
+
+                {/* Live on DAT — big number */}
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-2xl font-bold text-foreground">{posted}</span>
+                  <span className="text-xs text-muted-foreground">of {total} live</span>
+                </div>
+
+                {/* Status pills */}
+                <div className="flex items-center gap-2 flex-wrap mt-1">
                   {pending > 0 && (
-                    <span className="text-xs text-blue-400">{pending} pending</span>
+                    <span className="flex items-center gap-0.5 text-xs text-blue-400">
+                      <Clock className="h-3 w-3" />
+                      {pending} pending
+                    </span>
+                  )}
+                  {failed > 0 && (
+                    <span className="flex items-center gap-0.5 text-xs text-amber-500 font-medium">
+                      <XCircle className="h-3 w-3" />
+                      {failed} failed
+                    </span>
+                  )}
+                  {failed === 0 && pending === 0 && posted > 0 && (
+                    <span className="flex items-center gap-0.5 text-xs text-green-500">
+                      <CheckCircle2 className="h-3 w-3" />
+                      all synced
+                    </span>
                   )}
                 </div>
               </CardContent>
             </Card>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{posted} loads live on DAT{failed > 0 ? ` • ${failed} failed (click to fix)` : ""}{pending > 0 ? ` • ${pending} pending sync` : ""}</p>
+            <p>
+              {posted} of {total} loads posted to DAT
+              {pending > 0 ? ` • ${pending} ready to post` : ""}
+              {failed > 0 ? ` • ${failed} need destination fix (click to fix)` : ""}
+            </p>
           </TooltipContent>
         </Tooltip>
 

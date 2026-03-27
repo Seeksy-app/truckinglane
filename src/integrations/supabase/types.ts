@@ -1828,6 +1828,38 @@ export type Database = {
           },
         ]
       }
+      load_activity_logs: {
+        Row: {
+          id: string
+          agency_id: string
+          action: string
+          created_at: string
+          meta: Json
+        }
+        Insert: {
+          id?: string
+          agency_id: string
+          action: string
+          created_at?: string
+          meta?: Json
+        }
+        Update: {
+          id?: string
+          agency_id?: string
+          action?: string
+          created_at?: string
+          meta?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_activity_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loads: {
         Row: {
           agency_id: string

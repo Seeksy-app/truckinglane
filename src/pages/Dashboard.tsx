@@ -36,7 +36,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
-import { getEffectiveNewLoadsThresholdUtc, isLoadNewByCreatedAt } from "@/lib/newLoadsView";
+import { isOpenLoadInLatestImportBatch } from "@/lib/newLoadsFromImport";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
@@ -466,6 +466,31 @@ const Dashboard = () => {
     return getDateWindow("today", timezone);
   }, [timezone]);
 
+  // Latest import batch bounds (load_activity_logs action=import) — drives NEW loads count
+  const { data: importBounds } = useQuery({
+    queryKey: ["load_import_bounds", effectiveAgencyId],
+    queryFn: async () => {
+      if (!effectiveAgencyId) {
+        return { lastImportAt: null as string | null, previousImportAt: null as string | null };
+      }
+      const { data, error } = await supabase
+        .from("load_activity_logs")
+        .select("created_at")
+        .eq("agency_id", effectiveAgencyId)
+        .eq("action", "import")
+        .order("created_at", { ascending: false })
+        .limit(2);
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        lastImportAt: rows[0]?.created_at ?? null,
+        previousImportAt: rows[1]?.created_at ?? null,
+      };
+    },
+    enabled: !!effectiveAgencyId,
+    refetchInterval: 30000,
+  });
+
   // Fetch agent_daily_state for current user's today KPIs
   const { data: agentDailyState } = useQuery({
     queryKey: ["agent-daily-state-kpis", user?.id, todayDateStr],
@@ -525,15 +550,11 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New = open loads whose created_at is after last viewed (not updated_at — sync refreshes update rows)
-    let newLoadsCount = 0;
-    if (user?.id) {
-      const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
-      newLoadsCount = loads.filter((l) => {
-        if (!l.is_active || l.status !== "open") return false;
-        return isLoadNewByCreatedAt(l, threshold);
-      }).length;
-    }
+    // New = open loads from the latest import batch only (see load_activity_logs, import action)
+    const bounds = importBounds ?? { lastImportAt: null as string | null, previousImportAt: null as string | null };
+    const newLoadsCount = loads.filter((l) =>
+      isOpenLoadInLatestImportBatch(l, bounds.lastImportAt, bounds.previousImportAt),
+    ).length;
 
     return {
       openToday: openLoadsCount,
@@ -543,7 +564,7 @@ const Dashboard = () => {
       bookedToday: bookedTodayCount,
       newLoads: newLoadsCount,
     };
-  }, [loads, leads, calls, todayWindow, user?.id]);
+  }, [loads, leads, calls, todayWindow, importBounds]);
 
   // Filtered data for each mode
   const filteredOpenLoads = useMemo(() => {
@@ -705,14 +726,12 @@ const Dashboard = () => {
     return result;
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
-  // New loads filtered: same rules as NEW stat (threshold from localStorage / daily baseline)
+  // New loads filtered: same rules as NEW stat (latest import batch from load_activity_logs)
   const filteredNewLoads = useMemo(() => {
-    if (!user?.id) return [];
-    const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
-    let result = loads.filter((l) => {
-      if (!l.is_active || l.status !== "open") return false;
-      return isLoadNewByCreatedAt(l, threshold);
-    });
+    const bounds = importBounds ?? { lastImportAt: null as string | null, previousImportAt: null as string | null };
+    let result = loads.filter((l) =>
+      isOpenLoadInLatestImportBatch(l, bounds.lastImportAt, bounds.previousImportAt),
+    );
     if (searchQuery.trim()) {
       const searchTerms = normalizeStateSearch(searchQuery);
       const isStateAbbr = searchQuery.trim().length === 2 && /^[a-zA-Z]{2}$/.test(searchQuery.trim());
@@ -729,7 +748,7 @@ const Dashboard = () => {
       });
     }
     return result;
-  }, [loads, searchQuery, user?.id]);
+  }, [loads, searchQuery, importBounds]);
 
   useEffect(() => {
     if (prevNewLoadsCountRef.current === null) {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { X, CheckCircle, Package, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -80,11 +81,11 @@ const Dashboard = () => {
   const [highlightedLoadNumber, setHighlightedLoadNumber] = useState<string | null>(null);
   const [showResetBanner, setShowResetBanner] = useState(false);
   const [datSyncInProgress, setDatSyncInProgress] = useState(false);
+  const [datModalOpen, setDatModalOpen] = useState(false);
+  const [datTokenValue, setDatTokenValue] = useState("");
   const [aljexSyncInProgress, setAljexSyncInProgress] = useState(false);
   const [aljexModalOpen, setAljexModalOpen] = useState(false);
   const [aljexCookieValue, setAljexCookieValue] = useState("");
-  const datPopupRef = useRef<Window | null>(null);
-  const datPopupMonitorRef = useRef<number | null>(null);
   
   // Check if reset banner should be shown (admins only, once)
   useEffect(() => {
@@ -370,107 +371,47 @@ const Dashboard = () => {
     },
   });
 
-  useEffect(() => {
-    const handleDatTokenMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const messageType = event.data?.type;
+  const syncDatToken = async () => {
+    if (datSyncInProgress) return;
+    setDatSyncInProgress(true);
 
-      if (messageType === "DAT_TOKEN_BRIDGE_RESULT") {
-        const token = typeof event.data?.token === "string" ? event.data.token : "";
-        const message = typeof event.data?.message === "string" ? event.data.message : "Token not found - make sure you are logged into DAT";
-
-        if (!token) {
-          setDatSyncInProgress(false);
-          toast({
-            title: "DAT token sync failed",
-            description: message,
-            variant: "destructive",
-          });
-          return;
-        }
-
-        fetch("https://axel.podlogix.io/tl/update-dat-token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542",
-          },
-          body: JSON.stringify({ token }),
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error("Failed to update DAT token");
-            }
-            toast({ title: "DAT token updated successfully" });
-          })
-          .catch((error: unknown) => {
-            toast({
-              title: "DAT token sync failed",
-              description: error instanceof Error ? error.message : "Failed to update DAT token",
-              variant: "destructive",
-            });
-          })
-          .finally(() => {
-            setDatSyncInProgress(false);
-          });
-      }
-
-      if (messageType === "ALJEX_COOKIE_SYNC_SUCCESS") {
-        setAljexSyncInProgress(false);
-        toast({ title: "Aljex cookie updated successfully" });
-      }
-
-      if (messageType === "ALJEX_COOKIE_SYNC_FAILED") {
-        setAljexSyncInProgress(false);
-        toast({
-          title: "Aljex cookie sync failed",
-          description: event.data?.message || "Not logged into Aljex - please log in first",
-          variant: "destructive",
-        });
-      }
-    };
-
-    window.addEventListener("message", handleDatTokenMessage);
-    return () => window.removeEventListener("message", handleDatTokenMessage);
-  }, [toast]);
-
-  useEffect(() => {
-    return () => {
-      if (datPopupMonitorRef.current) {
-        window.clearInterval(datPopupMonitorRef.current);
-      }
-    };
-  }, []);
-
-  const syncDatToken = () => {
-    const bridgeUrl = `${window.location.origin}/dat-token-bridge.html`;
-    const datUrl = `https://one.dat.com/?redirect_uri=${encodeURIComponent(bridgeUrl)}&tl_origin=${encodeURIComponent(window.location.origin)}`;
-    const popup = window.open(datUrl, "dat-token-sync", "width=400,height=300,resizable=yes,scrollbars=yes");
-    if (!popup) {
+    const token = datTokenValue.trim();
+    if (!token) {
+      setDatSyncInProgress(false);
       toast({
-        title: "Popup blocked",
-        description: "Please allow popups for TruckingLane and try again.",
+        title: "Token required",
+        description: "Paste your DAT Bearer token, then click Confirm.",
         variant: "destructive",
       });
       return;
     }
 
-    datPopupRef.current = popup;
-    setDatSyncInProgress(true);
+    try {
+      const response = await fetch("https://axel.podlogix.io/tl/update-dat-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542",
+        },
+        body: JSON.stringify({ token }),
+      });
 
-    if (datPopupMonitorRef.current) {
-      window.clearInterval(datPopupMonitorRef.current);
-    }
-
-    datPopupMonitorRef.current = window.setInterval(() => {
-      if (datPopupRef.current?.closed) {
-        setDatSyncInProgress(false);
-        if (datPopupMonitorRef.current) {
-          window.clearInterval(datPopupMonitorRef.current);
-          datPopupMonitorRef.current = null;
-        }
+      if (!response.ok) {
+        throw new Error("Failed to update DAT token");
       }
-    }, 500);
+
+      toast({ title: "DAT token updated successfully" });
+      setDatModalOpen(false);
+      setDatTokenValue("");
+    } catch (error) {
+      toast({
+        title: "DAT token sync failed",
+        description: error instanceof Error ? error.message : "Failed to update DAT token",
+        variant: "destructive",
+      });
+    } finally {
+      setDatSyncInProgress(false);
+    }
   };
 
   const syncAljexCookie = async () => {
@@ -889,7 +830,7 @@ const Dashboard = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={syncDatToken}
+              onClick={() => setDatModalOpen(true)}
               disabled={datSyncInProgress}
             >
               {datSyncInProgress ? "Syncing DAT..." : "🔑 Sync DAT Token"}
@@ -1049,6 +990,47 @@ const Dashboard = () => {
 
       {/* Create Load Modal */}
       <CreateLoadModal open={createLoadOpen} onOpenChange={setCreateLoadOpen} />
+
+      <Dialog open={datModalOpen} onOpenChange={setDatModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync DAT Token</DialogTitle>
+            <DialogDescription>
+              <span className="block">1. Go to one.dat.com in another tab (make sure you&apos;re logged in)</span>
+              <span className="block">2. Press F12 (Windows) or Cmd+Option+I (Mac) to open DevTools</span>
+              <span className="block">3. Click the Network tab</span>
+              <span className="block">4. Click any link or button on the DAT page</span>
+              <span className="block">5. Click on any request to prod-api.dat.com or network.api.prod.dat.com</span>
+              <span className="block">6. Click Headers tab</span>
+              <span className="block">7. Find Authorization header - copy everything after &apos;Bearer &apos;</span>
+              <span className="block">8. Paste it below and click Confirm</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Textarea
+              value={datTokenValue}
+              onChange={(e) => setDatTokenValue(e.target.value)}
+              placeholder="Paste DAT token value (without 'Bearer ')"
+              className="min-h-[120px]"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDatModalOpen(false)}
+              disabled={datSyncInProgress}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={syncDatToken} disabled={datSyncInProgress}>
+              {datSyncInProgress ? "Syncing..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={aljexModalOpen} onOpenChange={setAljexModalOpen}>
         <DialogContent className="max-w-md">

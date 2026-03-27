@@ -36,7 +36,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
-import { getEffectiveNewLoadsThresholdUtc, setLastViewedLoadsAtNow } from "@/lib/newLoadsView";
+import { getEffectiveNewLoadsThresholdUtc } from "@/lib/newLoadsView";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
@@ -74,10 +74,9 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  /** Bumps when user marks NEW as viewed so stats/list re-read localStorage threshold. */
-  const [lastViewedLoadsVersion, setLastViewedLoadsVersion] = useState(0);
-  /** Threshold snapshot taken when entering NEW (before last_viewed is written) so the list still shows rows that were "new". */
-  const newLoadsListThresholdRef = useRef<Date | null>(null);
+  /** After user opens NEW, stop pulsing until the count increases (new loads arrived). */
+  const [newPulseDismissed, setNewPulseDismissed] = useState(false);
+  const prevNewLoadsCountRef = useRef<number | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);
@@ -544,7 +543,7 @@ const Dashboard = () => {
       bookedToday: bookedTodayCount,
       newLoads: newLoadsCount,
     };
-  }, [loads, leads, calls, todayWindow, user?.id, lastViewedLoadsVersion]);
+  }, [loads, leads, calls, todayWindow, user?.id]);
 
   // Filtered data for each mode
   const filteredOpenLoads = useMemo(() => {
@@ -706,13 +705,10 @@ const Dashboard = () => {
     return result;
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
-  // New loads filtered: same open + created_at rules; while on NEW tab use pre-click threshold snapshot
+  // New loads filtered: same rules as NEW stat (threshold from localStorage / daily baseline)
   const filteredNewLoads = useMemo(() => {
     if (!user?.id) return [];
-    const threshold =
-      mode === "new" && newLoadsListThresholdRef.current
-        ? newLoadsListThresholdRef.current
-        : getEffectiveNewLoadsThresholdUtc(user.id);
+    const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
     let result = loads.filter((l) => {
       if (!l.is_active || l.status !== "open") return false;
       return new Date(l.created_at).getTime() > threshold.getTime();
@@ -733,16 +729,22 @@ const Dashboard = () => {
       });
     }
     return result;
-  }, [loads, searchQuery, user?.id, lastViewedLoadsVersion, mode]);
+  }, [loads, searchQuery, user?.id]);
+
+  useEffect(() => {
+    if (prevNewLoadsCountRef.current === null) {
+      prevNewLoadsCountRef.current = stats.newLoads;
+      return;
+    }
+    if (stats.newLoads > prevNewLoadsCountRef.current) {
+      setNewPulseDismissed(false);
+    }
+    prevNewLoadsCountRef.current = stats.newLoads;
+  }, [stats.newLoads]);
 
   const handleModeChange = (next: DashboardMode) => {
-    if (next === "new" && user?.id) {
-      newLoadsListThresholdRef.current = getEffectiveNewLoadsThresholdUtc(user.id);
-      setLastViewedLoadsAtNow(user.id);
-      setLastViewedLoadsVersion((v) => v + 1);
-    }
-    if (next !== "new") {
-      newLoadsListThresholdRef.current = null;
+    if (next === "new") {
+      setNewPulseDismissed(true);
     }
     setMode(next);
   };
@@ -815,7 +817,13 @@ const Dashboard = () => {
         <AgentPerformanceBanner userId={user.id} agencyId={agencyMember?.agency_id} />
         
         {/* KPI Cards as view toggles (DAT card + Cost card for admins) */}
-        <DashboardStats stats={stats} activeMode={mode} onModeChange={handleModeChange} isAdmin={isAdmin} />
+        <DashboardStats
+          stats={stats}
+          activeMode={mode}
+          onModeChange={handleModeChange}
+          isAdmin={isAdmin}
+          newPulseDismissed={newPulseDismissed}
+        />
 
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">

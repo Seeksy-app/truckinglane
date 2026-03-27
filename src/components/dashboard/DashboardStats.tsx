@@ -23,9 +23,17 @@ interface DashboardStatsProps {
   };
   activeMode: DashboardMode;
   onModeChange: (mode: DashboardMode) => void;
+  /** When true, NEW card does not pulse (user opened NEW; count unchanged until more new loads arrive). */
+  newPulseDismissed?: boolean;
 }
 
-export const DashboardStats = ({ stats, activeMode, onModeChange, isAdmin = false }: DashboardStatsProps & { isAdmin?: boolean }) => {
+export const DashboardStats = ({
+  stats,
+  activeMode,
+  onModeChange,
+  isAdmin = false,
+  newPulseDismissed = false,
+}: DashboardStatsProps & { isAdmin?: boolean }) => {
   const { timezone } = useUserTimezone();
   const timezoneLabel = getTimezoneLabel(timezone);
 
@@ -44,9 +52,8 @@ export const DashboardStats = ({ stats, activeMode, onModeChange, isAdmin = fals
       value: stats.newLoads,
       icon: Sparkles,
       activeClass: "bg-[hsl(280,70%,50%)] border-[hsl(280,70%,42%)] text-white",
-      inactiveClass: stats.newLoads > 0
-        ? "bg-card border-[hsl(280,70%,50%)]/50 hover:border-[hsl(280,70%,50%)] hover:bg-[hsl(280,70%,50%)]/5 animate-pulse"
-        : "bg-card border-border hover:border-[hsl(280,70%,50%)]/50 hover:bg-[hsl(280,70%,50%)]/5",
+      inactiveClass:
+        "bg-card border-border hover:border-[hsl(280,70%,50%)]/50 hover:bg-[hsl(280,70%,50%)]/5",
       tooltip: {
         scope: "Agency",
         range: "Open loads since last view",
@@ -107,12 +114,16 @@ export const DashboardStats = ({ stats, activeMode, onModeChange, isAdmin = fals
         {statCards.map((stat) => {
           const isActive = activeMode === stat.key;
           const Icon = stat.icon;
+          const inactiveClass =
+            stat.key === "new" && stats.newLoads > 0 && !newPulseDismissed
+              ? "bg-card border-[hsl(280,70%,50%)]/50 hover:border-[hsl(280,70%,50%)] hover:bg-[hsl(280,70%,50%)]/5 animate-pulse"
+              : stat.inactiveClass;
           return (
             <Tooltip key={stat.key} delayDuration={300}>
               <TooltipTrigger asChild>
                 <Card 
                   className={`cursor-pointer transition-all duration-200 border-2 ${
-                    isActive ? stat.activeClass : stat.inactiveClass
+                    isActive ? stat.activeClass : inactiveClass
                   }`}
                   onClick={() => onModeChange(stat.key)}
                 >

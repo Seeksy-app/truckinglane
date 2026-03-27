@@ -477,34 +477,7 @@ const Dashboard = () => {
     if (aljexSyncInProgress) return;
     setAljexSyncInProgress(true);
 
-    let cookie = aljexCookieValue.trim();
-
-    // Best effort: this works only in extension/privileged contexts.
-    if (!cookie) {
-      try {
-        const chromeApi = (window as typeof window & { chrome?: unknown }).chrome as
-          | {
-              cookies?: {
-                get: (
-                  details: { url: string; name: string },
-                  callback: (result?: { value?: string }) => void,
-                ) => void;
-              };
-            }
-          | undefined;
-
-        if (chromeApi?.cookies?.get) {
-          cookie = await new Promise<string>((resolve) => {
-            chromeApi.cookies!.get(
-              { url: "https://dandl.aljex.com", name: "aljex_sso_dandl" },
-              (result) => resolve(result?.value ?? ""),
-            );
-          });
-        }
-      } catch {
-        // Ignore and fall back to manual input.
-      }
-    }
+    const cookie = aljexCookieValue.trim();
 
     if (!cookie) {
       setAljexSyncInProgress(false);
@@ -1082,7 +1055,7 @@ const Dashboard = () => {
           <DialogHeader>
             <DialogTitle>Sync Aljex Cookie</DialogTitle>
             <DialogDescription>
-              Open your Aljex tab, then click Confirm. If auto-read is unavailable, paste your <code>aljex_sso_dandl</code> cookie value below.
+              Go to dandl.aljex.com, open DevTools (F12), click Application tab, then Cookies &gt; dandl.aljex.com. Find the cookie named <code>aljex_sso_dandl</code> and paste the value below.
             </DialogDescription>
           </DialogHeader>
 
@@ -1090,7 +1063,7 @@ const Dashboard = () => {
             <Input
               value={aljexCookieValue}
               onChange={(e) => setAljexCookieValue(e.target.value)}
-              placeholder="Paste aljex_sso_dandl cookie (optional)"
+              placeholder="Paste aljex_sso_dandl cookie value"
             />
           </div>
 
@@ -1104,7 +1077,7 @@ const Dashboard = () => {
               Cancel
             </Button>
             <Button type="button" onClick={syncAljexCookie} disabled={aljexSyncInProgress}>
-              {aljexSyncInProgress ? "Syncing..." : "Confirm"}
+              {aljexSyncInProgress ? "Syncing..." : "Sync"}
             </Button>
           </DialogFooter>
         </DialogContent>

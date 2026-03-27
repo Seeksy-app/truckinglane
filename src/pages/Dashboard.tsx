@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +36,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
+import { getEffectiveNewLoadsThresholdUtc, setLastViewedLoadsAtNow } from "@/lib/newLoadsView";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
@@ -73,7 +74,10 @@ const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  const LAST_VIEWED_KEY = "oldcastle_loads_last_viewed";
+  /** Bumps when user marks NEW as viewed so stats/list re-read localStorage threshold. */
+  const [lastViewedLoadsVersion, setLastViewedLoadsVersion] = useState(0);
+  /** Threshold snapshot taken when entering NEW (before last_viewed is written) so the list still shows rows that were "new". */
+  const newLoadsListThresholdRef = useRef<Date | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);
@@ -522,15 +526,16 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New loads = loads with board_date = TODAY (added to the board today)
-    // Resets to 0 at midnight when nightly archive clears yesterday's loads
-    // and fresh loads come in with today's board_date
-    const todayStr = new Date(todayWindow.startTs).toISOString().split("T")[0];
-    const newLoadsCount = loads.filter((l) => {
-      if (!l.is_active) return false;
-      return l.board_date === todayStr;
-    }).length;
-    
+    // New = open loads created after per-user last_viewed threshold (see newLoadsView.ts)
+    let newLoadsCount = 0;
+    if (user?.id) {
+      const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
+      newLoadsCount = loads.filter((l) => {
+        if (!l.is_active || l.status !== "open") return false;
+        return new Date(l.created_at).getTime() > threshold.getTime();
+      }).length;
+    }
+
     return {
       openToday: openLoadsCount,
       claimedToday: claimedTodayCount,
@@ -539,7 +544,7 @@ const Dashboard = () => {
       bookedToday: bookedTodayCount,
       newLoads: newLoadsCount,
     };
-  }, [loads, leads, calls, todayWindow]);
+  }, [loads, leads, calls, todayWindow, user?.id, lastViewedLoadsVersion]);
 
   // Filtered data for each mode
   const filteredOpenLoads = useMemo(() => {
@@ -701,13 +706,16 @@ const Dashboard = () => {
     return result;
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
-  // New loads filtered
+  // New loads filtered: same open + created_at rules; while on NEW tab use pre-click threshold snapshot
   const filteredNewLoads = useMemo(() => {
-    const lastViewed = localStorage.getItem(LAST_VIEWED_KEY);
-    const lastViewedDate = lastViewed ? new Date(lastViewed) : new Date(0);
+    if (!user?.id) return [];
+    const threshold =
+      mode === "new" && newLoadsListThresholdRef.current
+        ? newLoadsListThresholdRef.current
+        : getEffectiveNewLoadsThresholdUtc(user.id);
     let result = loads.filter((l) => {
-      if (!l.is_active) return false;
-      return new Date(l.updated_at) > lastViewedDate;
+      if (!l.is_active || l.status !== "open") return false;
+      return new Date(l.created_at).getTime() > threshold.getTime();
     });
     if (searchQuery.trim()) {
       const searchTerms = normalizeStateSearch(searchQuery);
@@ -725,19 +733,19 @@ const Dashboard = () => {
       });
     }
     return result;
-  }, [loads, searchQuery, LAST_VIEWED_KEY]);
+  }, [loads, searchQuery, user?.id, lastViewedLoadsVersion, mode]);
 
-  // Mark new loads as seen when viewing the "new" tab
-  useEffect(() => {
-    if (mode === "new" && filteredNewLoads.length > 0) {
-      // Mark as seen after a brief delay so the user can see the count
-      const timer = setTimeout(() => {
-        localStorage.setItem(LAST_VIEWED_KEY, new Date().toISOString());
-        queryClient.invalidateQueries({ queryKey: ["loads"] });
-      }, 3000);
-      return () => clearTimeout(timer);
+  const handleModeChange = (next: DashboardMode) => {
+    if (next === "new" && user?.id) {
+      newLoadsListThresholdRef.current = getEffectiveNewLoadsThresholdUtc(user.id);
+      setLastViewedLoadsAtNow(user.id);
+      setLastViewedLoadsVersion((v) => v + 1);
     }
-  }, [mode, filteredNewLoads.length, queryClient, LAST_VIEWED_KEY]);
+    if (next !== "new") {
+      newLoadsListThresholdRef.current = null;
+    }
+    setMode(next);
+  };
 
   // Get current filtered data based on mode
   const getCurrentData = () => {
@@ -807,7 +815,7 @@ const Dashboard = () => {
         <AgentPerformanceBanner userId={user.id} agencyId={agencyMember?.agency_id} />
         
         {/* KPI Cards as view toggles (DAT card + Cost card for admins) */}
-        <DashboardStats stats={stats} activeMode={mode} onModeChange={setMode} isAdmin={isAdmin} />
+        <DashboardStats stats={stats} activeMode={mode} onModeChange={handleModeChange} isAdmin={isAdmin} />
 
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">

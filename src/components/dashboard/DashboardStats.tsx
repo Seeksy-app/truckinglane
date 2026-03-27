@@ -47,7 +47,11 @@ export const DashboardStats = ({ stats, activeMode, onModeChange, isAdmin = fals
       inactiveClass: stats.newLoads > 0
         ? "bg-card border-[hsl(280,70%,50%)]/50 hover:border-[hsl(280,70%,50%)] hover:bg-[hsl(280,70%,50%)]/5 animate-pulse"
         : "bg-card border-border hover:border-[hsl(280,70%,50%)]/50 hover:bg-[hsl(280,70%,50%)]/5",
-      tooltip: { scope: "Agency", range: "Since last view", description: "New Oldcastle loads you haven't seen yet." },
+      tooltip: {
+        scope: "Agency",
+        range: "Open loads since last view",
+        description: "Open loads created after you last opened NEW (or today’s morning window).",
+      },
     },
     {
       key: "open",

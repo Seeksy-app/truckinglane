@@ -1511,6 +1511,71 @@ export type Database = {
           },
         ]
       }
+      kb_articles: {
+        Row: {
+          id: string
+          title: string
+          content: string | null
+          section_order: number
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content?: string | null
+          section_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          content?: string | null
+          section_order?: number
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kb_media: {
+        Row: {
+          id: string
+          article_id: string
+          url: string
+          caption: string | null
+          media_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          article_id: string
+          url: string
+          caption?: string | null
+          media_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          article_id?: string
+          url?: string
+          caption?: string | null
+          media_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_media_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "kb_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_events: {
         Row: {
           agent_id: string | null

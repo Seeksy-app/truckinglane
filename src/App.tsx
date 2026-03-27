@@ -35,6 +35,7 @@ import CompleteAgencySetup from "./pages/CompleteAgencySetup";
 import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
 import Help from "./pages/Help";
+import KnowledgeBaseAdmin from "./pages/KnowledgeBaseAdmin";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
 import { Loader2 } from "lucide-react";
@@ -172,6 +173,14 @@ const App = () => (
                 element={
                   <SuperAdminRoute>
                     <SuperAdminDashboard />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/knowledge-base"
+                element={
+                  <SuperAdminRoute>
+                    <KnowledgeBaseAdmin />
                   </SuperAdminRoute>
                 }
               />

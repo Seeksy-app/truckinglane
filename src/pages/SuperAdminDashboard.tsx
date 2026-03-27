@@ -30,6 +30,7 @@ import {
   ChevronDown,
   ChevronRight,
   Briefcase,
+  BookOpen,
 } from 'lucide-react';
 import {
   Table,
@@ -342,6 +343,24 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Knowledge base
+            </CardTitle>
+            <CardDescription>
+              Help articles for agents (visible on Help / ? in the app)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/admin/knowledge-base')} className="gap-2" variant="secondary">
+              <ArrowRight className="h-4 w-4" />
+              Open knowledge base editor
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Super Admins Section */}
         <Card>

@@ -13,8 +13,14 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
   );
 }
 
-/** Pending for DAT: eligible template, not yet posted, exportable row. */
+/** Today at 15:00:00.000 UTC — pending export only includes loads created strictly after this. */
+export function getTodayDatNewLoadsCutoffUtc(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 15, 0, 0, 0));
+}
+
+/** Pending for DAT: eligible, not posted, created after 15:00 UTC today, exportable row. */
 export function getDatPendingLoads(loads: Load[]): Load[] {
+  const cutoff = getTodayDatNewLoadsCutoffUtc();
   return loads.filter((load) => {
     if (
       !DAT_ELIGIBLE_TEMPLATE_TYPES.includes(
@@ -24,6 +30,7 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
       return false;
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
+    if (new Date(load.created_at).getTime() <= cutoff.getTime()) return false;
     return isExportableLoad(load);
   });
 }
@@ -145,7 +152,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "DAT Loadboard Rate": "",
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
-    "Contact Method*": "primary phone",
+    "Contact Method*": "941-621-2397",
     "Origin City*": load.pickup_city || "",
     "Origin State*": cleanState(load.pickup_state),
     // R / U / W / X: keep headers; fixed values per DAT template spec
@@ -153,7 +160,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Destination City*": load.dest_city || "",
     "Destination State*": cleanState(load.dest_state),
     "Destination Postal Code": "",
-    "Comment": "941-621-2397",
+    "Comment": "",
     "Commodity": "",
     "Reference ID": ""
   };

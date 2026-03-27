@@ -1782,6 +1782,7 @@ export type Database = {
           commodity: string | null
           created_at: string
           customer_invoice_total: number
+          dat_posted_at: string | null
           delivery_date: string | null
           dest_city: string | null
           dest_location_raw: string | null
@@ -1834,6 +1835,7 @@ export type Database = {
           commodity?: string | null
           created_at?: string
           customer_invoice_total: number
+          dat_posted_at?: string | null
           delivery_date?: string | null
           dest_city?: string | null
           dest_location_raw?: string | null
@@ -1886,6 +1888,7 @@ export type Database = {
           commodity?: string | null
           created_at?: string
           customer_invoice_total?: number
+          dat_posted_at?: string | null
           delivery_date?: string | null
           dest_city?: string | null
           dest_location_raw?: string | null

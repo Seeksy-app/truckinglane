@@ -307,13 +307,26 @@ export function AppHeader() {
                          )}
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => {
+                        onClick={async () => {
                           if (datPendingLoads.length === 0) {
                             toast.error("No pending DAT loads to export");
                             return;
                           }
-                          downloadDATExport(datPendingLoads, `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`);
+                          const ids = datPendingLoads.map((l) => l.id);
+                          const filename = `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`;
+                          downloadDATExport(datPendingLoads, filename);
+                          const postedAt = new Date().toISOString();
+                          const { error } = await supabase
+                            .from("loads")
+                            .update({ dat_posted_at: postedAt })
+                            .in("id", ids);
+                          if (error) {
+                            toast.error(`Exported file, but failed to mark loads as posted: ${error.message}`);
+                            return;
+                          }
                           markDATExportComplete();
+                          queryClient.invalidateQueries({ queryKey: ["loads"] });
+                          queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
                           toast.success(`Exported ${datPendingLoads.length} pending loads to DAT format`);
                         }}
                       >

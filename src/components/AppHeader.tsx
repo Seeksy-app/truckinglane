@@ -22,7 +22,14 @@ import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { downloadDATExport, getNewLoadsSinceLastExport, markDATExportComplete, getLastDATExportTimestamp } from '@/lib/datExport';
+import {
+  downloadDATExport,
+  getNewLoadsSinceLastExport,
+  markDATExportComplete,
+  getLastDATExportTimestamp,
+  filterDatEligibleLoads,
+  getDatPendingLoads,
+} from '@/lib/datExport';
 import { useLoads } from '@/hooks/useLoads';
 type ImportState = "idle" | "loading" | "success" | "error";
 
@@ -40,8 +47,10 @@ export function AppHeader() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { loads } = useLoads();
-  const newLoadsForExport = getNewLoadsSinceLastExport(loads);
-  const hasNewExport = newLoadsForExport.length > 0;
+  const datEligibleLoads = filterDatEligibleLoads(loads);
+  const datPendingLoads = getDatPendingLoads(loads);
+  const newLoadsForExport = getNewLoadsSinceLastExport(datEligibleLoads);
+  const hasNewExport = datPendingLoads.length > 0;
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
   const [templateType, setTemplateType] = useState<string>("aljex_flat");
@@ -273,11 +282,11 @@ export function AppHeader() {
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => {
-                          if (loads.length === 0) {
-                            toast.error("No active loads to export");
+                          if (datEligibleLoads.length === 0) {
+                            toast.error("No DAT-eligible loads to export");
                             return;
                           }
-                          const newLoads = getNewLoadsSinceLastExport(loads);
+                          const newLoads = getNewLoadsSinceLastExport(datEligibleLoads);
                           if (newLoads.length === 0) {
                             const lastTs = getLastDATExportTimestamp();
                             const since = lastTs ? new Date(lastTs).toLocaleString() : "unknown";
@@ -293,9 +302,23 @@ export function AppHeader() {
                         Export to DAT
                         {hasNewExport && (
                           <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
-                            {newLoadsForExport.length}
+                            {datPendingLoads.length}
                           </Badge>
                          )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (datPendingLoads.length === 0) {
+                            toast.error("No pending DAT loads to export");
+                            return;
+                          }
+                          downloadDATExport(datPendingLoads, `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`);
+                          markDATExportComplete();
+                          toast.success(`Exported ${datPendingLoads.length} pending loads to DAT format`);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Pending to DAT
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {

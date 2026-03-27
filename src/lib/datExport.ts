@@ -2,6 +2,32 @@ import { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
 
+/** Loads that can be exported to DAT (matches DATStatusCard / board rules). */
+export const DAT_ELIGIBLE_TEMPLATE_TYPES = ["oldcastle_gsheet", "adelphia_xlsx", "vms_email"] as const;
+
+export function filterDatEligibleLoads(loads: Load[]): Load[] {
+  return loads.filter((l) =>
+    DAT_ELIGIBLE_TEMPLATE_TYPES.includes(
+      l.template_type as (typeof DAT_ELIGIBLE_TEMPLATE_TYPES)[number],
+    ),
+  );
+}
+
+/** Pending for DAT: eligible template, not yet posted, exportable row. */
+export function getDatPendingLoads(loads: Load[]): Load[] {
+  return loads.filter((load) => {
+    if (
+      !DAT_ELIGIBLE_TEMPLATE_TYPES.includes(
+        load.template_type as (typeof DAT_ELIGIBLE_TEMPLATE_TYPES)[number],
+      )
+    ) {
+      return false;
+    }
+    if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
+    return isExportableLoad(load);
+  });
+}
+
 // Official DAT bulk upload template columns
 export const DAT_COLUMNS = [
   "Pickup Earliest*",
@@ -97,20 +123,7 @@ function isExportableLoad(load: Load): boolean {
 function mapLoadToDAT(load: Load): Record<string, string> {
   // Length: use trailer_footage if available, default to 48 (standard flatbed) if missing
   const lengthValue = load.trailer_footage ? String(load.trailer_footage) : "48";
-  // Commodity logic for Adelphia loads:
-  // - If trailer_footage has a value → "rebar"
-  // - If trailer_footage is blank/null → "COILS"
-  // For other templates, use the commodity field directly
-  let commodityValue = load.commodity || "";
-  
-  // Check if this is an Adelphia load (load_number starts with "ADE-")
-  const isAdelphiaLoad = load.load_number?.startsWith("ADE-");
-  
-  if (isAdelphiaLoad && (!commodityValue || commodityValue === "")) {
-    // Infer commodity from trailer_footage for legacy Adelphia loads
-    commodityValue = load.trailer_footage ? "rebar" : "COILS";
-  }
-  
+
   // Use current date for first two columns
   const currentDate = getCurrentDate();
   
@@ -135,12 +148,13 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Contact Method*": "primary phone",
     "Origin City*": load.pickup_city || "",
     "Origin State*": cleanState(load.pickup_state),
-    "Origin Postal Code": load.pickup_zip || "",
+    // R / U / W / X: keep headers; fixed values per DAT template spec
+    "Origin Postal Code": "",
     "Destination City*": load.dest_city || "",
     "Destination State*": cleanState(load.dest_state),
-    "Destination Postal Code": load.dest_zip || "",
-    "Comment": load.tarps ? `Tarps: ${load.tarps}` : "",
-    "Commodity": commodityValue,
+    "Destination Postal Code": "",
+    "Comment": "941-621-2397",
+    "Commodity": "",
     "Reference ID": ""
   };
 }

@@ -13,6 +13,15 @@ import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { X, CheckCircle, Package, RotateCcw, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { AIAssistantDrawer } from "@/components/dashboard/AIAssistantDrawer";
@@ -72,10 +81,10 @@ const Dashboard = () => {
   const [showResetBanner, setShowResetBanner] = useState(false);
   const [datSyncInProgress, setDatSyncInProgress] = useState(false);
   const [aljexSyncInProgress, setAljexSyncInProgress] = useState(false);
+  const [aljexModalOpen, setAljexModalOpen] = useState(false);
+  const [aljexCookieValue, setAljexCookieValue] = useState("");
   const datPopupRef = useRef<Window | null>(null);
   const datPopupMonitorRef = useRef<number | null>(null);
-  const aljexPopupRef = useRef<Window | null>(null);
-  const aljexPopupMonitorRef = useRef<number | null>(null);
   
   // Check if reset banner should be shown (admins only, once)
   useEffect(() => {
@@ -363,20 +372,47 @@ const Dashboard = () => {
 
   useEffect(() => {
     const handleDatTokenMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
       const messageType = event.data?.type;
 
-      if (messageType === "DAT_TOKEN_SYNC_SUCCESS") {
-        setDatSyncInProgress(false);
-        toast({ title: "DAT token updated successfully" });
-      }
+      if (messageType === "DAT_TOKEN_BRIDGE_RESULT") {
+        const token = typeof event.data?.token === "string" ? event.data.token : "";
+        const message = typeof event.data?.message === "string" ? event.data.message : "Token not found - make sure you are logged into DAT";
 
-      if (messageType === "DAT_TOKEN_SYNC_FAILED") {
-        setDatSyncInProgress(false);
-        toast({
-          title: "DAT token sync failed",
-          description: event.data?.message || "Token not found - make sure you are logged into DAT",
-          variant: "destructive",
-        });
+        if (!token) {
+          setDatSyncInProgress(false);
+          toast({
+            title: "DAT token sync failed",
+            description: message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        fetch("https://axel.podlogix.io/tl/update-dat-token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542",
+          },
+          body: JSON.stringify({ token }),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Failed to update DAT token");
+            }
+            toast({ title: "DAT token updated successfully" });
+          })
+          .catch((error: unknown) => {
+            toast({
+              title: "DAT token sync failed",
+              description: error instanceof Error ? error.message : "Failed to update DAT token",
+              variant: "destructive",
+            });
+          })
+          .finally(() => {
+            setDatSyncInProgress(false);
+          });
       }
 
       if (messageType === "ALJEX_COOKIE_SYNC_SUCCESS") {
@@ -403,14 +439,13 @@ const Dashboard = () => {
       if (datPopupMonitorRef.current) {
         window.clearInterval(datPopupMonitorRef.current);
       }
-      if (aljexPopupMonitorRef.current) {
-        window.clearInterval(aljexPopupMonitorRef.current);
-      }
     };
   }, []);
 
   const syncDatToken = () => {
-    const popup = window.open("https://one.dat.com", "dat-token-sync", "width=400,height=300,resizable=yes,scrollbars=yes");
+    const bridgeUrl = `${window.location.origin}/dat-token-bridge.html`;
+    const datUrl = `https://one.dat.com/?redirect_uri=${encodeURIComponent(bridgeUrl)}&tl_origin=${encodeURIComponent(window.location.origin)}`;
+    const popup = window.open(datUrl, "dat-token-sync", "width=400,height=300,resizable=yes,scrollbars=yes");
     if (!popup) {
       toast({
         title: "Popup blocked",
@@ -436,255 +471,77 @@ const Dashboard = () => {
         }
       }
     }, 500);
-
-    window.setTimeout(() => {
-      const script = `
-        (async function runDatTokenSync() {
-          const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-          const showOverlay = (message, isSuccess) => {
-            const overlay = document.createElement("div");
-            overlay.style.position = "fixed";
-            overlay.style.inset = "0";
-            overlay.style.zIndex = "2147483647";
-            overlay.style.display = "flex";
-            overlay.style.alignItems = "center";
-            overlay.style.justifyContent = "center";
-            overlay.style.fontFamily = "Inter, system-ui, sans-serif";
-            overlay.style.fontSize = "18px";
-            overlay.style.fontWeight = "700";
-            overlay.style.color = "#fff";
-            overlay.style.background = isSuccess ? "rgba(22, 163, 74, 0.92)" : "rgba(220, 38, 38, 0.92)";
-            overlay.textContent = message;
-            document.body.appendChild(overlay);
-          };
-
-          const extractToken = () => {
-            try {
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (!key) continue;
-                const value = localStorage.getItem(key);
-                if (!value) continue;
-
-                if (key.toLowerCase().includes("access_token")) {
-                  return value;
-                }
-
-                try {
-                  const parsed = JSON.parse(value);
-                  if (parsed && typeof parsed === "object") {
-                    if (typeof parsed.access_token === "string" && parsed.access_token.length > 20) {
-                      return parsed.access_token;
-                    }
-                    if (typeof parsed.token === "string" && parsed.token.length > 20 && key.toLowerCase().includes("access")) {
-                      return parsed.token;
-                    }
-                  }
-                } catch (_ignored) {}
-              }
-
-              const cookiePairs = document.cookie.split(";").map((chunk) => chunk.trim());
-              for (const pair of cookiePairs) {
-                const [rawName, ...rest] = pair.split("=");
-                if (!rawName || rest.length === 0) continue;
-                const name = rawName.toLowerCase();
-                if (name.includes("access_token") || name.includes("auth_token") || name.includes("dat_token")) {
-                  return decodeURIComponent(rest.join("="));
-                }
-              }
-            } catch (_error) {}
-
-            return null;
-          };
-
-          await wait(3000);
-
-          const token = extractToken();
-          if (!token) {
-            const message = "Token not found - make sure you are logged into DAT";
-            showOverlay(message, false);
-            if (window.opener) {
-              window.opener.postMessage({ type: "DAT_TOKEN_SYNC_FAILED", message }, "*");
-            }
-            return;
-          }
-
-          const response = await fetch("https://axel.podlogix.io/tl/update-dat-token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542"
-            },
-            body: JSON.stringify({ token })
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to update DAT token");
-          }
-
-          showOverlay("DAT Token Synced!", true);
-          if (window.opener) {
-            window.opener.postMessage({ type: "DAT_TOKEN_SYNC_SUCCESS" }, "*");
-          }
-          setTimeout(() => window.close(), 2000);
-        })().catch((error) => {
-          const message = error instanceof Error ? error.message : "DAT token sync failed";
-          const overlay = document.createElement("div");
-          overlay.style.position = "fixed";
-          overlay.style.inset = "0";
-          overlay.style.zIndex = "2147483647";
-          overlay.style.display = "flex";
-          overlay.style.alignItems = "center";
-          overlay.style.justifyContent = "center";
-          overlay.style.fontFamily = "Inter, system-ui, sans-serif";
-          overlay.style.fontSize = "16px";
-          overlay.style.fontWeight = "700";
-          overlay.style.color = "#fff";
-          overlay.style.background = "rgba(220, 38, 38, 0.92)";
-          overlay.textContent = message;
-          document.body.appendChild(overlay);
-          if (window.opener) {
-            window.opener.postMessage({ type: "DAT_TOKEN_SYNC_FAILED", message }, "*");
-          }
-        });
-      `;
-
-      try {
-        popup.location.href = `javascript:${encodeURIComponent(script).replace(/%20/g, " ")}`;
-      } catch (_error) {
-        setDatSyncInProgress(false);
-        toast({
-          title: "Unable to inject sync script",
-          description: "Please ensure DAT is fully loaded and try again.",
-          variant: "destructive",
-        });
-      }
-    }, 3000);
   };
 
-  const syncAljexCookie = () => {
-    const popup = window.open("https://dandl.aljex.com/route.php", "aljex-cookie-sync", "width=400,height=300,resizable=yes,scrollbars=yes");
-    if (!popup) {
+  const syncAljexCookie = async () => {
+    if (aljexSyncInProgress) return;
+    setAljexSyncInProgress(true);
+
+    let cookie = aljexCookieValue.trim();
+
+    // Best effort: this works only in extension/privileged contexts.
+    if (!cookie) {
+      try {
+        const chromeApi = (window as typeof window & { chrome?: unknown }).chrome as
+          | {
+              cookies?: {
+                get: (
+                  details: { url: string; name: string },
+                  callback: (result?: { value?: string }) => void,
+                ) => void;
+              };
+            }
+          | undefined;
+
+        if (chromeApi?.cookies?.get) {
+          cookie = await new Promise<string>((resolve) => {
+            chromeApi.cookies!.get(
+              { url: "https://dandl.aljex.com", name: "aljex_sso_dandl" },
+              (result) => resolve(result?.value ?? ""),
+            );
+          });
+        }
+      } catch {
+        // Ignore and fall back to manual input.
+      }
+    }
+
+    if (!cookie) {
+      setAljexSyncInProgress(false);
       toast({
-        title: "Popup blocked",
-        description: "Please allow popups for TruckingLane and try again.",
+        title: "Cookie required",
+        description: "Paste your aljex_sso_dandl cookie value, then click Confirm.",
         variant: "destructive",
       });
       return;
     }
 
-    aljexPopupRef.current = popup;
-    setAljexSyncInProgress(true);
+    try {
+      const response = await fetch("https://axel.podlogix.io/tl/update-aljex-cookie", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542",
+        },
+        body: JSON.stringify({ cookie }),
+      });
 
-    if (aljexPopupMonitorRef.current) {
-      window.clearInterval(aljexPopupMonitorRef.current);
+      if (!response.ok) {
+        throw new Error("Failed to update Aljex cookie");
+      }
+
+      toast({ title: "Aljex cookie updated successfully" });
+      setAljexModalOpen(false);
+      setAljexCookieValue("");
+    } catch (error) {
+      toast({
+        title: "Aljex cookie sync failed",
+        description: error instanceof Error ? error.message : "Failed to update Aljex cookie",
+        variant: "destructive",
+      });
+    } finally {
+      setAljexSyncInProgress(false);
     }
-
-    aljexPopupMonitorRef.current = window.setInterval(() => {
-      if (aljexPopupRef.current?.closed) {
-        setAljexSyncInProgress(false);
-        if (aljexPopupMonitorRef.current) {
-          window.clearInterval(aljexPopupMonitorRef.current);
-          aljexPopupMonitorRef.current = null;
-        }
-      }
-    }, 500);
-
-    window.setTimeout(() => {
-      const script = `
-        (async function runAljexCookieSync() {
-          const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-          const showOverlay = (message, isSuccess) => {
-            const overlay = document.createElement("div");
-            overlay.style.position = "fixed";
-            overlay.style.inset = "0";
-            overlay.style.zIndex = "2147483647";
-            overlay.style.display = "flex";
-            overlay.style.alignItems = "center";
-            overlay.style.justifyContent = "center";
-            overlay.style.fontFamily = "Inter, system-ui, sans-serif";
-            overlay.style.fontSize = "18px";
-            overlay.style.fontWeight = "700";
-            overlay.style.color = "#fff";
-            overlay.style.background = isSuccess ? "rgba(22, 163, 74, 0.92)" : "rgba(220, 38, 38, 0.92)";
-            overlay.textContent = message;
-            document.body.appendChild(overlay);
-          };
-
-          const getCookieValue = (cookieName) => {
-            const cookies = document.cookie ? document.cookie.split("; ") : [];
-            for (const cookie of cookies) {
-              const [name, ...rest] = cookie.split("=");
-              if (name === cookieName) {
-                return decodeURIComponent(rest.join("="));
-              }
-            }
-            return null;
-          };
-
-          await wait(3000);
-
-          const cookieValue = getCookieValue("aljex_sso_dandl");
-          if (!cookieValue) {
-            const message = "Not logged into Aljex - please log in first";
-            showOverlay(message, false);
-            if (window.opener) {
-              window.opener.postMessage({ type: "ALJEX_COOKIE_SYNC_FAILED", message }, "*");
-            }
-            return;
-          }
-
-          const response = await fetch("https://axel.podlogix.io/tl/update-aljex-cookie", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542"
-            },
-            body: JSON.stringify({ cookie: cookieValue })
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to update Aljex cookie");
-          }
-
-          showOverlay("Aljex Cookie Synced!", true);
-          if (window.opener) {
-            window.opener.postMessage({ type: "ALJEX_COOKIE_SYNC_SUCCESS" }, "*");
-          }
-          setTimeout(() => window.close(), 2000);
-        })().catch((error) => {
-          const message = error instanceof Error ? error.message : "Aljex cookie sync failed";
-          const overlay = document.createElement("div");
-          overlay.style.position = "fixed";
-          overlay.style.inset = "0";
-          overlay.style.zIndex = "2147483647";
-          overlay.style.display = "flex";
-          overlay.style.alignItems = "center";
-          overlay.style.justifyContent = "center";
-          overlay.style.fontFamily = "Inter, system-ui, sans-serif";
-          overlay.style.fontSize = "16px";
-          overlay.style.fontWeight = "700";
-          overlay.style.color = "#fff";
-          overlay.style.background = "rgba(220, 38, 38, 0.92)";
-          overlay.textContent = message;
-          document.body.appendChild(overlay);
-          if (window.opener) {
-            window.opener.postMessage({ type: "ALJEX_COOKIE_SYNC_FAILED", message }, "*");
-          }
-        });
-      `;
-
-      try {
-        popup.location.href = `javascript:${encodeURIComponent(script).replace(/%20/g, " ")}`;
-      } catch (_error) {
-        setAljexSyncInProgress(false);
-        toast({
-          title: "Unable to inject sync script",
-          description: "Please ensure Aljex is fully loaded and try again.",
-          variant: "destructive",
-        });
-      }
-    }, 3000);
   };
 
   // Compute timezone-aware "today" window for filtering
@@ -1067,7 +924,7 @@ const Dashboard = () => {
             <Button
               size="sm"
               variant="outline"
-              onClick={syncAljexCookie}
+              onClick={() => setAljexModalOpen(true)}
               disabled={aljexSyncInProgress}
             >
               {aljexSyncInProgress ? "Syncing Aljex..." : "🔑 Sync Aljex Cookie"}
@@ -1219,6 +1076,39 @@ const Dashboard = () => {
 
       {/* Create Load Modal */}
       <CreateLoadModal open={createLoadOpen} onOpenChange={setCreateLoadOpen} />
+
+      <Dialog open={aljexModalOpen} onOpenChange={setAljexModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sync Aljex Cookie</DialogTitle>
+            <DialogDescription>
+              Open your Aljex tab, then click Confirm. If auto-read is unavailable, paste your <code>aljex_sso_dandl</code> cookie value below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Input
+              value={aljexCookieValue}
+              onChange={(e) => setAljexCookieValue(e.target.value)}
+              placeholder="Paste aljex_sso_dandl cookie (optional)"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAljexModalOpen(false)}
+              disabled={aljexSyncInProgress}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={syncAljexCookie} disabled={aljexSyncInProgress}>
+              {aljexSyncInProgress ? "Syncing..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

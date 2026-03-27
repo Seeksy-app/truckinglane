@@ -41,8 +41,9 @@ interface ImportResult {
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
-  const { role } = useUserRole();
-  const { isImpersonating, impersonatedAgencyName, clearImpersonation } = useImpersonation();
+  const { role, agencyId } = useUserRole();
+  const { isImpersonating, impersonatedAgencyId, impersonatedAgencyName, clearImpersonation } = useImpersonation();
+  const effectiveAgencyId = isImpersonating ? impersonatedAgencyId : agencyId;
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -312,22 +313,46 @@ export function AppHeader() {
                             toast.error("No pending DAT loads to export");
                             return;
                           }
-                          const ids = datPendingLoads.map((l) => l.id);
-                          const filename = `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`;
-                          downloadDATExport(datPendingLoads, filename);
+                          if (!effectiveAgencyId) {
+                            toast.error("No agency — cannot export");
+                            return;
+                          }
+                          const pending = [...datPendingLoads];
+                          const ids = pending.map((l) => l.id);
+                          const count = pending.length;
                           const postedAt = new Date().toISOString();
                           const { error } = await supabase
                             .from("loads")
                             .update({ dat_posted_at: postedAt })
                             .in("id", ids);
                           if (error) {
-                            toast.error(`Exported file, but failed to mark loads as posted: ${error.message}`);
+                            toast.error(`Failed to mark loads as posted: ${error.message}`);
                             return;
+                          }
+                          const filename = `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`;
+                          downloadDATExport(pending, filename);
+                          const agentName =
+                            profile?.full_name?.trim() ||
+                            user?.email?.split("@")[0] ||
+                            "Agent";
+                          const { error: logError } = await supabase.from("email_import_logs").insert({
+                            agency_id: effectiveAgencyId,
+                            sender_email: "dat-csv-export@truckinglane.com",
+                            subject: null,
+                            status: "success",
+                            imported_count: count,
+                            raw_headers: { mode: "csv", agent_name: agentName, count },
+                            error_message: null,
+                          });
+                          if (logError) {
+                            console.error("DAT CSV activity log:", logError);
+                            toast.warning("Exported CSV, but activity log could not be saved.");
                           }
                           markDATExportComplete();
                           queryClient.invalidateQueries({ queryKey: ["loads"] });
                           queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
-                          toast.success(`Exported ${datPendingLoads.length} pending loads to DAT format`);
+                          queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
+                          toast.success(`Exported ${count} pending loads to DAT format`);
                         }}
                       >
                         <Download className="h-4 w-4 mr-2" />

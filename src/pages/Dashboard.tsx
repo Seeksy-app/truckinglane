@@ -1055,9 +1055,28 @@ const Dashboard = () => {
           <DialogHeader>
             <DialogTitle>Sync Aljex Cookie</DialogTitle>
             <DialogDescription>
-              Go to dandl.aljex.com, open DevTools (F12), click Application tab, then Cookies &gt; dandl.aljex.com. Find the cookie named <code>aljex_sso_dandl</code> and paste the value below.
+              <span className="block">1. Go to dandl.aljex.com in another tab (make sure you&apos;re logged in)</span>
+              <span className="block">2. Press Ctrl + Shift + I to open DevTools</span>
+              <span className="block">3. Click the Application tab at the top of DevTools</span>
+              <span className="block">4. In the left sidebar, click Cookies -&gt; then click https://dandl.aljex.com</span>
+              <span className="block">5. Find the row where Name = aljex_sso_dandl</span>
+              <span className="block">6. Click that row - the Value appears at the bottom</span>
+              <span className="block">7. Right-click the Value field -&gt; Copy</span>
+              <span className="block">8. Come back here, paste it below, and click Confirm</span>
             </DialogDescription>
           </DialogHeader>
+
+          <div className="rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground space-y-2">
+            <div className="font-medium text-foreground">Quick visual guide (Chrome DevTools)</div>
+            <div className="rounded border border-border bg-background p-2 font-mono text-[11px] leading-relaxed">
+              Tabs: Elements | Console | Sources | Network | <span className="text-foreground font-semibold">Application</span><br />
+              Left sidebar: Storage<br />
+              &nbsp;&nbsp;└─ Cookies<br />
+              &nbsp;&nbsp;&nbsp;&nbsp;└─ <span className="text-foreground">https://dandl.aljex.com</span><br />
+              Main table row: Name = <span className="text-foreground">aljex_sso_dandl</span><br />
+              Bottom pane: Value (copy this)
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Input
@@ -1077,7 +1096,7 @@ const Dashboard = () => {
               Cancel
             </Button>
             <Button type="button" onClick={syncAljexCookie} disabled={aljexSyncInProgress}>
-              {aljexSyncInProgress ? "Syncing..." : "Sync"}
+              {aljexSyncInProgress ? "Syncing..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

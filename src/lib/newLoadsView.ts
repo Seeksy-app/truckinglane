@@ -24,6 +24,9 @@ const QUICK_FIX_2026_03_27_FLOOR = new Date("2026-03-27T15:00:00.000Z");
  * - Per-user localStorage `tl_last_viewed_loads_at_<userId>` (ISO string).
  * - Missing or stale (stored date before today UTC): default to today 12:00 UTC.
  * - 2026-03-27: never count anything at/before 15:00 UTC floor (quick fix).
+ *
+ * Important: "new" must compare **created_at** to this threshold, never **updated_at** —
+ * scheduled syncs (e.g. Oldcastle) bump updated_at when row data changes.
  */
 export function getEffectiveNewLoadsThresholdUtc(userId: string, now: Date = new Date()): Date {
   if (typeof window === "undefined") {
@@ -60,4 +63,9 @@ export function getEffectiveNewLoadsThresholdUtc(userId: string, now: Date = new
 export function setLastViewedLoadsAtNow(userId: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(lastViewedLoadsStorageKey(userId), new Date().toISOString());
+}
+
+/** True if load.created_at is strictly after the viewer cutoff (uses created_at only). */
+export function isLoadNewByCreatedAt(load: { created_at: string }, thresholdUtc: Date): boolean {
+  return new Date(load.created_at).getTime() > thresholdUtc.getTime();
 }

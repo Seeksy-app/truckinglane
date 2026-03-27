@@ -36,7 +36,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
-import { getEffectiveNewLoadsThresholdUtc } from "@/lib/newLoadsView";
+import { getEffectiveNewLoadsThresholdUtc, isLoadNewByCreatedAt } from "@/lib/newLoadsView";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
@@ -525,13 +525,13 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New = open loads created after per-user last_viewed threshold (see newLoadsView.ts)
+    // New = open loads whose created_at is after last viewed (not updated_at — sync refreshes update rows)
     let newLoadsCount = 0;
     if (user?.id) {
       const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
       newLoadsCount = loads.filter((l) => {
         if (!l.is_active || l.status !== "open") return false;
-        return new Date(l.created_at).getTime() > threshold.getTime();
+        return isLoadNewByCreatedAt(l, threshold);
       }).length;
     }
 
@@ -711,7 +711,7 @@ const Dashboard = () => {
     const threshold = getEffectiveNewLoadsThresholdUtc(user.id);
     let result = loads.filter((l) => {
       if (!l.is_active || l.status !== "open") return false;
-      return new Date(l.created_at).getTime() > threshold.getTime();
+      return isLoadNewByCreatedAt(l, threshold);
     });
     if (searchQuery.trim()) {
       const searchTerms = normalizeStateSearch(searchQuery);

@@ -34,6 +34,7 @@ import AcceptInvite from "./pages/AcceptInvite";
 import CompleteAgencySetup from "./pages/CompleteAgencySetup";
 import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
+import Help from "./pages/Help";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
 import { Loader2 } from "lucide-react";
@@ -227,6 +228,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <MyKeywords />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help"
+                element={
+                  <ProtectedRoute>
+                    <Help />
                   </ProtectedRoute>
                 }
               />

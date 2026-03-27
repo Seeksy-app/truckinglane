@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -84,6 +84,7 @@ export function AppHeader() {
     location.pathname === p || location.pathname.startsWith('/accounts/')
   );
   const isOnDashboard = location.pathname === '/dashboard';
+  const isOnHelpPage = location.pathname === '/help';
 
   // Show agency-level nav when impersonating or when user is not super admin
   const showAgencyNav = !isSuperAdmin || isImpersonating;
@@ -529,6 +530,16 @@ export function AppHeader() {
 
           {/* User Menu */}
           <div className="flex items-center gap-2">
+            <Button
+              variant={isOnHelpPage ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => navigate('/help')}
+              className="gap-1.5"
+              aria-label="Help and knowledge base"
+            >
+              <CircleHelp className="h-4 w-4" />
+              <span className="hidden sm:inline">Help</span>
+            </Button>
             <NotificationCenter />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -1,34 +1,49 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
 import { useNotificationSettings } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
+import { playLeadNotificationDing } from "@/lib/leadNotificationSound";
 
-// Sound for notifications (optional)
-const NOTIFICATION_SOUND_URL = "/notification.mp3";
+export type LeadNotificationOptions = {
+  /** Agency to filter realtime inserts (use effective agency id on dashboard, incl. impersonation). */
+  agencyId: string | null | undefined;
+  /** When true, do not play the Web Audio ding. */
+  soundMuted: boolean;
+};
 
-export function useLeadNotifications() {
+/**
+ * Subscribes to new leads for the agency. Plays a ding + in-app toast; optional desktop notification from settings.
+ * Intended only while the dashboard is mounted so agents hear alerts only on that page.
+ */
+export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationOptions) {
   const { user } = useAuth();
-  const { agencyId } = useUserRole();
   const { settings } = useNotificationSettings();
   const { toast } = useToast();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Request notification permission on mount
+  // Unlock AudioContext after first user gesture (browser autoplay policy)
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      // Don't auto-request - let user trigger via settings
-    }
+    const unlock = async () => {
+      if (audioCtxRef.current) return;
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      try {
+        const ctx = new AC();
+        await ctx.resume();
+        audioCtxRef.current = ctx;
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("pointerdown", unlock, { capture: true });
+    window.addEventListener("keydown", unlock, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
   }, []);
 
-  // Initialize audio element
-  useEffect(() => {
-    audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
-    audioRef.current.volume = 0.5;
-  }, []);
-
-  // Subscribe to new leads via Supabase Realtime
   useEffect(() => {
     if (!user?.id || !agencyId) return;
 
@@ -48,71 +63,63 @@ export function useLeadNotifications() {
             caller_phone: string;
             caller_name: string | null;
             caller_company: string | null;
+            equipment_type: string | null;
             is_high_intent: boolean | null;
             notes: string | null;
             created_at: string;
           };
 
-          // Format phone for display - handle +1 country code properly
-          const phone = newLead.caller_phone || "Unknown";
-          const digits = phone.replace(/\D/g, "");
-          // Remove leading 1 if it's a US number
-          const nationalDigits = digits.length === 11 && digits.startsWith("1") 
-            ? digits.slice(1) 
-            : digits;
-          const formattedPhone = nationalDigits.length === 10
-            ? `(${nationalDigits.slice(0, 3)}) ${nationalDigits.slice(3, 6)}-${nationalDigits.slice(6)}`
-            : phone;
-          
-          const isHighIntent = newLead.is_high_intent;
-          const title = isHighIntent ? "🔥 High Intent Lead!" : "📞 New Lead";
-          
-          // Build body with company, phone, and summary
-          const parts: string[] = [];
-          if (newLead.caller_name) parts.push(newLead.caller_name);
-          if (newLead.caller_company) parts.push(newLead.caller_company);
-          parts.push(formattedPhone);
-          
-          // Add summary/notes if available (truncated)
-          const summary = newLead.notes?.slice(0, 100);
-          const body = summary 
-            ? `${parts.join(" • ")}\n${summary}${newLead.notes && newLead.notes.length > 100 ? "..." : ""}`
-            : parts.join(" • ");
+          const equipment = newLead.equipment_type?.trim();
+          const carrierLine = equipment || newLead.caller_company?.trim() || null;
 
-          // Show in-app toast notification
           toast({
-            title,
-            description: body,
-            duration: 8000,
+            title: "New lead incoming!",
+            description: equipment
+              ? `Equipment: ${equipment}`
+              : carrierLine
+                ? carrierLine
+                : undefined,
+            duration: 6000,
           });
 
-          // Auto-navigate to lead on toast click via a brief timeout trick
-          // The browser notification (below) handles direct click navigation
-
-          // Play sound if enabled
-          if (settings.chat_sound && audioRef.current) {
+          if (!soundMuted && audioCtxRef.current) {
             try {
-              audioRef.current.currentTime = 0;
-              await audioRef.current.play();
+              if (audioCtxRef.current.state === "suspended") {
+                await audioCtxRef.current.resume();
+              }
+              playLeadNotificationDing(audioCtxRef.current);
             } catch (e) {
-              // Audio play may fail if user hasn't interacted with page
-              console.log("Could not play notification sound:", e);
+              console.log("Could not play lead notification sound:", e);
             }
           }
 
-          // Show browser notification if enabled and permission granted
           if (settings.chat_desktop && "Notification" in window && Notification.permission === "granted") {
-            const notification = new Notification(title, {
-              body,
+            const phone = newLead.caller_phone || "Unknown";
+            const digits = phone.replace(/\D/g, "");
+            const nationalDigits = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+            const formattedPhone =
+              nationalDigits.length === 10
+                ? `(${nationalDigits.slice(0, 3)}) ${nationalDigits.slice(3, 6)}-${nationalDigits.slice(6)}`
+                : phone;
+
+            const parts: string[] = [];
+            if (newLead.caller_name) parts.push(newLead.caller_name);
+            if (newLead.caller_company) parts.push(newLead.caller_company);
+            parts.push(formattedPhone);
+            const summary = newLead.notes?.slice(0, 100);
+            const body = summary
+              ? `${parts.join(" • ")}\n${summary}${newLead.notes && newLead.notes.length > 100 ? "..." : ""}`
+              : parts.join(" • ");
+
+            const notification = new Notification("New lead incoming!", {
+              body: equipment ? `Equipment: ${equipment} — ${body}` : carrierLine ? `${carrierLine} — ${body}` : body,
               icon: "/favicon.svg",
               tag: `lead-${newLead.id}`,
-              requireInteraction: isHighIntent, // Keep high-intent visible until dismissed
+              requireInteraction: !!newLead.is_high_intent,
             });
 
-            // Click handler to focus the app
             notification.onclick = () => {
               window.focus();
-              // Navigate to lead in dashboard
               const url = new URL(window.location.href);
               url.pathname = "/dashboard";
               url.searchParams.set("lead", newLead.caller_phone);
@@ -120,21 +127,19 @@ export function useLeadNotifications() {
               notification.close();
             };
 
-            // Auto-close after 10 seconds for non-high-intent
-            if (!isHighIntent) {
+            if (!newLead.is_high_intent) {
               setTimeout(() => notification.close(), 10000);
             }
           }
-        }
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, agencyId, settings.chat_sound, settings.chat_desktop, toast]);
+  }, [user?.id, agencyId, soundMuted, settings.chat_desktop, toast]);
 
-  // Helper to request permission
   const requestPermission = async (): Promise<boolean> => {
     if (!("Notification" in window)) {
       toast({

@@ -15,13 +15,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   downloadDATExport,
   getNewLoadsSinceLastExport,
@@ -39,7 +40,13 @@ interface ImportResult {
   error?: string;
 }
 
-export function AppHeader() {
+type AppHeaderProps = {
+  /** When set (e.g. from Dashboard), shows mute toggle for new-lead ding. Default sound is ON (unmuted). */
+  leadSoundMuted?: boolean;
+  onLeadSoundMutedChange?: (muted: boolean) => void;
+};
+
+export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: AppHeaderProps = {}) {
   const { user, signOut } = useAuth();
   const { role, agencyId } = useUserRole();
   const { isImpersonating, impersonatedAgencyId, impersonatedAgencyName, clearImpersonation } = useImpersonation();
@@ -531,6 +538,30 @@ export function AppHeader() {
 
           {/* User Menu */}
           <div className="flex items-center gap-2">
+            {onLeadSoundMutedChange && isOnDashboard && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-9 w-9"
+                    aria-label={leadSoundMuted ? 'Unmute new lead sound' : 'Mute new lead sound'}
+                    aria-pressed={leadSoundMuted}
+                    onClick={() => onLeadSoundMutedChange(!leadSoundMuted)}
+                  >
+                    {leadSoundMuted ? (
+                      <BellOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Bell className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {leadSoundMuted ? 'New lead sound off (click to turn on)' : 'New lead sound on (click to mute)'}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Button
               variant={isOnHelpPage ? 'secondary' : 'ghost'}
               size="sm"

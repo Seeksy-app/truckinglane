@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,6 +37,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { isOpenLoadInLatestImportBatch } from "@/lib/newLoadsFromImport";
+import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
@@ -63,14 +64,21 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
   const { role, agencyId: userAgencyId } = useUserRole();
   const { impersonatedAgencyId, isImpersonating } = useImpersonation();
+  const effectiveAgencyId = isImpersonating ? impersonatedAgencyId : userAgencyId;
+
+  const [leadSoundMuted, setLeadSoundMutedState] = useState(false);
+  useEffect(() => {
+    setLeadSoundMutedState(readLeadSoundMutedFromStorage());
+  }, []);
+  const setLeadSoundMuted = useCallback((muted: boolean) => {
+    setLeadSoundMutedState(muted);
+    writeLeadSoundMutedToStorage(muted);
+  }, []);
+
+  useLeadNotifications({ agencyId: effectiveAgencyId ?? undefined, soundMuted: leadSoundMuted });
+
   const { timezone } = useUserTimezone();
   const isAdmin = role === "agency_admin" || role === "super_admin";
-  
-  // Enable browser push notifications for new leads
-  useLeadNotifications();
-  
-  // Use impersonated agency if set, otherwise use user's agency
-  const effectiveAgencyId = isImpersonating ? impersonatedAgencyId : userAgencyId;
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
@@ -804,7 +812,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader />
+      <AppHeader leadSoundMuted={leadSoundMuted} onLeadSoundMutedChange={setLeadSoundMuted} />
       
       {/* System Reset Banner - Admin only, dismissible */}
       {showResetBanner && (

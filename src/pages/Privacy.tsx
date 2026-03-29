@@ -58,6 +58,15 @@ export default function Privacy() {
           </section>
 
           <section>
+            <h2 className="text-lg font-semibold text-white mt-8 mb-3">SMS DATA &amp; THIRD PARTIES</h2>
+            <p>
+              No mobile information will be shared with third parties or affiliates for marketing or promotional
+              purposes. All the above categories exclude text messaging originator opt-in data and consent; this
+              information will not be shared with any third parties.
+            </p>
+          </section>
+
+          <section>
             <h2 className="text-lg font-semibold text-white mt-8 mb-3">DATA SECURITY</h2>
             <p>
               Your information is stored securely and only accessible to authorized D&amp;L Transport and TruckingLanes

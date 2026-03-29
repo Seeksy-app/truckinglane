@@ -2,29 +2,30 @@
  * Aljex spot form autofill — runs on https://dandl.aljex.com/route.php*
  */
 
-const CUSTOMER_IDS = {
-  "ADELPHIA METALS": "133755",
-  "CENTURY ENTERPRISES": "103744",
-  VMS: "144472",
-  OLDCASTLE: "282899",
-  "SEMCO DISTRIBUTING": "113508",
-  "ALLIED BUILDING STORES": "116401",
+/** Aljex CustID by loads.template_type (no customer_name column). */
+const TEMPLATE_TO_CUST_ID = {
+  adelphia_xlsx: "133755",
+  vms_email: "144472",
+  oldcastle_gsheet: "282899",
+  century_xlsx: "103744",
 };
 
-/** Exact match on uppercase customer_name → CustID; no fuzzy match (per spec: abort if unknown). */
+const TEMPLATE_TO_DISPLAY = {
+  adelphia_xlsx: "ADELPHIA METALS",
+  vms_email: "VMS",
+  oldcastle_gsheet: "OLDCASTLE",
+  century_xlsx: "CENTURY ENTERPRISES",
+};
+
 function custIdForLoad(load) {
-  const raw = (load.customer_name || "").trim();
-  const key = raw.toUpperCase();
-  if (!key) {
-    console.warn("[Aljex injector] Missing customer_name; aborting submit");
+  const tt = (load.template_type || "").trim();
+  const id = TEMPLATE_TO_CUST_ID[tt];
+  const display = TEMPLATE_TO_DISPLAY[tt];
+  if (!id || !display) {
+    console.warn("[Aljex injector] No CustID / display for template_type:", tt);
     return null;
   }
-  const id = CUSTOMER_IDS[key];
-  if (!id) {
-    console.warn("[Aljex injector] No CustID for customer_name (expected exact key):", key);
-    return null;
-  }
-  return { id, display: raw };
+  return { id, display };
 }
 
 function mapTrailerToFld50(raw) {
@@ -82,7 +83,7 @@ function runFill(load) {
     console.warn("[Aljex injector] Unknown customer for Aljex CustID mapping", load);
     chrome.runtime.sendMessage({
       type: "ALJEX_ABORT",
-      reason: "unknown_customer",
+      reason: "unknown_template_type",
     });
     return;
   }

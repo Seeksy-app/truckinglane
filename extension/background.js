@@ -4,7 +4,6 @@ const SUPABASE_URL = "https://vjgakkomhphvdbwjjwiv.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZ2Fra29taHBodmRid2pqd2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTIzNjMsImV4cCI6MjA4MjA2ODM2M30.mQRJK5Bj04P-hxwIWkVxG7lXiXI4daMs59UuxU2w1Ow";
 
-const AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323";
 const ALJEX_NEW_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
 const TL_TRIGGER_BASE = "http://187.77.217.123:3098";
 const TL_TRIGGER_KEY = "tl-trigger-7b747d391801b8e5f55b4542";
@@ -20,27 +19,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "aljexSpotPoll") pollAljexSubmitQueue();
 });
 
-function localTodayYMD() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function buildLoadsPendingQuery() {
-  const today = localTodayYMD();
-  const customerOr =
-    "or(customer_name.ilike.*ADELPHIA*,customer_name.ilike.*CENTURY*ENTERPRISES*,customer_name.ilike.*VMS*,customer_name.ilike.*OLDCASTLE*,customer_name.ilike.*SEMCO*,customer_name.ilike.*ALLIED*BUILDING*)";
-  const parts = [
-    `agency_id.eq.${AGENCY_ID}`,
-    "is_active.eq.true",
-    "dispatch_status.eq.open",
-    "or(aljex_submitted.is.null,aljex_submitted.eq.false)",
-    `ship_date.gte.${today}`,
-    customerOr,
-  ];
-  return `(${parts.join(",")})`;
+/** PostgREST loads poll for Aljex spot queue — not yet submitted; no dispatch_status filter. */
+function buildAljexLoadsPollUrl() {
+  const q = [
+    "template_type=in.(adelphia_xlsx,vms_email,oldcastle_gsheet,century_xlsx)",
+    "aljex_submitted=eq.false",
+    "select=*",
+    "limit=1",
+  ].join("&");
+  return `${SUPABASE_URL}/rest/v1/loads?${q}`;
 }
 
 async function pollAljexSubmitQueue() {
@@ -59,25 +46,7 @@ async function pollAljexSubmitQueue() {
       return;
     }
 
-    const select = [
-      "id",
-      "load_number",
-      "customer_name",
-      "template_type",
-      "pickup_city",
-      "pickup_state",
-      "dest_city",
-      "dest_state",
-      "ship_date",
-      "trailer_type",
-      "weight_lbs",
-      "commodity",
-      "customer_invoice_total",
-      "target_pay",
-    ].join(",");
-
-    const andParam = encodeURIComponent(buildLoadsPendingQuery());
-    const url = `${SUPABASE_URL}/rest/v1/loads?select=${select}&and=${andParam}&order=created_at.asc&limit=1`;
+    const url = buildAljexLoadsPollUrl();
 
     const response = await fetch(url, {
       headers: {

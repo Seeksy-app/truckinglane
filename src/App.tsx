@@ -22,6 +22,8 @@ import Extension from "./pages/Extension";
 import Trust from "./pages/Trust";
 import Status from "./pages/Status";
 import Legal from "./pages/Legal";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import LeadDiscovery from "./pages/LeadDiscovery";
 import Accounts from "./pages/Accounts";
 import AccountDetail from "./pages/AccountDetail";
@@ -150,6 +152,8 @@ const App = () => (
               <Route path="/trust" element={<Trust />} />
               <Route path="/csv-converter" element={<CsvConverter />} />
               <Route path="/status" element={<Status />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/legal/:slug" element={<Legal />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/signup/agency" element={<AgencySignup />} />

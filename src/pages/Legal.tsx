@@ -41,9 +41,15 @@ export default function Legal() {
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <Link to="/"><Logo size="sm" /></Link>
           <nav className="flex gap-6 text-sm">
-            <Link to="/legal/terms" className={`hover:text-white ${slug === 'terms' ? 'text-white' : 'text-white/50'}`}>Terms</Link>
-            <Link to="/legal/privacy" className={`hover:text-white ${slug === 'privacy' ? 'text-white' : 'text-white/50'}`}>Privacy</Link>
-            <Link to="/legal/trust" className={`hover:text-white ${slug === 'trust' ? 'text-white' : 'text-white/50'}`}>Trust</Link>
+            <Link to="/terms" className="text-white/50 hover:text-white">
+              Terms
+            </Link>
+            <Link to="/privacy" className="text-white/50 hover:text-white">
+              Privacy
+            </Link>
+            <Link to="/legal/trust" className={`hover:text-white ${slug === 'trust' ? 'text-white' : 'text-white/50'}`}>
+              Trust
+            </Link>
           </nav>
         </div>
       </header>

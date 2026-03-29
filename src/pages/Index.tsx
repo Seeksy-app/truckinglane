@@ -26,6 +26,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { SiteFooter } from "@/components/SiteFooter";
 import truckingHero from "@/assets/trucking-hero.jpg";
 import dispatcherOffice from "@/assets/dispatcher-office.jpg";
 import freightBroker from "@/assets/freight-broker.jpg";
@@ -78,8 +79,7 @@ const Index = () => {
       {/* CTA Section */}
       <CTASection />
 
-      {/* Footer */}
-      <Footer />
+      <SiteFooter />
     </div>
   );
 };
@@ -696,29 +696,6 @@ function CTASection() {
         </motion.div>
       </div>
     </section>
-  );
-}
-
-// Footer
-function Footer() {
-  return (
-    <footer className="py-12 px-6 border-t border-white/10 bg-[hsl(220,15%,6%)]">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <Logo size="sm" />
-
-          <div className="flex items-center gap-8 text-white/50 text-sm">
-            <Link to="/trust" className="hover:text-white transition-colors">
-              Trust & Security
-            </Link>
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
-          </div>
-
-          <p className="text-white/40 text-sm">© 2025 TruckingLane.com — a Seeksy Product</p>
-        </div>
-      </div>
-    </footer>
   );
 }
 

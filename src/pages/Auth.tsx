@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Truck, Mail, ArrowRight, Sparkles, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import truckingHero from '@/assets/trucking-hero.jpg';
+import { SiteFooter } from '@/components/SiteFooter';
 
 type AuthMode = 'password' | 'magic' | 'forgot';
 
@@ -139,7 +140,8 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
+      <div className="flex flex-1 flex-col lg:flex-row min-h-0">
       {/* Left side - Hero */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <img 
@@ -176,8 +178,10 @@ export default function Auth() {
             </p>
           </div>
 
-          <div className="text-sm text-white/70 pl-4">
-            © 2025 TruckingLane.com — a Seeksy Product.
+          <div className="text-sm text-white/50 pl-4">
+            <Link to="/privacy" className="hover:text-white">Privacy</Link>
+            <span className="mx-2 text-white/30">·</span>
+            <Link to="/terms" className="hover:text-white">Terms</Link>
           </div>
         </div>
       </div>
@@ -384,6 +388,8 @@ export default function Auth() {
           )}
         </div>
       </div>
+      </div>
+      <SiteFooter />
     </div>
   );
 }

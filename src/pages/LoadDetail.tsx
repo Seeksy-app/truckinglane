@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,11 +11,15 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   ArrowLeft, Package, MapPin, Calendar, DollarSign, Truck, 
-  Scale, Ruler, AlertTriangle, Home, RefreshCw
+  Scale, Ruler, AlertTriangle, Home, RefreshCw, Copy, Check
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  buildAljexDispatcherCallScript,
+  isAljexCallScriptLoad,
+} from "@/lib/aljexLoadBoard";
 
 type Load = Tables<"loads">;
 type LoadStatus = "open" | "claimed" | "booked" | "closed";
@@ -176,6 +181,7 @@ function LoadDetailContent() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [scriptCopied, setScriptCopied] = useState(false);
 
   const demoLoad = (location.state as any)?.demoLoad as Load | undefined;
 
@@ -307,6 +313,20 @@ function LoadDetailContent() {
       return `$${load.customer_invoice_total.toLocaleString()}`;
     }
     return "TBD";
+  };
+
+  const dispatcherCallScript = isAljexCallScriptLoad(load.template_type)
+    ? buildAljexDispatcherCallScript(load)
+    : "";
+  const callScriptDisplay =
+    dispatcherCallScript || (load.load_call_script?.trim() ?? "");
+
+  const handleCopyCallScript = async () => {
+    if (!callScriptDisplay) return;
+    await navigator.clipboard.writeText(callScriptDisplay);
+    setScriptCopied(true);
+    toast({ title: "Call script copied to clipboard" });
+    setTimeout(() => setScriptCopied(false), 2000);
   };
 
   return (
@@ -526,19 +546,39 @@ function LoadDetailContent() {
             </CardContent>
           </Card>
 
-          {/* Call Script */}
-          {load.load_call_script && (
+          {/* Call Script — Aljex dispatcher loads use live AI-voice template; others use stored load_call_script */}
+          {callScriptDisplay ? (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="font-serif text-xl">Call Script</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={handleCopyCallScript}
+                  aria-label="Copy call script to clipboard"
+                >
+                  {scriptCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy Script
+                    </>
+                  )}
+                </Button>
               </CardHeader>
               <CardContent>
                 <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
-                  {load.load_call_script}
+                  {callScriptDisplay}
                 </p>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { format, isValid, parseISO } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -64,20 +65,37 @@ function formatScriptMoney(n: number | null | undefined): string {
   return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
+function formatScriptShipDate(iso: string | null | undefined): string {
+  if (!iso?.trim()) return "TBD";
+  const d = parseISO(iso.trim());
+  return isValid(d) ? format(d, "MMM d, yyyy") : iso.trim();
+}
+
 /**
  * Plain-text script for ElevenLabs / human dispatchers (aljex_big500, aljex_spot).
+ * Uses target_pay only (never customer_invoice_total or max_pay). Per-ton loads quote rate_raw/ton.
  */
 export function buildAljexDispatcherCallScript(load: Load): string {
-  const inv = formatScriptMoney(load.customer_invoice_total);
+  const pickupCity = load.pickup_city?.trim() || load.pickup_state?.trim() || "—";
+  const destCity = load.dest_city?.trim() || load.dest_state?.trim() || "—";
+  const trailer = load.trailer_type?.trim() || "load";
+  const ship = formatScriptShipDate(load.ship_date);
   const target = formatScriptMoney(load.target_pay);
-  const max = formatScriptMoney(load.max_pay);
-  const lines: string[] = [
-    `This load pays ${inv}. We can offer up to ${target} and max out at ${max}.`,
-  ];
 
-  if (load.is_per_ton && load.rate_raw != null && Number(load.rate_raw) > 0) {
-    lines.push(`Rate: $${Number(load.rate_raw).toLocaleString()}/ton`);
-  }
+  const perTonOk =
+    Boolean(load.is_per_ton) && load.rate_raw != null && Number(load.rate_raw) > 0;
+  const perTonStr = perTonOk
+    ? `$${Number(load.rate_raw).toLocaleString(undefined, { maximumFractionDigits: 2 })}/ton`
+    : "";
+
+  const ratePart =
+    load.is_per_ton && perTonOk
+      ? `It's a per-ton rate, paying ${perTonStr}.`
+      : `It's paying ${target}.`;
+
+  const lines: string[] = [
+    `I've got a ${pickupCity} to ${destCity} ${trailer} moving ${ship} — that work for you? ${ratePart}`,
+  ];
 
   const pc = load.pickup_city?.trim() || "";
   const ps = load.pickup_state?.trim() || "";

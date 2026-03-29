@@ -346,6 +346,7 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
         agency_id: agencyId,
         template_type: "vms_email",
         load_number: loadNumber,
+        customer_name: "VMS",
         pickup_city: pickupCity,
         pickup_state: pickupState,
         pickup_location_raw: `${pickupCity}, ${pickupState}`,
@@ -362,6 +363,7 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
         commodity: commodity,
         miles: null,
         status: "open",
+        dispatch_status: "open",
         source_row: { original_line: line, load_instance: i + 1, total_instances: count },
       };
       
@@ -527,6 +529,7 @@ function parseOldcastleAllSheets(buffer: ArrayBuffer, agencyId: string): Record<
         agency_id: agencyId,
         template_type: "oldcastle_gsheet",
         load_number: loadNumber,
+        customer_name: "OLDCASTLE",
         pickup_city: shipperCity || null,
         pickup_state: shipperState || null,
         pickup_location_raw: pickupRaw || null,
@@ -542,6 +545,7 @@ function parseOldcastleAllSheets(buffer: ArrayBuffer, agencyId: string): Record<
         miles: null,
         tarp_required: false,
         status: "open",
+        dispatch_status: "open",
         source_row: { sheet: sheetName, equipment },
       };
 

@@ -30,13 +30,15 @@ function localTodayYMD() {
 
 function buildLoadsPendingQuery() {
   const today = localTodayYMD();
+  const customerOr =
+    "or(customer_name.ilike.*ADELPHIA*,customer_name.ilike.*CENTURY*ENTERPRISES*,customer_name.ilike.*VMS*,customer_name.ilike.*OLDCASTLE*,customer_name.ilike.*SEMCO*,customer_name.ilike.*ALLIED*BUILDING*)";
   const parts = [
     `agency_id.eq.${AGENCY_ID}`,
     "is_active.eq.true",
     "dispatch_status.eq.open",
     "or(aljex_submitted.is.null,aljex_submitted.eq.false)",
     `ship_date.gte.${today}`,
-    "or(template_type.in.(adelphia_xlsx,century_xlsx),customer_name.ilike.*ADELPHIA*,customer_name.ilike.*CENTURY*ENTERPRISES*)",
+    customerOr,
   ];
   return `(${parts.join(",")})`;
 }

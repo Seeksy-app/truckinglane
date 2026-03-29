@@ -5,26 +5,32 @@
 const CUSTOMER_IDS = {
   "ADELPHIA METALS": "133755",
   "CENTURY ENTERPRISES": "103744",
+  VMS: "144472",
+  OLDCASTLE: "282899",
+  "SEMCO DISTRIBUTING": "113508",
+  "ALLIED BUILDING STORES": "116401",
 };
 
-function resolveCustomerName(load) {
-  let n = (load.customer_name || "").trim().toUpperCase();
-  if (!n && load.template_type === "adelphia_xlsx") n = "ADELPHIA METALS";
-  if (!n && load.template_type === "century_xlsx") n = "CENTURY ENTERPRISES";
-  return n;
-}
-
+/** Exact match on uppercase customer_name → CustID; no fuzzy match (per spec: abort if unknown). */
 function custIdForLoad(load) {
-  const n = resolveCustomerName(load);
-  if (CUSTOMER_IDS[n]) return { id: CUSTOMER_IDS[n], display: n };
-  if (n.includes("ADELPHIA")) return { id: CUSTOMER_IDS["ADELPHIA METALS"], display: "ADELPHIA METALS" };
-  if (n.includes("CENTURY")) return { id: CUSTOMER_IDS["CENTURY ENTERPRISES"], display: "CENTURY ENTERPRISES" };
-  return null;
+  const raw = (load.customer_name || "").trim();
+  const key = raw.toUpperCase();
+  if (!key) {
+    console.warn("[Aljex injector] Missing customer_name; aborting submit");
+    return null;
+  }
+  const id = CUSTOMER_IDS[key];
+  if (!id) {
+    console.warn("[Aljex injector] No CustID for customer_name (expected exact key):", key);
+    return null;
+  }
+  return { id, display: raw };
 }
 
 function mapTrailerToFld50(raw) {
   const u = (raw || "").toUpperCase().replace(/\s+/g, " ").trim();
   if (!u) return "FLATBED";
+  if (u.includes("FLATBED OR STEPDECK")) return "FLATBED OR STEPDECK";
   if (u.includes("FLATBED W TARPS")) return "FLATBED W TARPS";
   if (/^(F|FT)\s*48$/.test(u) || /^(F|FT)\s*53$/.test(u) || /^F\s*40$/.test(u)) return "FLATBED";
   if (/^VR\s*53$|^V\s*53$/.test(u)) return "VAN";

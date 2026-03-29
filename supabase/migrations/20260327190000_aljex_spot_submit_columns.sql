@@ -14,7 +14,8 @@ WHERE template_type = 'adelphia_xlsx' AND customer_name IS NULL;
 
 UPDATE public.loads
 SET dispatch_status = 'open'
-WHERE template_type IN ('adelphia_xlsx', 'century_xlsx') AND dispatch_status IS NULL;
+WHERE template_type IN ('adelphia_xlsx', 'century_xlsx', 'vms_email', 'oldcastle_gsheet')
+  AND dispatch_status IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_loads_aljex_pending_submit
   ON public.loads (agency_id, ship_date)

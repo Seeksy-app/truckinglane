@@ -429,6 +429,7 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
     agency_id: agencyId,
     template_type: "adelphia_xlsx",
     load_number: loadNumber,
+    customer_name: "ADELPHIA METALS",
     pickup_city: pickupCity || null,
     pickup_state: pickupState || null,
     pickup_location_raw: pickupLocationRaw || null,
@@ -445,6 +446,7 @@ function mapAdelphiaRow(row: Record<string, string>, agencyId: string, rowIndex:
     commodity: notes || null,
     miles: null,
     status: "open",
+    dispatch_status: "open",
     source_row: row,
   };
   

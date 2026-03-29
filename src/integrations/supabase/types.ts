@@ -1863,6 +1863,9 @@ export type Database = {
       loads: {
         Row: {
           agency_id: string
+          aljex_spot_number: string | null
+          aljex_submitted: boolean | null
+          aljex_submitted_at: string | null
           archived_at: string | null
           board_date: string
           booked_at: string | null
@@ -1879,6 +1882,7 @@ export type Database = {
           commodity: string | null
           created_at: string
           customer_invoice_total: number
+          customer_name: string | null
           dat_posted_at: string | null
           delivery_date: string | null
           dest_city: string | null
@@ -1916,6 +1920,9 @@ export type Database = {
         }
         Insert: {
           agency_id: string
+          aljex_spot_number?: string | null
+          aljex_submitted?: boolean | null
+          aljex_submitted_at?: string | null
           archived_at?: string | null
           board_date?: string
           booked_at?: string | null
@@ -1932,6 +1939,7 @@ export type Database = {
           commodity?: string | null
           created_at?: string
           customer_invoice_total: number
+          customer_name?: string | null
           dat_posted_at?: string | null
           delivery_date?: string | null
           dest_city?: string | null
@@ -1969,6 +1977,9 @@ export type Database = {
         }
         Update: {
           agency_id?: string
+          aljex_spot_number?: string | null
+          aljex_submitted?: boolean | null
+          aljex_submitted_at?: string | null
           archived_at?: string | null
           board_date?: string
           booked_at?: string | null
@@ -1985,6 +1996,7 @@ export type Database = {
           commodity?: string | null
           created_at?: string
           customer_invoice_total?: number
+          customer_name?: string | null
           dat_posted_at?: string | null
           delivery_date?: string | null
           dest_city?: string | null

@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  buildAljexDispatcherCallScript,
+  isAljexCallScriptLoad,
+} from "@/lib/aljexLoadBoard";
 
 type Load = Tables<"loads">;
 
@@ -19,6 +23,7 @@ interface LoadExpandedRowProps {
 
 export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadExpandedRowProps) {
   const [copied, setCopied] = useState(false);
+  const [scriptCopied, setScriptCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [coveredDialogOpen, setCoveredDialogOpen] = useState(false);
 
@@ -28,6 +33,18 @@ export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadEx
     setCopied(true);
     toast.success("Notes copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const dispatcherCallScript = isAljexCallScriptLoad(load.template_type)
+    ? buildAljexDispatcherCallScript(load)
+    : "";
+
+  const handleCopyCallScript = async () => {
+    if (!dispatcherCallScript) return;
+    await navigator.clipboard.writeText(dispatcherCallScript);
+    setScriptCopied(true);
+    toast.success("Call script copied to clipboard");
+    setTimeout(() => setScriptCopied(false), 2000);
   };
 
   const updateStatus = async (newStatus: string, additionalFields: Record<string, unknown> = {}) => {
@@ -241,6 +258,39 @@ export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadEx
 
         {/* Compact Details Grid */}
         <LoadDetailsGrid load={load} />
+
+        {dispatcherCallScript ? (
+          <div className="rounded-md border border-border bg-background/50 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                CALL SCRIPT
+              </h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyCallScript}
+                className="h-7 gap-1.5 text-xs"
+                aria-label="Copy call script to clipboard"
+              >
+                {scriptCopied ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    Copy Script
+                  </>
+                )}
+              </Button>
+            </div>
+            <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed m-0">
+              {dispatcherCallScript}
+            </pre>
+          </div>
+        ) : null}
 
         {/* Action Bar */}
         <div className="flex items-center gap-2 pt-2 border-t border-border/50">

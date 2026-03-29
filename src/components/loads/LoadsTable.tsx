@@ -25,6 +25,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  getAljexTemplateBadgeLabel,
+  getLoadBoardClientPrimaryLabel,
+} from "@/lib/aljexLoadBoard";
 
 type Load = Tables<"loads">;
 
@@ -87,7 +91,14 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
       destStates: Array.from(destSet).sort(),
       clients: Array.from(clientSet).sort((a, b) => {
         // Custom order: VMS first, then Adelphia, then Aljex
-        const order: Record<string, number> = { vms_email: 1, adelphia_xlsx: 2, aljex_flat: 3, aljex_spot: 4, oldcastle_gsheet: 5 };
+        const order: Record<string, number> = {
+          vms_email: 1,
+          adelphia_xlsx: 2,
+          aljex_flat: 3,
+          aljex_big500: 3,
+          aljex_spot: 4,
+          oldcastle_gsheet: 5,
+        };
         return (order[a] || 99) - (order[b] || 99);
       }),
       clientCounts: countMap,
@@ -126,7 +137,9 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
             vms_email: 1,
             adelphia_xlsx: 2,
             aljex_flat: 3,
-            oldcastle_gsheet: 4,
+            aljex_big500: 3,
+            aljex_spot: 4,
+            oldcastle_gsheet: 5,
           };
           const aOrder = templateOrder[a.template_type] || 99;
           const bOrder = templateOrder[b.template_type] || 99;
@@ -236,7 +249,8 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
               <SelectItem value="all">All ({loads.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
-                  {client === "vms_email" ? "VMS" : client === "adelphia_xlsx" ? "Adelphia" : client === "oldcastle_gsheet" ? "Oldcastle" : client === "aljex_spot" ? "Spot Loads" : "Aljex"} ({clientCounts[client] ?? 0})
+                  {getLoadBoardClientPrimaryLabel(client)}
+                  {client === "aljex_big500" ? " (Big 500)" : ""} ({clientCounts[client] ?? 0})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -318,6 +332,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
         <TableBody>
           {filteredAndSortedLoads.slice(0, displayCount).map((load) => {
             const isPending = load.status === "open" && !load.booked_by;
+            const aljexTemplateBadge = getAljexTemplateBadgeLabel(load.template_type);
             return (
               <>
                 <TableRow
@@ -334,17 +349,19 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
                   </TableCell>
                   <TableCell className="font-medium">{load.load_number || "—"}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {load.template_type === "adelphia_xlsx" 
-                        ? "Adelphia" 
-                        : load.template_type === "vms_email" 
-                          ? "VMS" 
-                          : load.template_type === "oldcastle_gsheet"
-                            ? "Oldcastle"
-                            : load.template_type === "aljex_spot"
-                              ? "Spot Loads"
-                              : "Aljex"}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className="text-xs font-medium">
+                        {getLoadBoardClientPrimaryLabel(load.template_type)}
+                      </Badge>
+                      {aljexTemplateBadge ? (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                        >
+                          {aljexTemplateBadge}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell>{load.ship_date || "—"}</TableCell>
                   <TableCell>

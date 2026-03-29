@@ -4,11 +4,11 @@ type Load = Tables<"loads">;
 
 // Format rate display
 const formatRateDisplay = (load: Load): string | null => {
-  if (!load.rate_raw) return null;
+  if (load.rate_raw == null || Number(load.rate_raw) <= 0) return null;
   if (load.is_per_ton) {
-    return `$${load.rate_raw?.toLocaleString()} / ton`;
+    return `$${Number(load.rate_raw).toLocaleString()}/ton`;
   }
-  return `$${load.rate_raw?.toLocaleString()}`;
+  return `$${Number(load.rate_raw).toLocaleString()}`;
 };
 
 // Format currency with TBD handling for per-ton
@@ -175,7 +175,7 @@ export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
       <div className="space-y-2">
         <SectionHeader title="Financials" />
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          <Field label="Rate" value={rate} />
+          <Field label={load.is_per_ton ? "Rate ($/ton)" : "Rate"} value={rate} />
           <Field label="Invoice" value={invoice} />
           <Field label="Target Pay" value={targetPay} />
           <Field label="Target Comm" value={targetComm} />

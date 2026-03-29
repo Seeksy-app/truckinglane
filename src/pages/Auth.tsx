@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Truck, Mail, ArrowRight, Sparkles, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import truckingHero from '@/assets/trucking-hero.jpg';
 import { SiteFooter } from '@/components/SiteFooter';
 
 type AuthMode = 'password' | 'magic' | 'forgot';

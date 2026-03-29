@@ -2,6 +2,32 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
 
+/** Stored on loads ingested from Aljex scrape / bookmarklet / sync (not manual Dispatch Status from exports). */
+export const ALJEX_SCRAPED_DISPATCH_STATUS = "available" as const;
+
+/**
+ * Reads an Aljex scrape / CSV row status (load board OPEN vs COVERED).
+ * Checks common column names from bookmarklet or CSV exports.
+ */
+export function getAljexScrapeRowStatus(row: Record<string, string>): string {
+  const raw =
+    row["Status"] ??
+    row["Load Status"] ??
+    row["St"] ??
+    "";
+  return String(raw).trim().toUpperCase();
+}
+
+/**
+ * Scrape / import filter: include only OPEN rows. Excludes COVERED (and anything else).
+ * Rows with no status column are kept so older CSVs without Status still import.
+ */
+export function scrapeAljexLoadsRowPassesStatusFilter(row: Record<string, string>): boolean {
+  const s = getAljexScrapeRowStatus(row);
+  if (!s) return true;
+  return s === "OPEN";
+}
+
 /** Templates that use the dispatcher / ElevenLabs call script UX. */
 export function isAljexCallScriptLoad(templateType: string): boolean {
   return templateType === "aljex_big500" || templateType === "aljex_spot";

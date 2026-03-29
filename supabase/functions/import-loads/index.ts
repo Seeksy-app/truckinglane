@@ -46,6 +46,16 @@ function parseCSV(text: string): Record<string, string>[] {
   return rows;
 }
 
+// Aljex bookmarklet / scrape CSV: OPEN only (excludes COVERED). Keep aligned with src/lib/aljexLoadBoard.ts.
+function scrapeAljexLoadsRowPassesStatusFilter(row: Record<string, string>): boolean {
+  const raw = row["Status"] ?? row["Load Status"] ?? row["St"] ?? "";
+  const s = String(raw).trim().toUpperCase();
+  if (!s) return true;
+  return s === "OPEN";
+}
+
+const ALJEX_SCRAPED_DISPATCH_STATUS = "available";
+
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -292,6 +302,7 @@ function mapAljexSpotRow(row: Record<string, string>, agencyId: string): Record<
     commission_target_pct: 0.20,
     commission_max_pct: 0.15,
     status: "open",
+    dispatch_status: ALJEX_SCRAPED_DISPATCH_STATUS,
     is_active: true,
     board_date: today,
     source_row: { customer: row["Customer"] || "", ref: row["Customer Ref #"] || "", purge_date: purgeDate },
@@ -669,13 +680,14 @@ Deno.serve(async (req) => {
     if (templateType === "aljex_spot") {
       // Spot loads scraped from Aljex homepage via bookmarklet
       const csvText = await file.text();
-      const rows = parseCSV(csvText);
+      const parsed = parseCSV(csvText);
+      const rows = parsed.filter(scrapeAljexLoadsRowPassesStatusFilter);
       if (rows.length === 0) {
-        return new Response(JSON.stringify({ error: "No spot load rows found" }), {
+        return new Response(JSON.stringify({ error: "No spot load rows found (after OPEN status filter)" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      console.log(`Parsed ${rows.length} spot load rows`);
+      console.log(`Parsed ${parsed.length} spot rows, ${rows.length} OPEN after status filter`);
       mappedLoads = rows.map(row => mapAljexSpotRow(row, agencyId)).filter(l => l.load_number);
 
     } else if (templateType === "aljex_flat") {

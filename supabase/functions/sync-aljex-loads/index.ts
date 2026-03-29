@@ -59,6 +59,16 @@ function parseCSV(text: string): Record<string, string>[] {
   return rows;
 }
 
+// Scrape / sync CSV: OPEN only (excludes COVERED). Keep aligned with src/lib/aljexLoadBoard.ts.
+function scrapeAljexLoadsRowPassesStatusFilter(row: Record<string, string>): boolean {
+  const raw = row["Status"] ?? row["Load Status"] ?? row["St"] ?? "";
+  const s = String(raw).trim().toUpperCase();
+  if (!s) return true;
+  return s === "OPEN";
+}
+
+const ALJEX_SCRAPED_DISPATCH_STATUS = "available";
+
 // ============= HELPERS =============
 
 function parseNumber(value: string | undefined | null): number | null {
@@ -153,7 +163,7 @@ function mapAljexFlatRow(row: Record<string, string>): Record<string, unknown> {
     ship_date: parseDate(row["Ship Date"]),
     delivery_date: parseDate(row["Ship Date"]),
     trailer_type: row["Type of Shipment"] || null,
-    dispatch_status: row["Dispatch Status"] || null,
+    dispatch_status: ALJEX_SCRAPED_DISPATCH_STATUS,
     trailer_footage: parseNumber(row["Footage"]),
     tarps: row["Tarps"] || null,
     tarp_size: row["Tarp Size"] || null,
@@ -202,11 +212,15 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Parsing Aljex CSV (${csvText.length} bytes)`);
-    const rows = parseCSV(csvText);
-    console.log(`Parsed ${rows.length} rows`);
+    const parsed = parseCSV(csvText);
+    const rows = parsed.filter(scrapeAljexLoadsRowPassesStatusFilter);
+    console.log(`Parsed ${parsed.length} rows, ${rows.length} OPEN after status filter`);
 
     if (rows.length === 0) {
-      return new Response(JSON.stringify({ error: "No data rows in CSV" }), {
+      const msg = parsed.length === 0
+        ? "No data rows in CSV"
+        : "No OPEN loads after status filter (COVERED rows excluded)";
+      return new Response(JSON.stringify({ error: msg }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

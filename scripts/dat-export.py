@@ -4,7 +4,7 @@ DAT bulk CSV helpers — keep in sync with src/lib/datExport.ts (mapLoadToDAT).
 
 Deploy copy to VPS: /root/scripts/dat-export.py
 
-- Contact Method* = dispatch phone (DAT routes calls to Stephen).
+- Contact Method* = "primary phone" (not the phone number).
 - Weight (lbs)* defaults to 1 when weight is null, 0, or missing.
 - Equipment* = normalize_dat_equipment_code (FSD/FSB/FT→F, VR/CN→V, prefix F/V/R, else F).
 """
@@ -18,8 +18,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-# Must match DAT Contact Method column (actual number, not a label).
-DAT_CONTACT_METHOD_PHONE = "941-621-2397"
+DAT_CONTACT_METHOD = "primary phone"
 
 
 def dat_export_weight_lbs(weight_lbs: Any) -> str:
@@ -117,7 +116,7 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
         "DAT Loadboard Rate": "",
         "Allow DAT Loadboard Booking": "no",
         "Use Extended Network": "no",
-        "Contact Method*": DAT_CONTACT_METHOD_PHONE,
+        "Contact Method*": DAT_CONTACT_METHOD,
         "Origin City*": str(load.get("pickup_city") or ""),
         "Origin State*": clean_state(load.get("pickup_state")),
         "Origin Postal Code": "",

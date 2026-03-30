@@ -86,8 +86,8 @@ function getCurrentDate(): string {
   return `${month}/${day}/${year}`;
 }
 
-/** DAT Contact Method must be the dispatch phone number (routes calls to Stephen). */
-const DAT_CONTACT_METHOD_PHONE = "941-621-2397";
+/** DAT Contact Method column value (not a phone number in this field). */
+const DAT_CONTACT_METHOD = "primary phone";
 
 /** DAT requires a weight; use 1 lbs when load weight is missing or zero. */
 function datExportWeightLbs(weightLbs: number | null | undefined): string {
@@ -183,7 +183,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "DAT Loadboard Rate": "",
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
-    "Contact Method*": DAT_CONTACT_METHOD_PHONE,
+    "Contact Method*": DAT_CONTACT_METHOD,
     "Origin City*": load.pickup_city || "",
     "Origin State*": cleanState(load.pickup_state),
     // R / U / W / X: keep headers; fixed values per DAT template spec

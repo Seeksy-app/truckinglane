@@ -1,5 +1,5 @@
 // Trucking Lane — background: AI leads + Aljex spot auto-submit queue.
-// Big 500 (aljex_big500) is ingested only via parse-big500.py on the VPS, not from the extension.
+// Big 500: when Aljex generates a CSV at /ptmp/*.csv, we fetch with session cookies and POST to VPS /upload-big500.
 
 const SUPABASE_URL = "https://vjgakkomhphvdbwjjwiv.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -11,6 +11,117 @@ const TL_TRIGGER_KEY = "tl-trigger-7b747d391801b8e5f55b4542";
 
 const CHECK_INTERVAL_SECONDS = 30;
 const ALJEX_POLL_MINUTES = 5;
+
+/** Aljex Reports export → async CSV at random /ptmp/*.csv URL */
+const BIG500_URL_FILTER = ["https://dandl.aljex.com/ptmp/*"];
+const BIG500_DEDUPE_MS = 15000;
+const big500RecentUrls = new Map();
+
+function pruneBig500Dedupe() {
+  const now = Date.now();
+  for (const [u, t] of big500RecentUrls) {
+    if (now - t > BIG500_DEDUPE_MS) big500RecentUrls.delete(u);
+  }
+}
+
+function shouldProcessBig500Url(url) {
+  try {
+    const u = new URL(url);
+    if (!u.pathname.startsWith("/ptmp/") || !u.pathname.toLowerCase().endsWith(".csv")) return false;
+  } catch {
+    return false;
+  }
+  pruneBig500Dedupe();
+  const now = Date.now();
+  const last = big500RecentUrls.get(url);
+  if (last != null && now - last < BIG500_DEDUPE_MS) return false;
+  big500RecentUrls.set(url, now);
+  return true;
+}
+
+async function buildCookieHeaderForUrl(url) {
+  try {
+    const cookies = await chrome.cookies.getAll({ url });
+    if (!cookies?.length) return "";
+    return cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  } catch (e) {
+    console.warn("[TruckingLane/Big500] cookies", e);
+    return "";
+  }
+}
+
+async function fetchBig500Csv(url) {
+  const cookieHeader = await buildCookieHeaderForUrl(url);
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "omit",
+    headers: cookieHeader ? { Cookie: cookieHeader } : {},
+  });
+  if (!res.ok) throw new Error(`CSV GET ${res.status}`);
+  return await res.text();
+}
+
+async function postBig500ToTrigger(csvText) {
+  const res = await fetch(`${TL_TRIGGER_BASE}/upload-big500`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "X-TL-Trigger-Key": TL_TRIGGER_KEY,
+    },
+    body: csvText,
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+async function handleBig500Completed(details) {
+  if (details.statusCode !== 200) return;
+  const url = details.url;
+  if (!shouldProcessBig500Url(url)) return;
+
+  try {
+    console.log("[TruckingLane/Big500] detected", url);
+    const csv = await fetchBig500Csv(url);
+    if (!csv || csv.length < 10) {
+      console.warn("[TruckingLane/Big500] empty CSV");
+      return;
+    }
+    await postBig500ToTrigger(csv);
+    await chrome.storage.local.set({
+      big500_last_sync: {
+        at: new Date().toISOString(),
+        ok: true,
+        url,
+      },
+    });
+    console.log("[TruckingLane/Big500] synced to VPS");
+  } catch (e) {
+    console.error("[TruckingLane/Big500]", e);
+    await chrome.storage.local.set({
+      big500_last_sync: {
+        at: new Date().toISOString(),
+        ok: false,
+        error: String(e?.message || e),
+        url,
+      },
+    });
+  }
+}
+
+if (chrome.webRequest?.onCompleted) {
+  chrome.webRequest.onCompleted.addListener(
+    (details) => {
+      void handleBig500Completed(details);
+    },
+    { urls: BIG500_URL_FILTER },
+    []
+  );
+}
 
 chrome.alarms.create("checkNewLeads", { periodInMinutes: Math.max(CHECK_INTERVAL_SECONDS / 60, 1) });
 chrome.alarms.create("aljexSpotPoll", { periodInMinutes: ALJEX_POLL_MINUTES });

@@ -9,10 +9,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginForm = document.getElementById('loginForm');
   const errorEl = document.getElementById('error');
   const pendingCountEl = document.getElementById('pendingCount');
-  
+  const big500StatusEl = document.getElementById('big500Status');
+
+  function formatShortTime(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }
+
+  function refreshBig500Status() {
+    if (!big500StatusEl) return;
+    chrome.storage.local.get(['big500_last_sync'], (s) => {
+      const row = s.big500_last_sync;
+      if (!row?.at) {
+        big500StatusEl.classList.add('hidden');
+        return;
+      }
+      big500StatusEl.classList.remove('hidden');
+      if (row.ok) {
+        big500StatusEl.classList.remove('error');
+        big500StatusEl.textContent = `Big 500 synced · ${formatShortTime(row.at)}`;
+      } else {
+        big500StatusEl.classList.add('error');
+        big500StatusEl.textContent = `Big 500 sync failed · ${(row.error || '').slice(0, 80)}`;
+      }
+    });
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.big500_last_sync) refreshBig500Status();
+  });
+
   // Check if already logged in
   const { accessToken } = await chrome.storage.local.get(['accessToken']);
   
+  refreshBig500Status();
+
   if (accessToken) {
     showLoggedInState();
     await fetchPendingCount();

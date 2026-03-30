@@ -12,7 +12,9 @@ Environment:
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 try:
@@ -77,6 +79,56 @@ def mark_aljex_submitted():
         return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
 
     return jsonify({"success": True})
+
+
+@app.post("/upload-big500")
+def upload_big500():
+    """Receive raw Big 500 CSV from the browser extension; run parse-big500.py and upsert loads."""
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    if request.is_json:
+        body = request.get_json(silent=True) or {}
+        raw = body.get("csv") or ""
+        if not isinstance(raw, str):
+            raw = ""
+    else:
+        raw = (request.get_data() or b"").decode("utf-8", errors="replace")
+
+    raw = raw.strip()
+    if len(raw) < 10:
+        return jsonify({"error": "body too short or empty"}), 400
+
+    script = os.environ.get("PARSE_BIG500_SCRIPT", "").strip()
+    if not script:
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "parse-big500.py")
+    if not os.path.isfile(script):
+        return jsonify({"error": f"parse script not found: {script}"}), 500
+
+    fd, path = tempfile.mkstemp(suffix=".csv", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(raw)
+
+        env = os.environ.copy()
+        proc = subprocess.run(
+            [sys.executable, script, path],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            env=env,
+        )
+        if proc.returncode != 0:
+            err_out = (proc.stderr or proc.stdout or "").strip() or "parse-big500 failed"
+            return jsonify({"error": err_out[-8000:]}), 502
+        out = (proc.stdout or "").strip()
+        return jsonify({"success": True, "message": out[-4000:] if out else "ok"})
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 def main():

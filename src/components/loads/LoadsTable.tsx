@@ -52,6 +52,12 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
 
+  /** Matches dashboard query: no archived dispatch rows in table or Client counts. */
+  const loadsExcludingArchived = useMemo(
+    () => loads.filter((l) => l.dispatch_status !== "archived"),
+    [loads],
+  );
+
   const handleNavigateToDetail = (
     loadId: string,
     load?: Load,
@@ -77,7 +83,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
     const clientSet = new Set<string>();
     const countMap: Record<string, number> = {};
     
-    loads.forEach((load) => {
+    loadsExcludingArchived.forEach((load) => {
       if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
       if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
       if (load.template_type) {
@@ -103,11 +109,11 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
       }),
       clientCounts: countMap,
     };
-  }, [loads]);
+  }, [loadsExcludingArchived]);
 
   // Apply filters then sort
   const filteredAndSortedLoads = useMemo(() => {
-    let result = loads;
+    let result = loadsExcludingArchived;
     
     // Apply client filter
     if (clientFilter !== "all") {
@@ -152,7 +158,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
     }
     
     return result;
-  }, [loads, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
+  }, [loadsExcludingArchived, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
 
   const hasActiveFilters = clientFilter !== "all" || pickupStateFilter !== "all" || destStateFilter !== "all";
 
@@ -177,7 +183,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
     );
   }
 
-  if (loads.length === 0) {
+  if (loadsExcludingArchived.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Package className="h-12 w-12 mb-4 opacity-50" />
@@ -246,7 +252,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
-              <SelectItem value="all">All ({loads.length})</SelectItem>
+              <SelectItem value="all">All ({loadsExcludingArchived.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
                   {getLoadBoardClientPrimaryLabel(client)}
@@ -309,7 +315,7 @@ export function LoadsTable({ loads, loading, isDemo = false, onRefresh }: LoadsT
         {/* Filter count indicator */}
         {hasActiveFilters && (
           <span className="text-xs text-muted-foreground">
-            Showing {filteredAndSortedLoads.length} of {loads.length}
+            Showing {filteredAndSortedLoads.length} of {loadsExcludingArchived.length}
           </span>
         )}
       </div>

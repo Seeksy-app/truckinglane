@@ -30,9 +30,11 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
 
-  // Defensive: even if parent passes mixed statuses, only render active open loads here.
+  // Defensive: active open loads only; exclude archived dispatch (matches dashboard query).
   const openLoads = useMemo(() => {
-    return loads.filter((l) => l.status === "open" && l.is_active);
+    return loads.filter(
+      (l) => l.status === "open" && l.is_active && l.dispatch_status !== "archived",
+    );
   }, [loads]);
 
   const handleNavigateToDetail = (loadId: string, e?: React.MouseEvent) => {

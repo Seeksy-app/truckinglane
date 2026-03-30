@@ -9,11 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, Clock, XCircle } from "lucide-react";
-import {
-  LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR,
-  LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR_REST,
-} from "@/lib/loadDashboardFilters";
-
 interface FailedLoad {
   id: string;
   load_number: string;
@@ -39,7 +34,7 @@ export function DATStatusCard() {
         .from("loads")
         .select("id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type")
         .eq("is_active", true)
-        .or(LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR);
+        .neq("dispatch_status", "archived");
 
       const { data: session } = await supabase.auth.getSession();
       const token = session?.session?.access_token;
@@ -48,8 +43,8 @@ export function DATStatusCard() {
 
       const datPostedUrl = new URL(`${supabaseUrl}/rest/v1/loads`);
       datPostedUrl.searchParams.set("is_active", "eq.true");
+      datPostedUrl.searchParams.set("dispatch_status", "neq.archived");
       datPostedUrl.searchParams.set("select", "id,dat_posted_at");
-      datPostedUrl.searchParams.set("or", LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR_REST);
       const resp = await fetch(datPostedUrl.toString(), {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` },
       });

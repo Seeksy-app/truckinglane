@@ -11,8 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useLoads } from "@/hooks/useLoads";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { X, CheckCircle, Package, RotateCcw, Plus, RefreshCw } from "lucide-react";
+import { X, CheckCircle, Package, RotateCcw, Plus, RefreshCw, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -894,31 +900,43 @@ const Dashboard = () => {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => backfillMutation.mutate()}
-              disabled={backfillMutation.isPending}
-            >
-              <RefreshCw className={`h-4 w-4 mr-1 ${backfillMutation.isPending ? 'animate-spin' : ''}`} />
-              {backfillMutation.isPending ? "Syncing..." : "Sync Calls"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setDatModalOpen(true)}
-              disabled={datSyncInProgress}
-            >
-              {datSyncInProgress ? "Syncing DAT..." : "🔑 Sync DAT Token"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setAljexModalOpen(true)}
-              disabled={aljexSyncInProgress}
-            >
-              {aljexSyncInProgress ? "Syncing Aljex..." : "🔑 Sync Aljex Cookie"}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  aria-label="Settings"
+                  title="Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 bg-popover">
+                <DropdownMenuItem
+                  onClick={() => backfillMutation.mutate()}
+                  disabled={backfillMutation.isPending}
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${backfillMutation.isPending ? "animate-spin" : ""}`}
+                  />
+                  {backfillMutation.isPending ? "Syncing..." : "Sync Calls"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setDatModalOpen(true)}
+                  disabled={datSyncInProgress}
+                >
+                  {datSyncInProgress ? "Syncing DAT..." : "Sync DAT Token"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setAljexModalOpen(true)}
+                  disabled={aljexSyncInProgress}
+                >
+                  {aljexSyncInProgress ? "Syncing Aljex..." : "Sync Aljex Cookie"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" onClick={() => setCreateLoadOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Create Load

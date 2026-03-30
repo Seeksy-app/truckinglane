@@ -6,6 +6,7 @@ Deploy copy to VPS: /root/scripts/dat-export.py
 
 - Contact Method* = dispatch phone (DAT routes calls to Stephen).
 - Weight (lbs)* defaults to 1 when weight is null, 0, or missing.
+- Equipment* = normalize_dat_equipment_code (FSD/FSB/FT→F, VR/CN→V, prefix F/V/R, else F).
 """
 
 from __future__ import annotations
@@ -34,6 +35,30 @@ def dat_export_weight_lbs(weight_lbs: Any) -> str:
     return str(int(round(n)))
 
 
+def normalize_dat_equipment_code(raw: Any) -> str:
+    """Normalize to DAT-valid F / V / R; empty or unknown → F. Keep in sync with datExport.ts."""
+    s = ("" if raw is None else str(raw)).strip().upper()
+    if not s:
+        return "F"
+    exact = {
+        "FSD": "F",
+        "FSB": "F",
+        "FT": "F",
+        "VR": "V",
+        "CN": "V",
+    }
+    if s in exact:
+        return exact[s]
+    c0 = s[0]
+    if c0 == "F":
+        return "F"
+    if c0 == "V":
+        return "V"
+    if c0 == "R":
+        return "R"
+    return "F"
+
+
 def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
     """Mirror of mapLoadToDAT in datExport.ts (subset used on VPS)."""
     now = datetime.now(timezone.utc)
@@ -47,31 +72,33 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
             return ""
         return str(state).split("/")[0].strip()
 
-    trailer = (load.get("trailer_type") or "").lower()
+    trailer = (load.get("trailer_type") or "").strip()
+    trailer_l = trailer.lower()
     tt = load.get("template_type") or ""
+    raw_equip = ""
     if not trailer:
         if tt in ("adelphia_xlsx", "vms_email", "oldcastle_gsheet"):
-            equip = "F"
-        else:
-            equip = ""
-    elif "van" in trailer or "dry" in trailer:
-        equip = "V"
-    elif "reefer" in trailer or "refriger" in trailer:
-        equip = "R"
-    elif "flat" in trailer or "step" in trailer:
-        equip = "F"
-    elif "tanker" in trailer:
-        equip = "T"
-    elif "hopper" in trailer:
-        equip = "HB"
-    elif "lowboy" in trailer:
-        equip = "LB"
-    elif "double" in trailer:
-        equip = "DD"
-    elif "container" in trailer:
-        equip = "C"
+            raw_equip = "F"
+    elif "van" in trailer_l or "dry" in trailer_l:
+        raw_equip = "V"
+    elif "reefer" in trailer_l or "refriger" in trailer_l:
+        raw_equip = "R"
+    elif "flat" in trailer_l or "step" in trailer_l:
+        raw_equip = "F"
+    elif "tanker" in trailer_l:
+        raw_equip = "T"
+    elif "hopper" in trailer_l:
+        raw_equip = "HB"
+    elif "lowboy" in trailer_l:
+        raw_equip = "LB"
+    elif "double" in trailer_l:
+        raw_equip = "DD"
+    elif "container" in trailer_l:
+        raw_equip = "C"
     else:
-        equip = str(load.get("trailer_type") or "")
+        raw_equip = trailer
+
+    equip = normalize_dat_equipment_code(raw_equip)
 
     w = dat_export_weight_lbs(load.get("weight_lbs"))
 

@@ -96,30 +96,52 @@ function datExportWeightLbs(weightLbs: number | null | undefined): string {
   return String(Math.round(n));
 }
 
-// Map trailer type to DAT equipment code
+/**
+ * Normalize equipment to DAT single-letter codes (F / V / R).
+ * Unknown or empty → F (flatbed).
+ */
+function normalizeDatEquipmentCode(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim().toUpperCase();
+  if (!s) return "F";
+
+  const exact: Record<string, string> = {
+    FSD: "F",
+    FSB: "F",
+    FT: "F",
+    VR: "V",
+    CN: "V",
+  };
+  if (exact[s]) return exact[s];
+
+  const c0 = s[0];
+  if (c0 === "F") return "F";
+  if (c0 === "V") return "V";
+  if (c0 === "R") return "R";
+
+  return "F";
+}
+
+// Map trailer type to DAT equipment code (word hints + raw codes), then normalize for CSV.
 // templateType is used to default Adelphia and VMS to Flatbed
 function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
-  // Default Adelphia and VMS to Flatbed if no trailer type specified
-  if (!trailerType) {
+  let raw = "";
+  if (!trailerType?.trim()) {
     if (templateType === "adelphia_xlsx" || templateType === "vms_email" || templateType === "oldcastle_gsheet") {
-      return "F"; // Flatbed
+      raw = "F";
     }
-    return "";
+  } else {
+    const type = trailerType.toLowerCase();
+    if (type.includes("van") || type.includes("dry")) raw = "V";
+    else if (type.includes("reefer") || type.includes("refriger")) raw = "R";
+    else if (type.includes("flat") || type.includes("step")) raw = "F";
+    else if (type.includes("tanker")) raw = "T";
+    else if (type.includes("hopper")) raw = "HB";
+    else if (type.includes("lowboy")) raw = "LB";
+    else if (type.includes("double")) raw = "DD";
+    else if (type.includes("container")) raw = "C";
+    else raw = trailerType.trim();
   }
-  const type = trailerType.toLowerCase();
-  
-  // Common mappings - V=Van, R=Reefer, F=Flatbed
-  if (type.includes("van") || type.includes("dry")) return "V";
-  if (type.includes("reefer") || type.includes("refriger")) return "R";
-  if (type.includes("flat") || type.includes("step")) return "F";
-  if (type.includes("tanker")) return "T";
-  if (type.includes("hopper")) return "HB";
-  if (type.includes("lowboy")) return "LB";
-  if (type.includes("double")) return "DD";
-  if (type.includes("container")) return "C";
-  
-  // Return original if no mapping found
-  return trailerType;
+  return normalizeDatEquipmentCode(raw);
 }
 
 // Clean state field: strip anything after "/" (e.g. "IN/CHICAGO" → "IN")

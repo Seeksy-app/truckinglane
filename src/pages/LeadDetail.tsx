@@ -14,7 +14,8 @@ import {
   Sparkles, ChevronDown, AlertTriangle, Home, RefreshCw 
 } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -27,29 +28,104 @@ const statusStyles: Record<LeadStatus, string> = {
   closed: "bg-emerald-100 text-emerald-800",
 };
 
-const TranscriptCollapsible = ({ transcript }: { transcript: string }) => {
-  const [isOpen, setIsOpen] = useState(false);
+type TranscriptTurn = { speaker: "Jess" | "Driver"; text: string };
+
+/** Map ElevenLabs / webhook roles to display names (Jess = AI, Driver = caller). */
+function speakerLabelFromRole(role: string): "Jess" | "Driver" {
+  const r = role.trim().toLowerCase();
+  if (["user", "customer", "caller", "driver", "human", "client"].includes(r)) return "Driver";
+  return "Jess";
+}
+
+/** Parse stored transcript: JSON array of {role,message}, or newline "role: text" (webhook format). */
+function parseTranscriptToTurns(raw: string): TranscriptTurn[] | null {
+  const trimmed = raw?.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      const turns: TranscriptTurn[] = [];
+      for (const t of parsed) {
+        if (!t || typeof t !== "object") continue;
+        const msg =
+          (t as { message?: string; text?: string }).message ??
+          (t as { text?: string }).text;
+        const role = (t as { role?: string }).role;
+        if (msg == null || String(msg).trim() === "") continue;
+        turns.push({
+          speaker: speakerLabelFromRole(String(role ?? "agent")),
+          text: String(msg).trim(),
+        });
+      }
+      if (turns.length) return turns;
+    }
+  } catch {
+    // not JSON — try line-oriented text
+  }
+  const turns: TranscriptTurn[] = [];
+  for (const line of trimmed.split(/\n+/)) {
+    if (!line.trim()) continue;
+    const m = line.match(/^([^:]+):\s*(.+)$/s);
+    if (m) {
+      const text = m[2].trim();
+      if (!text) continue;
+      turns.push({
+        speaker: speakerLabelFromRole(m[1].trim()),
+        text,
+      });
+    }
+  }
+  return turns.length ? turns : null;
+}
+
+function TranscriptSection({ transcript }: { transcript: string }) {
+  const [isOpen, setIsOpen] = useState(true);
+  const turns = useMemo(() => parseTranscriptToTurns(transcript), [transcript]);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between px-0 hover:bg-transparent">
-          <span className="text-sm text-muted-foreground">View full transcript</span>
-          <ChevronDown 
-            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} 
-          />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="animate-accordion-down">
-        <div className="pt-3 border-t border-border">
-          <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
-            {transcript}
-          </p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="space-y-0">
+      <p className="text-sm font-medium text-foreground">Transcript</p>
+      <div className="border-t border-border my-3" />
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full justify-between px-0 hover:bg-transparent h-auto py-1">
+            <span className="text-sm text-muted-foreground">View full transcript</span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                isOpen && "rotate-180",
+              )}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="animate-accordion-down">
+          <div className="space-y-1 pt-3">
+            {turns && turns.length > 0 ? (
+              turns.map((turn, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm leading-relaxed",
+                    turn.speaker === "Jess"
+                      ? "bg-muted text-foreground"
+                      : "bg-white text-foreground border border-border/70 dark:bg-background dark:border-border",
+                  )}
+                >
+                  <span className="font-medium">{turn.speaker}:</span>{" "}
+                  <span>&ldquo;{turn.text}&rdquo;</span>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                {transcript}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
-};
+}
 
 // Loading skeleton component
 function LeadDetailSkeleton() {
@@ -342,7 +418,14 @@ function LeadDetailContent() {
   const isPending = lead.status === "pending";
   const isClaimed = lead.status === "claimed";
   const isClaimedByMe = lead.claimed_by === user.id;
-  const conversation = lead.conversations as { summary?: string; transcript?: string } | null;
+  const convJoined = lead.conversations as
+    | { summary?: string; transcript?: string }
+    | { summary?: string; transcript?: string }[]
+    | null;
+  const conversation = (Array.isArray(convJoined) ? convJoined[0] : convJoined) as {
+    summary?: string;
+    transcript?: string;
+  } | null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -503,9 +586,12 @@ function LeadDetailContent() {
                     <p className="text-foreground whitespace-pre-wrap">{conversation.summary}</p>
                   </div>
                 )}
-                
+
                 {conversation?.transcript && (
-                  <TranscriptCollapsible transcript={conversation.transcript} />
+                  <>
+                    {conversation?.summary && <Separator className="my-6" />}
+                    <TranscriptSection transcript={conversation.transcript} />
+                  </>
                 )}
               </CardContent>
             </Card>

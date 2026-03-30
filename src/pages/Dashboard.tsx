@@ -271,7 +271,7 @@ const Dashboard = () => {
       if (!effectiveAgencyId) return [];
       const { data, error } = await supabase
         .from("ai_call_summaries")
-        .select("id, created_at, duration_secs, call_outcome, termination_reason, summary_title, summary_short, external_number, conversation_id, is_high_intent, carrier_name, carrier_usdot, transcript")
+        .select("id, created_at, duration_secs, call_outcome, termination_reason, summary_title, summary_short, summary, external_number, conversation_id, is_high_intent, carrier_name, carrier_usdot, transcript")
         .eq("agency_id", effectiveAgencyId)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -690,7 +690,8 @@ const Dashboard = () => {
       result = result.filter((c) =>
         c.external_number?.toLowerCase().includes(q) ||
         c.summary_title?.toLowerCase().includes(q) ||
-        c.summary_short?.toLowerCase().includes(q)
+        c.summary_short?.toLowerCase().includes(q) ||
+        c.summary?.toLowerCase().includes(q)
       );
     }
     return result;

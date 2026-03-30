@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Phone, ChevronDown, ChevronRight, Flame, Copy, Check, FileText, Truck
+import {
+  Phone,
+  ChevronDown,
+  ChevronRight,
+  Flame,
+  Copy,
+  Check,
+  Truck,
+  ExternalLink,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
@@ -14,8 +22,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TranscriptViewerModal } from "@/components/analytics/TranscriptViewerModal";
 import { toast } from "@/hooks/use-toast";
+import { TranscriptTurnsList } from "@/lib/callTranscript";
 
 interface AICallSummary {
   id: string;
@@ -25,6 +33,8 @@ interface AICallSummary {
   termination_reason: string | null;
   summary_title: string | null;
   summary_short: string | null;
+  /** Full post-call summary (2–3 sentences) from webhook */
+  summary?: string | null;
   external_number: string | null;
   conversation_id: string | null;
   is_high_intent: boolean | null;
@@ -70,7 +80,7 @@ const checkHighIntent = (call: AICallSummary): boolean => {
   const duration = call.duration_secs || 0;
   if (duration >= 60) return true;
   
-  const summary = (call.summary_short || '').toLowerCase();
+  const summary = (call.summary_short || call.summary || '').toLowerCase();
   const highIntentKeywords = ['rate', 'book', 'interested', 'available', 'pickup', 'deliver', 'truck'];
   return highIntentKeywords.some(kw => summary.includes(kw));
 };
@@ -82,7 +92,7 @@ const getHighIntentReasons = (call: AICallSummary): string[] => {
   
   if (duration >= 60) reasons.push('Long call (60s+)');
   
-  const summary = (call.summary_short || '').toLowerCase();
+  const summary = (call.summary_short || call.summary || '').toLowerCase();
   if (summary.includes('rate')) reasons.push('Rate discussion');
   if (summary.includes('book')) reasons.push('Booking intent');
   if (summary.includes('interested')) reasons.push('Expressed interest');
@@ -96,18 +106,6 @@ const INITIAL_DISPLAY_COUNT = 25;
 export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
-  const [transcriptModal, setTranscriptModal] = useState<{
-    open: boolean;
-    transcript: string | null;
-    summary?: string | null;
-    summaryTitle?: string | null;
-    callInfo?: {
-      externalNumber?: string;
-      duration?: number;
-      outcome?: string;
-      createdAt?: string;
-    };
-  }>({ open: false, transcript: null });
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const statusStyles: Record<string, string> = {
@@ -133,7 +131,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
   };
 
   const handleCopySummary = async (call: AICallSummary) => {
-    const summary = call.summary_short || call.summary_title || '';
+    const summary = call.summary || call.summary_short || call.summary_title || '';
     if (!summary) {
       toast({ title: "No summary to copy", variant: "destructive" });
       return;
@@ -147,21 +145,6 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
     } catch {
       toast({ title: "Failed to copy", variant: "destructive" });
     }
-  };
-
-  const handleViewTranscript = (call: AICallSummary) => {
-    setTranscriptModal({
-      open: true,
-      transcript: call.transcript,
-      summary: call.summary_short,
-      summaryTitle: call.summary_title,
-      callInfo: {
-        externalNumber: call.external_number || undefined,
-        duration: call.duration_secs || undefined,
-        outcome: extractOutcome(call),
-        createdAt: call.created_at,
-      },
-    });
   };
 
   if (loading) {
@@ -214,13 +197,13 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                   const outcome = extractOutcome(call);
                   const carrier = { usdot: call.carrier_usdot, company: call.carrier_name, mc: null as string | null };
                   const highIntentReasons = highIntent ? getHighIntentReasons(call) : [];
-                  const hasTranscript = !!call.transcript;
                   const phoneNumber = extractPhoneNumber(call);
-                  
+                  const aiSummaryBlock =
+                    call.summary?.trim() || call.summary_short?.trim() || null;
+
                   return (
-                    <>
+                    <Fragment key={call.id}>
                       <TableRow
-                        key={call.id}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${highIntent ? "bg-amber-500/5" : ""}`}
                         onClick={() => toggleExpand(call.id)}
                       >
@@ -257,9 +240,24 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                           })()}
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate text-sm">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             {highIntent && <Flame className="h-4 w-4 text-amber-500 flex-shrink-0" />}
-                            <span className="truncate">{call.summary_title || "—"}</span>
+                            <Link
+                              to={`/calls/${call.id}`}
+                              className="truncate hover:underline text-primary"
+                              title="Open call detail"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {call.summary_title || "—"}
+                            </Link>
+                            <Link
+                              to={`/calls/${call.id}`}
+                              className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                              aria-label="Open call detail"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -305,12 +303,28 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                                 </Button>
                               </div>
                               
-                              {/* Summary text */}
-                              {call.summary_short && (
-                                <div className="bg-card border border-border rounded-md p-4">
-                                  <p className="text-sm text-foreground leading-relaxed">
-                                    {call.summary_short}
+                              {/* AI summary + transcript */}
+                              {aiSummaryBlock && (
+                                <div className="space-y-1">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    AI summary
                                   </p>
+                                  <div className="bg-card border border-border rounded-md p-4">
+                                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                                      {aiSummaryBlock}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {call.transcript?.trim() && (
+                                <div className="space-y-2">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    Transcript
+                                  </p>
+                                  <div className="rounded-md border border-border bg-background p-3 max-h-[min(480px,50vh)] overflow-y-auto">
+                                    <TranscriptTurnsList transcript={call.transcript} />
+                                  </div>
                                 </div>
                               )}
                               
@@ -355,22 +369,13 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                                 )}
                               </div>
                               
-                              {/* Actions row */}
                               <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewTranscript(call);
-                                  }}
-                                  disabled={!hasTranscript}
-                                  className="gap-1.5"
-                                >
-                                  <FileText className="h-3.5 w-3.5" />
-                                  View Transcript
+                                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                  <Link to={`/calls/${call.id}`} onClick={(e) => e.stopPropagation()}>
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    Full page
+                                  </Link>
                                 </Button>
-                                
                                 <span className="text-xs text-muted-foreground">
                                   ID: {call.conversation_id?.slice(0, 10) || call.id.slice(0, 8)}...
                                 </span>
@@ -379,7 +384,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>
@@ -408,14 +413,6 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
         </CardContent>
       </Card>
 
-      <TranscriptViewerModal
-        open={transcriptModal.open}
-        onOpenChange={(open) => setTranscriptModal((prev) => ({ ...prev, open }))}
-        transcript={transcriptModal.transcript}
-        summary={transcriptModal.summary}
-        summaryTitle={transcriptModal.summaryTitle}
-        callInfo={transcriptModal.callInfo}
-      />
     </>
   );
 };

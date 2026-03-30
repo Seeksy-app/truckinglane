@@ -16,6 +16,7 @@ import AccessDenied from "./pages/AccessDenied";
 import ResetPassword from "./pages/ResetPassword";
 import LeadDetail from "./pages/LeadDetail";
 import LoadDetail from "./pages/LoadDetail";
+import CallDetail from "./pages/CallDetail";
 import Analytics from "./pages/Analytics";
 import Demo from "./pages/Demo";
 import Extension from "./pages/Extension";
@@ -209,6 +210,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <LoadDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calls/:id"
+                element={
+                  <ProtectedRoute>
+                    <CallDetail />
                   </ProtectedRoute>
                 }
               />

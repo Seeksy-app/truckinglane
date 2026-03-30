@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 
+/** Root font size (+3px vs typical 16px) is set on `html` in `src/index.css` so all `rem` utilities scale. */
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],

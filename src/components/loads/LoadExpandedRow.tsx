@@ -12,6 +12,7 @@ import {
   buildAljexDispatcherCallScript,
   isAljexCallScriptLoad,
 } from "@/lib/aljexLoadBoard";
+import { MarketRatesSection } from "./MarketRatesSection";
 
 type Load = Tables<"loads">;
 
@@ -291,6 +292,8 @@ export function LoadExpandedRow({ load, isDemo = false, onStatusChange }: LoadEx
             </pre>
           </div>
         ) : null}
+
+        <MarketRatesSection load={load} />
 
         {/* Action Bar */}
         <div className="flex items-center gap-2 pt-2 border-t border-border/50">

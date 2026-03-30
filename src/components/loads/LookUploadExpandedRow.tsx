@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadDetailsGrid, formatLoadNotes } from "@/components/loads/LoadNotes";
 import { Copy, Check, Phone, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import { MarketRatesSection } from "./MarketRatesSection";
 
 type Load = Tables<"loads">;
 
@@ -78,6 +79,8 @@ export function LookUploadExpandedRow({ load }: LookUploadExpandedRowProps) {
 
       {/* Compact Details Grid */}
       <LoadDetailsGrid load={load} />
+
+      <MarketRatesSection load={load} />
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2 pt-2 border-t border-border/50">

@@ -7,14 +7,19 @@ Environment:
   TL_TRIGGER_KEY        Shared secret (must match extension header)
   SUPABASE_URL          https://vjgakkomhphvdbwjjwiv.supabase.co
   SUPABASE_SERVICE_ROLE_KEY   Service role key (never expose to clients)
+  DAT_BEARER_TOKEN      Optional; DAT freight API bearer (or DAT_TOKEN_FILE, default /root/.dat_bearer_token)
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from datetime import datetime, timezone
 
 try:
@@ -30,6 +35,150 @@ app = Flask(__name__)
 TL_TRIGGER_KEY = os.environ.get("TL_TRIGGER_KEY", "tl-trigger-7b747d391801b8e5f55b4542")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vjgakkomhphvdbwjjwiv.supabase.co").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+DAT_SEARCH_URL = "https://freight.api.dat.com/search/v2/loads"
+_DAT_LANE_CACHE: dict[str, tuple[float, dict]] = {}
+_DAT_LANE_CACHE_LOCK = threading.Lock()
+_DAT_LANE_CACHE_TTL_SEC = 30 * 60
+
+
+def _read_dat_bearer_token() -> str | None:
+    tok = (os.environ.get("DAT_BEARER_TOKEN") or "").strip()
+    if tok:
+        return tok
+    path = (os.environ.get("DAT_TOKEN_FILE") or "/root/.dat_bearer_token").strip()
+    try:
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as f:
+                t = f.read().strip()
+                return t or None
+    except OSError:
+        pass
+    return None
+
+
+def _coerce_float(x) -> float | None:
+    if x is None:
+        return None
+    try:
+        if isinstance(x, (int, float)):
+            return float(x)
+        return float(str(x).replace(",", "").replace("$", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _first_load_list(d: dict) -> list:
+    if not isinstance(d, dict):
+        return []
+    for key in ("loads", "searchResults", "results", "matches", "items"):
+        v = d.get(key)
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            return v
+    sr = d.get("searchResult")
+    if isinstance(sr, dict):
+        for key in ("loads", "results", "items", "matches"):
+            v = sr.get(key)
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return v
+    inner = d.get("data")
+    if isinstance(inner, dict):
+        for key in ("loads", "results", "items", "matches"):
+            v = inner.get(key)
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return v
+    return []
+
+
+def _human_age_label(posted) -> str:
+    if posted is None:
+        return "—"
+    try:
+        if isinstance(posted, (int, float)):
+            ts = float(posted)
+            if ts > 1e12:
+                ts /= 1000.0
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        else:
+            raw = str(posted).strip()
+            if raw.isdigit() and len(raw) >= 12:
+                dt = datetime.fromtimestamp(int(raw) / 1000.0, tz=timezone.utc)
+            else:
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        delta = datetime.now(timezone.utc) - dt
+        mins = max(0, int(delta.total_seconds() // 60))
+        if mins < 90:
+            return f"{mins}m ago"
+        hrs = mins // 60
+        if hrs < 72:
+            return f"{hrs}h ago"
+        return f"{hrs // 24}d ago"
+    except Exception:
+        return str(posted)[:24]
+
+
+def _extract_posting(item: dict) -> dict | None:
+    rate = None
+    for k in ("totalRate", "rate", "customerRate", "allInRate", "linehaulRate", "offerRate"):
+        if k in item:
+            rate = _coerce_float(item.get(k))
+            if rate is not None:
+                break
+    if rate is None and isinstance(item.get("rate"), dict):
+        rdict = item["rate"]
+        rate = _coerce_float(rdict.get("amount") or rdict.get("value"))
+    miles = None
+    for k in ("tripMiles", "miles", "distance", "trip_miles"):
+        if k in item:
+            miles = _coerce_float(item.get(k))
+            if miles is not None:
+                break
+    company = "—"
+    pi = item.get("posterInfo") or item.get("poster") or item.get("broker")
+    if isinstance(pi, dict):
+        for k in ("companyName", "name", "legalName"):
+            v = pi.get(k)
+            if isinstance(v, str) and v.strip():
+                company = v.strip()[:120]
+                break
+    if company == "—":
+        for k in ("companyName", "brokerName", "posterName"):
+            v = item.get(k)
+            if isinstance(v, str) and v.strip():
+                company = v.strip()[:120]
+                break
+    posted = (
+        item.get("postedAt")
+        or item.get("posted")
+        or item.get("postingTime")
+        or item.get("createTime")
+        or item.get("createdAt")
+    )
+    age_label = _human_age_label(posted)
+    if rate is None:
+        return None
+    return {
+        "rate": rate,
+        "miles": miles,
+        "company": company,
+        "age_label": age_label,
+    }
+
+
+def _parse_dat_search_response(dat_json: dict) -> tuple[list[dict], float | None]:
+    raw_list = _first_load_list(dat_json)
+    postings: list[dict] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        row = _extract_posting(item)
+        if row:
+            postings.append(row)
+        if len(postings) >= 5:
+            break
+    rates = [p["rate"] for p in postings if p.get("rate") is not None]
+    avg = sum(rates) / len(rates) if rates else None
+    return postings, avg
 
 
 def require_trigger_key() -> tuple[bool, tuple]:
@@ -129,6 +278,119 @@ def upload_big500():
             os.unlink(path)
         except OSError:
             pass
+
+
+@app.post("/dat-lane-rates")
+def dat_lane_rates():
+    """DAT load board search (demo): same-lane market postings. Cached 30 min per lane."""
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    pickup_city = (body.get("pickup_city") or "").strip()
+    pickup_state = (body.get("pickup_state") or "").strip()
+    dest_city = (body.get("dest_city") or "").strip()
+    dest_state = (body.get("dest_state") or "").strip()
+    equipment = (body.get("equipment") or "F").strip().upper()[:1] or "F"
+    if equipment not in ("F", "V", "R", "T", "C"):
+        equipment = "F"
+
+    if not (pickup_city and pickup_state and dest_city and dest_state):
+        return jsonify({"ok": False, "error": "pickup_city, pickup_state, dest_city, dest_state required"}), 400
+
+    cache_key = hashlib.sha256(
+        json.dumps(
+            {
+                "o": pickup_city.upper(),
+                "os": pickup_state.upper()[:2],
+                "d": dest_city.upper(),
+                "ds": dest_state.upper()[:2],
+                "e": equipment,
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    now = time.time()
+    with _DAT_LANE_CACHE_LOCK:
+        hit = _DAT_LANE_CACHE.get(cache_key)
+        if hit and hit[0] > now:
+            payload = dict(hit[1])
+            payload["cached"] = True
+            return jsonify(payload)
+
+    token = _read_dat_bearer_token()
+    if not token:
+        return jsonify(
+            {
+                "ok": False,
+                "unavailable": True,
+                "error": "DAT bearer token not configured on server (DAT_BEARER_TOKEN or DAT_TOKEN_FILE)",
+            }
+        )
+
+    payload_req = {
+        "origin": {
+            "city": pickup_city.upper(),
+            "stateProv": pickup_state.upper()[:2],
+            "circle": {"miles": 50},
+        },
+        "destination": {
+            "city": dest_city.upper(),
+            "stateProv": dest_state.upper()[:2],
+            "circle": {"miles": 50},
+        },
+        "equipmentType": equipment,
+        "includePostingDetails": True,
+    }
+
+    try:
+        r = requests.post(
+            DAT_SEARCH_URL,
+            json=payload_req,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=45,
+        )
+    except requests.RequestException as e:
+        return jsonify({"ok": False, "unavailable": True, "error": f"DAT request failed: {e}"})
+
+    try:
+        dat_json = r.json()
+    except ValueError:
+        return jsonify(
+            {
+                "ok": False,
+                "unavailable": True,
+                "error": f"DAT returned non-JSON (HTTP {r.status_code})",
+            }
+        )
+
+    if r.status_code >= 400:
+        msg = dat_json if isinstance(dat_json, dict) else {}
+        detail = msg.get("message") or msg.get("error") or msg.get("detail") or r.text[:400]
+        return jsonify(
+            {
+                "ok": False,
+                "unavailable": True,
+                "error": f"DAT API {r.status_code}: {detail}",
+            }
+        )
+
+    postings, avg = _parse_dat_search_response(dat_json if isinstance(dat_json, dict) else {})
+    out = {
+        "ok": True,
+        "cached": False,
+        "average_rate": avg,
+        "postings": postings,
+    }
+    with _DAT_LANE_CACHE_LOCK:
+        _DAT_LANE_CACHE[cache_key] = (now + _DAT_LANE_CACHE_TTL_SEC, dict(out))
+    return jsonify(out)
 
 
 def main():

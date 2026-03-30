@@ -145,7 +145,7 @@ function normalizeDatEquipmentCode(raw: string | null | undefined): string {
 
 // Map trailer type to DAT equipment code (word hints + raw codes), then normalize for CSV.
 // templateType is used to default Adelphia and VMS to Flatbed
-function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
+export function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
   let raw = "";
   if (!trailerType?.trim()) {
     if (templateType === "adelphia_xlsx" || templateType === "vms_email" || templateType === "oldcastle_gsheet") {

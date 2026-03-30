@@ -285,6 +285,8 @@ export function LoadsTable({
 
   const handleRowPostToDat = async (load: Load, e: React.MouseEvent) => {
     e.stopPropagation();
+    const postedAt = (load as { dat_posted_at?: string | null }).dat_posted_at;
+    if (postedAt != null) return;
     if (!isExportableLoad(load)) {
       toast.error("Add pickup and destination city/state before posting to DAT.");
       return;
@@ -593,26 +595,41 @@ export function LoadsTable({
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-0.5 justify-end">
-                      {enableOpenLoadActions && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-1.5 text-[10px] font-semibold"
-                              disabled={datPostingId === load.id}
-                              onClick={(e) => handleRowPostToDat(load, e)}
-                            >
-                              {datPostingId === load.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                "DAT"
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Post to DAT (download CSV, mark posted)</TooltipContent>
-                        </Tooltip>
-                      )}
+                      {enableOpenLoadActions && (() => {
+                        const datPosted = (load as { dat_posted_at?: string | null }).dat_posted_at != null;
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "h-7 px-1.5 text-[10px] font-semibold shrink-0",
+                                  datPosted
+                                    ? "cursor-default border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white"
+                                    : "border-amber-500/70 bg-amber-500/15 text-amber-950 hover:bg-amber-500/25 dark:border-amber-500/60 dark:bg-amber-500/20 dark:text-amber-50 dark:hover:bg-amber-500/30",
+                                )}
+                                disabled={datPostingId === load.id}
+                                onClick={(e) => handleRowPostToDat(load, e)}
+                              >
+                                {datPostingId === load.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : datPosted ? (
+                                  "DAT ✓"
+                                ) : (
+                                  "DAT"
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {datPosted
+                                ? "Posted to DAT"
+                                : "Download DAT CSV and mark as posted"}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })()}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

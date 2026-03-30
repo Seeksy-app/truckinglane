@@ -932,7 +932,12 @@ const Dashboard = () => {
 
         {/* Single unified table based on mode */}
         {mode === "open" && (
-          <LoadsTable loads={filteredOpenLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+          <LoadsTable
+            loads={filteredOpenLoads}
+            loading={loadsLoading}
+            onRefresh={refetchLoads}
+            enableOpenLoadActions
+          />
         )}
 
         {mode === "claimed" && (

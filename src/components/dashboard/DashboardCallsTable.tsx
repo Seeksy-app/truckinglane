@@ -253,7 +253,10 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                           {format(parseISO(call.created_at), "MMM d, h:mm a")}
                         </TableCell>
                         <TableCell className="text-sm">
-                          <PhoneDisplay phone={phoneNumber} />
+                          <PhoneDisplay
+                            phone={phoneNumber}
+                            className="font-semibold text-[0.95rem]"
+                          />
                         </TableCell>
                         <TableCell className="text-sm">
                           {call.duration_secs ? `${call.duration_secs}s` : "—"}

@@ -428,7 +428,10 @@ export const LeadsTable = ({
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
                   <TableCell className="text-sm">
-                    <PhoneDisplay phone={lead.caller_phone} />
+                    <PhoneDisplay
+                      phone={lead.caller_phone}
+                      className="font-semibold text-[0.95rem]"
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">

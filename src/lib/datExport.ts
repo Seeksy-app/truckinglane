@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -13,14 +14,33 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
   );
 }
 
-/** Today at 15:00:00.000 UTC — pending export only includes loads created strictly after this. */
-export function getTodayDatNewLoadsCutoffUtc(now: Date = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 15, 0, 0, 0));
+/**
+ * Server-side pending list for "Export Pending to DAT": does not filter by is_active.
+ * Open dispatch + not yet posted to DAT + DAT-eligible template + exportable row shape.
+ */
+export async function fetchDatPendingLoadsForExport(
+  supabase: SupabaseClient,
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<Load[]> {
+  let q = supabase
+    .from("loads")
+    .select("*")
+    .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
+    .is("dat_posted_at", null)
+    .eq("dispatch_status", "open")
+    .order("ship_date", { ascending: true });
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []).filter(isExportableLoad);
 }
 
-/** Pending for DAT: eligible, not posted, created after 15:00 UTC today, exportable row. */
+/** In-memory pending filter (e.g. when only dashboard `loads` are available). Same rules as fetch, minus inactive rows not in `loads`. */
 export function getDatPendingLoads(loads: Load[]): Load[] {
-  const cutoff = getTodayDatNewLoadsCutoffUtc();
   return loads.filter((load) => {
     if (
       !DAT_ELIGIBLE_TEMPLATE_TYPES.includes(
@@ -30,7 +50,7 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
       return false;
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
-    if (new Date(load.created_at).getTime() <= cutoff.getTime()) return false;
+    if (load.dispatch_status !== "open") return false;
     return isExportableLoad(load);
   });
 }
@@ -180,7 +200,7 @@ function datExportDestinationResolved(load: Load): { city: string; state: string
 }
 
 // Check if a load is a valid exportable load (not a template note/instruction row)
-function isExportableLoad(load: Load): boolean {
+export function isExportableLoad(load: Load): boolean {
   const city = (load.pickup_city || "").toUpperCase();
   if (city.startsWith("PICK UP") || city.startsWith("NOTE") || city.startsWith("***")) return false;
   if (!load.pickup_city && !load.dest_city) return false;

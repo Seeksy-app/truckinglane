@@ -29,7 +29,7 @@ import {
   markDATExportComplete,
   getLastDATExportTimestamp,
   filterDatEligibleLoads,
-  getDatPendingLoads,
+  fetchDatPendingLoadsForExport,
 } from '@/lib/datExport';
 import { useLoads } from '@/hooks/useLoads';
 type ImportState = "idle" | "loading" | "success" | "error";
@@ -56,7 +56,15 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const queryClient = useQueryClient();
   const { loads } = useLoads();
   const datEligibleLoads = filterDatEligibleLoads(loads);
-  const datPendingLoads = getDatPendingLoads(loads);
+  const { data: datPendingLoads = [] } = useQuery({
+    queryKey: ["dat-pending-export", role, impersonatedAgencyId],
+    queryFn: () =>
+      fetchDatPendingLoadsForExport(supabase, {
+        role,
+        impersonatedAgencyId: impersonatedAgencyId ?? null,
+      }),
+    enabled: !!user,
+  });
   const newLoadsForExport = getNewLoadsSinceLastExport(datEligibleLoads);
   const hasNewExport = datPendingLoads.length > 0;
   // Import Loads state
@@ -360,6 +368,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                           markDATExportComplete();
                           queryClient.invalidateQueries({ queryKey: ["loads"] });
                           queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
+                          queryClient.invalidateQueries({ queryKey: ["dat-pending-export"] });
                           queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
                           toast.success(`Exported ${count} pending loads to DAT format`);
                         }}

@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
+import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
+import type { Json } from "@/integrations/supabase/types";
 
 interface AICallSummary {
   id: string;
@@ -42,6 +44,13 @@ interface AICallSummary {
   carrier_usdot: string | null;
   transcript: string | null;
   lead_status?: 'pending' | 'claimed' | 'closed' | 'booked' | null;
+  /** Latest elevenlabs_post_calls row for this conversation_id */
+  epc?: {
+    conversation_id: string | null;
+    transcript_summary: string | null;
+    call_summary_title: string | null;
+    payload: Json;
+  } | null;
 }
 
 interface DashboardCallsTableProps {
@@ -80,7 +89,12 @@ const checkHighIntent = (call: AICallSummary): boolean => {
   const duration = call.duration_secs || 0;
   if (duration >= 60) return true;
   
-  const summary = (call.summary_short || call.summary || '').toLowerCase();
+  const summary = (
+    call.summary_short ||
+    call.summary ||
+    call.epc?.transcript_summary ||
+    ''
+  ).toLowerCase();
   const highIntentKeywords = ['rate', 'book', 'interested', 'available', 'pickup', 'deliver', 'truck'];
   return highIntentKeywords.some(kw => summary.includes(kw));
 };
@@ -92,7 +106,12 @@ const getHighIntentReasons = (call: AICallSummary): string[] => {
   
   if (duration >= 60) reasons.push('Long call (60s+)');
   
-  const summary = (call.summary_short || call.summary || '').toLowerCase();
+  const summary = (
+    call.summary_short ||
+    call.summary ||
+    call.epc?.transcript_summary ||
+    ''
+  ).toLowerCase();
   if (summary.includes('rate')) reasons.push('Rate discussion');
   if (summary.includes('book')) reasons.push('Booking intent');
   if (summary.includes('interested')) reasons.push('Expressed interest');
@@ -131,7 +150,12 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
   };
 
   const handleCopySummary = async (call: AICallSummary) => {
-    const summary = call.summary || call.summary_short || call.summary_title || '';
+    const summary =
+      call.epc?.transcript_summary?.trim() ||
+      call.summary ||
+      call.summary_short ||
+      call.summary_title ||
+      '';
     if (!summary) {
       toast({ title: "No summary to copy", variant: "destructive" });
       return;
@@ -198,8 +222,18 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                   const carrier = { usdot: call.carrier_usdot, company: call.carrier_name, mc: null as string | null };
                   const highIntentReasons = highIntent ? getHighIntentReasons(call) : [];
                   const phoneNumber = extractPhoneNumber(call);
+                  const displayTitle =
+                    call.epc?.call_summary_title?.trim() || call.summary_title || null;
                   const aiSummaryBlock =
-                    call.summary?.trim() || call.summary_short?.trim() || null;
+                    call.epc?.transcript_summary?.trim() ||
+                    call.summary?.trim() ||
+                    call.summary_short?.trim() ||
+                    null;
+                  const transcriptFromPayload = call.epc?.payload
+                    ? extractTranscriptFromElevenlabsPayload(call.epc.payload)
+                    : null;
+                  const transcriptToShow =
+                    transcriptFromPayload?.trim() || call.transcript?.trim() || null;
 
                   return (
                     <Fragment key={call.id}>
@@ -248,7 +282,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                               title="Open call detail"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {call.summary_title || "—"}
+                              {displayTitle || "—"}
                             </Link>
                             <Link
                               to={`/calls/${call.id}`}
@@ -269,8 +303,8 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                               {/* Top row: Title + badges */}
                               <div className="flex items-start justify-between gap-4">
                               <div className="space-y-1">
-                                  <h4 className="font-medium text-foreground">
-                                    {call.summary_title || "Call Summary"}
+                                  <h4 className="font-semibold text-foreground">
+                                    {displayTitle || call.summary_title || "Call Summary"}
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-2">
                                     <Badge className={outcomeStyles[outcome] || outcomeStyles.unknown}>
@@ -317,13 +351,13 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                                 </div>
                               )}
 
-                              {call.transcript?.trim() && (
+                              {transcriptToShow && (
                                 <div className="space-y-2">
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                     Transcript
                                   </p>
                                   <div className="rounded-md border border-border bg-background p-3 max-h-[min(480px,50vh)] overflow-y-auto">
-                                    <TranscriptTurnsList transcript={call.transcript} />
+                                    <TranscriptTurnsList transcript={transcriptToShow} />
                                   </div>
                                 </div>
                               )}

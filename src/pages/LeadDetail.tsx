@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
+import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Tables } from "@/integrations/supabase/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -252,6 +254,23 @@ function LeadDetailContent() {
     },
   });
 
+  const { data: epcRow } = useQuery({
+    queryKey: ["elevenlabs_post_calls", lead?.conversation_id, lead?.agency_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("elevenlabs_post_calls")
+        .select("transcript_summary, call_summary_title, payload")
+        .eq("conversation_id", lead!.conversation_id!)
+        .eq("agency_id", lead!.agency_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!lead?.conversation_id && !!lead?.agency_id,
+  });
+
   const claimMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -356,6 +375,15 @@ function LeadDetailContent() {
     summary?: string;
     transcript?: string;
   } | null;
+
+  const epcTranscript = epcRow ? extractTranscriptFromElevenlabsPayload(epcRow.payload) : null;
+  const showElevenLabsCard =
+    !!epcRow &&
+    !!(
+      epcRow.call_summary_title?.trim() ||
+      epcRow.transcript_summary?.trim() ||
+      epcTranscript?.trim()
+    );
 
   return (
     <div className="min-h-screen bg-background">
@@ -521,6 +549,32 @@ function LeadDetailContent() {
                   <>
                     {conversation?.summary && <Separator className="my-6" />}
                     <TranscriptSection transcript={conversation.transcript} />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {showElevenLabsCard && epcRow && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-semibold">
+                  {epcRow.call_summary_title?.trim() || "Call transcript"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {epcRow.transcript_summary?.trim() && (
+                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                    {epcRow.transcript_summary}
+                  </p>
+                )}
+                {epcTranscript?.trim() && (
+                  <>
+                    {epcRow.transcript_summary?.trim() && <Separator />}
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-2">Transcript</p>
+                      <TranscriptTurnsList transcript={epcTranscript} />
+                    </div>
                   </>
                 )}
               </CardContent>

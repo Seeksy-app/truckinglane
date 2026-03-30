@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Phone } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
+import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 
 export default function CallDetail() {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +36,23 @@ export default function CallDetail() {
       return data;
     },
     enabled: !!user && !!id && !!effectiveAgencyId,
+  });
+
+  const { data: epcRow } = useQuery({
+    queryKey: ["elevenlabs_post_calls", "detail", call?.conversation_id, effectiveAgencyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("elevenlabs_post_calls")
+        .select("transcript_summary, call_summary_title, payload")
+        .eq("conversation_id", call!.conversation_id!)
+        .eq("agency_id", effectiveAgencyId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!effectiveAgencyId && !!call?.conversation_id,
   });
 
   const handleBack = () => {
@@ -86,7 +104,15 @@ export default function CallDetail() {
     );
   }
 
-  const aiSummary = call.summary?.trim() || call.summary_short?.trim() || null;
+  const epcTranscript = epcRow ? extractTranscriptFromElevenlabsPayload(epcRow.payload) : null;
+  const displayTitle =
+    epcRow?.call_summary_title?.trim() || call.summary_title || "AI call";
+  const aiSummary =
+    epcRow?.transcript_summary?.trim() ||
+    call.summary?.trim() ||
+    call.summary_short?.trim() ||
+    null;
+  const transcriptToShow = epcTranscript?.trim() || call.transcript?.trim() || null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +126,7 @@ export default function CallDetail() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-serif font-semibold text-foreground">
-                {call.summary_title || "AI call"}
+                {displayTitle}
               </h1>
               <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                 <Phone className="h-4 w-4" />
@@ -158,8 +184,8 @@ export default function CallDetail() {
               <CardTitle className="text-base">Transcript</CardTitle>
             </CardHeader>
             <CardContent>
-              {call.transcript?.trim() ? (
-                <TranscriptTurnsList transcript={call.transcript} />
+              {transcriptToShow ? (
+                <TranscriptTurnsList transcript={transcriptToShow} />
               ) : (
                 <p className="text-sm text-muted-foreground">No transcript available.</p>
               )}

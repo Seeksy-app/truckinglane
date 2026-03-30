@@ -281,6 +281,33 @@ const Dashboard = () => {
     enabled: !!user && !!effectiveAgencyId,
   });
 
+  // Join latest elevenlabs_post_calls per conversation_id (payload has full transcript array)
+  const { data: epcRows = [], isLoading: epcLoading } = useQuery({
+    queryKey: ["elevenlabs_post_calls_dashboard", effectiveAgencyId],
+    queryFn: async () => {
+      if (!effectiveAgencyId) return [];
+      const { data, error } = await supabase
+        .from("elevenlabs_post_calls")
+        .select("conversation_id, transcript_summary, call_summary_title, payload, created_at")
+        .eq("agency_id", effectiveAgencyId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!effectiveAgencyId,
+  });
+
+  const epcByConversationId = useMemo(() => {
+    const m = new Map<string, (typeof epcRows)[number]>();
+    for (const row of epcRows) {
+      if (row.conversation_id && !m.has(row.conversation_id)) {
+        m.set(row.conversation_id, row);
+      }
+    }
+    return m;
+  }, [epcRows]);
+
   // Build a map of phone -> lead status for enriching calls
   const phoneToLeadStatus = useMemo(() => {
     const map = new Map<string, 'pending' | 'claimed' | 'closed' | 'booked'>();
@@ -301,14 +328,17 @@ const Dashboard = () => {
     return map;
   }, [leads]);
 
-  // Enrich calls with lead status
+  // Enrich calls with lead status + elevenlabs_post_calls row (by conversation_id)
   const calls = useMemo(() => {
     return rawCalls.map(call => {
       const phone = (call.external_number || '').replace(/\D/g, '');
       const leadStatus = phone ? phoneToLeadStatus.get(phone) : null;
-      return { ...call, lead_status: leadStatus };
+      const epc = call.conversation_id
+        ? epcByConversationId.get(call.conversation_id) ?? null
+        : null;
+      return { ...call, lead_status: leadStatus, epc };
     });
-  }, [rawCalls, phoneToLeadStatus]);
+  }, [rawCalls, phoneToLeadStatus, epcByConversationId]);
 
   // Mutations for leads
   const claimMutation = useMutation({
@@ -691,7 +721,9 @@ const Dashboard = () => {
         c.external_number?.toLowerCase().includes(q) ||
         c.summary_title?.toLowerCase().includes(q) ||
         c.summary_short?.toLowerCase().includes(q) ||
-        c.summary?.toLowerCase().includes(q)
+        c.summary?.toLowerCase().includes(q) ||
+        c.epc?.transcript_summary?.toLowerCase().includes(q) ||
+        c.epc?.call_summary_title?.toLowerCase().includes(q)
       );
     }
     return result;
@@ -992,7 +1024,7 @@ const Dashboard = () => {
         )}
 
         {mode === "calls" && (
-          <DashboardCallsTable calls={filteredCalls} loading={callsLoading} />
+          <DashboardCallsTable calls={filteredCalls} loading={callsLoading || epcLoading} />
         )}
 
         {mode === "booked" && (

@@ -6,6 +6,13 @@ import { useUserRole } from "@/hooks/useUserRole";
 
 type Load = Tables<"loads">;
 
+/** Hide aljex_big500 rows with no invoice on the dashboard (zero-rate placeholders). */
+function loadPassesBig500InvoiceRule(load: Load): boolean {
+  if (load.template_type !== "aljex_big500") return true;
+  const n = load.customer_invoice_total;
+  return n != null && Number(n) > 0;
+}
+
 export function useLoads() {
   const [loads, setLoads] = useState<Load[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +39,7 @@ export function useLoads() {
       const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
-      setLoads(data || []);
+      setLoads((data || []).filter(loadPassesBig500InvoiceRule));
     } catch (err) {
       console.error("Error fetching loads:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch loads");

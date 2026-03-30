@@ -559,6 +559,104 @@ function parseOldcastleAllSheets(buffer: ArrayBuffer, agencyId: string): Record<
   return allLoads;
 }
 
+// ============= CUSTOMER DETECTION (subject + body) =============
+type EmailImportKind = "vms" | "oldcastle" | "adelphia" | "century" | "allied" | "semco";
+
+function stripHtmlToText(s: string): string {
+  if (!s) return "";
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Subject line only — order: VMS, Oldcastle, Adelphia, Century, Allied, Semco */
+function detectFromSubject(subjectLower: string): EmailImportKind | null {
+  const s = subjectLower || "";
+  const containsVMS = s.includes("vms") || s.includes("mvs") || s.includes("vsm");
+  const containsOldcastle = s.includes("oldcastle") || s.includes("old castle");
+  const containsAdelphia =
+    s.includes("adelphia") ||
+    s.includes("aldelphia") ||
+    s.includes("adlephia") ||
+    s.includes("adelphoa") ||
+    s.includes("adelpha");
+  const containsCentury = s.includes("century enterprises");
+  const containsAllied = s.includes("allied building stores") || /\babs\b/i.test(s);
+  const containsSemco = s.includes("semco distributing") || s.includes("semco");
+
+  if (containsVMS) return "vms";
+  if (containsOldcastle) return "oldcastle";
+  if (containsAdelphia) return "adelphia";
+  if (containsCentury) return "century";
+  if (containsAllied) return "allied";
+  if (containsSemco) return "semco";
+  return null;
+}
+
+/** Body text (lowercased) — same priority; includes explicit phrases from product spec */
+function detectFromBody(bodyLower: string): EmailImportKind | null {
+  const b = bodyLower || "";
+  if (b.length < 3) return null;
+
+  if (b.includes("valley metal services") || b.includes("vms") || b.includes("mvs") || b.includes("vsm")) {
+    return "vms";
+  }
+  if (b.includes("oldcastle") || b.includes("old castle")) return "oldcastle";
+  if (
+    b.includes("adelphia metals") ||
+    b.includes("adelphia") ||
+    b.includes("aldelphia") ||
+    b.includes("adlephia") ||
+    b.includes("adelphoa") ||
+    b.includes("adelpha")
+  ) {
+    return "adelphia";
+  }
+  if (b.includes("century enterprises")) return "century";
+  if (b.includes("allied building stores") || /\babs\b/.test(b)) return "allied";
+  if (b.includes("semco distributing") || b.includes("semco")) return "semco";
+  return null;
+}
+
+async function fetchInboundEmailBody(
+  emailId: string | undefined,
+  resendApiKey: string | undefined,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const email = payload.email as Record<string, unknown> | undefined;
+
+  const direct =
+    (typeof payload.text === "string" && payload.text) ||
+    (typeof payload.html === "string" && payload.html) ||
+    (data && typeof data.text === "string" && data.text) ||
+    (data && typeof data.html === "string" && data.html) ||
+    (email && typeof email.text === "string" && email.text) ||
+    (email && typeof email.html === "string" && email.html) ||
+    "";
+
+  if (direct && String(direct).trim().length > 0) {
+    return stripHtmlToText(String(direct));
+  }
+
+  if (!emailId || !resendApiKey) return "";
+
+  try {
+    const emailResponse = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+      headers: { Authorization: `Bearer ${resendApiKey}` },
+    });
+    if (!emailResponse.ok) {
+      const errText = await emailResponse.text();
+      console.error("fetchInboundEmailBody: Resend receiving API error:", emailResponse.status, errText);
+      return "";
+    }
+    const emailData = (await emailResponse.json()) as { text?: string; html?: string };
+    const raw = emailData.text || emailData.html || "";
+    return stripHtmlToText(String(raw));
+  } catch (e) {
+    console.error("fetchInboundEmailBody error:", e);
+    return "";
+  }
+}
+
 // ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   console.log("=== EMAIL-IMPORT-LOADS FUNCTION CALLED ===");
@@ -623,69 +721,48 @@ Deno.serve(async (req) => {
       });
     }
     
-    // Determine import type from subject line
     const subjectLower = (subject || "").toLowerCase();
-    // Support common typos: "adelphia", "aldelphia", "adlephia", "adelphoa", "adelpha"
-    const containsAdelphia = subjectLower.includes("adelphia") || subjectLower.includes("aldelphia") || subjectLower.includes("adlephia") || subjectLower.includes("adelphoa") || subjectLower.includes("adelpha");
-    // Support both "VMS" and "MVS" (common typo), and "Re:" prefix stripping
-    const containsVMS = subjectLower.includes("vms") || subjectLower.includes("mvs") || subjectLower.includes("vsm");
-    // Oldcastle keywords
-    const containsOldcastle = subjectLower.includes("oldcastle") || subjectLower.includes("old castle");
-    
-    // Determine import type from subject line first
-    if (!containsAdelphia && !containsVMS && !containsOldcastle) {
-      console.error("Subject line does not match any known import type:", subject);
-      
-      // Log the failed attempt
+    const emailId = payload.data?.email_id || payload.email_id;
+
+    let importKind: EmailImportKind | null = detectFromSubject(subjectLower);
+    let emailBody = "";
+
+    if (!importKind) {
+      console.log("Subject did not match customer keywords; fetching body and checking…");
+      emailBody = await fetchInboundEmailBody(emailId, resendApiKey, payload as Record<string, unknown>);
+      importKind = detectFromBody(emailBody.toLowerCase());
+      if (importKind) {
+        console.log(`Body matched import kind: ${importKind} (body length=${emailBody.length})`);
+      }
+    }
+
+    if (!importKind) {
+      console.error("Neither subject nor body matched a known customer import:", subject);
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
         status: "rejected",
-        error_message: `Subject must contain "adelphia", "VMS", "MVS", or "oldcastle"`,
+        error_message:
+          "No customer keywords in subject or body (Adelphia, VMS, Oldcastle, Century Enterprises, Allied, Semco)",
         raw_headers: emailHeaders,
       });
-      
-      return new Response(JSON.stringify({ 
-        error: `Subject must contain "adelphia", "VMS", "MVS", or "oldcastle"` 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error:
+            "Email must mention a supported customer in the subject or body (e.g. Adelphia, VMS, Oldcastle, Century Enterprises, Allied Building Stores, Semco)",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-    
-    const importType = containsVMS ? "vms" : containsOldcastle ? "oldcastle" : "adelphia";
-    console.log(`Subject line matches - processing ${importType.toUpperCase()} import`);
-    
-    // For VMS imports, we need to fetch the email body from Resend API
-    // Resend inbound webhooks don't include body - must use resend.emails.receiving.get()
-    let emailBody = "";
-    const emailId = payload.data?.email_id || payload.email_id;
-    
-    if (containsVMS && emailId && resendApiKey) {
-      console.log("Fetching email content from Resend receiving API for email_id:", emailId);
-      try {
-        // Use the receiving API to get inbound email content
-        const emailResponse = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
-          headers: {
-            "Authorization": `Bearer ${resendApiKey}`,
-          },
-        });
-        
-        if (emailResponse.ok) {
-          const emailData = await emailResponse.json();
-          console.log("Resend receiving API response keys:", Object.keys(emailData));
-          emailBody = emailData.text || emailData.html || "";
-          console.log("Fetched email body length:", emailBody.length);
-          console.log("Email body preview:", emailBody.substring(0, 200));
-        } else {
-          const errorText = await emailResponse.text();
-          console.error("Failed to fetch email from Resend receiving API:", emailResponse.status, errorText);
-        }
-      } catch (e) {
-        console.error("Error fetching email from Resend receiving API:", e);
-      }
+
+    const importType: EmailImportKind = importKind;
+    console.log(`Processing ${importType.toUpperCase()} import (subject and/or body match)`);
+
+    if (importType === "vms" && (!emailBody || emailBody.trim().length === 0)) {
+      emailBody = await fetchInboundEmailBody(emailId, resendApiKey, payload as Record<string, unknown>);
+      console.log("VMS: ensured email body; length:", emailBody.length);
     }
-    
+
     // Look up agency by sender domain in allowed_sender_domains
     // This is the most reliable approach since domains are explicitly configured per agency
     const { data: agencyByDomain } = await supabase
@@ -699,11 +776,18 @@ Deno.serve(async (req) => {
     let agency = agencyByDomain;
     if (!agency) {
       console.log("No agency found by domain, falling back to name/code lookup");
-      const fallbackFilter = importType === "vms"
-        ? "name.ilike.%dl transport%,import_email_code.eq.VMS"
-        : importType === "oldcastle"
-        ? "name.ilike.%oldcastle%,import_email_code.eq.OLDCASTLE"
-        : "name.ilike.%adelphia%,import_email_code.eq.ADELPHIA";
+      const fallbackFilter =
+        importType === "vms"
+          ? "name.ilike.%dl transport%,import_email_code.eq.VMS"
+          : importType === "oldcastle"
+          ? "name.ilike.%oldcastle%,import_email_code.eq.OLDCASTLE"
+          : importType === "century"
+          ? "name.ilike.%century%,import_email_code.eq.CENTURY"
+          : importType === "allied"
+          ? "name.ilike.%allied%,import_email_code.eq.ALLIED"
+          : importType === "semco"
+          ? "name.ilike.%semco%,import_email_code.eq.SEMCO"
+          : "name.ilike.%adelphia%,import_email_code.eq.ADELPHIA";
       const { data: agencyByCode } = await supabase
         .from("agencies")
         .select("id, name, allowed_sender_domains")
@@ -716,8 +800,32 @@ Deno.serve(async (req) => {
     const agencyError = !agency;
     
     if (agencyError || !agency) {
+      if (importType === "century" || importType === "allied" || importType === "semco") {
+        const templateType =
+          importType === "century" ? "century_xlsx" : importType === "allied" ? "allied_xlsx" : "semco_xlsx";
+        console.warn(`${templateType}: agency not found — logging email as received anyway`);
+        await supabase.from("email_import_logs").insert({
+          agency_id: null,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "received",
+          imported_count: 0,
+          error_message: `${templateType}: agency not configured; email recorded (parser pending)`,
+          raw_headers: emailHeaders,
+        });
+        return new Response(
+          JSON.stringify({
+            success: true,
+            received: true,
+            template_type: templateType,
+            message: "Email logged; configure agency import mapping to enable full processing",
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       console.error(`${importType.toUpperCase()} agency not found`);
-      
+
       await supabase.from("email_import_logs").insert({
         sender_email: senderEmail,
         subject: subject,
@@ -725,7 +833,7 @@ Deno.serve(async (req) => {
         error_message: `${importType.toUpperCase()} agency not configured in the system`,
         raw_headers: emailHeaders,
       });
-      
+
       return new Response(JSON.stringify({ error: `${importType.toUpperCase()} agency not configured` }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -766,7 +874,33 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    
+
+    // ============= CENTURY / ALLIED / SEMCO (parser pending — log only) =============
+    if (importType === "century" || importType === "allied" || importType === "semco") {
+      const templateType =
+        importType === "century" ? "century_xlsx" : importType === "allied" ? "allied_xlsx" : "semco_xlsx";
+      console.log(`[${templateType}] Email accepted — full XLSX parser not implemented yet; logging as received`);
+      await supabase.from("email_import_logs").insert({
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject: subject,
+        status: "received",
+        imported_count: 0,
+        error_message: `Accepted for ${templateType}; parser implementation pending`,
+        raw_headers: emailHeaders,
+      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          received: true,
+          template_type: templateType,
+          agency: agency.name,
+          message: "Email logged; import parser not yet implemented for this customer",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ============= VMS EMAIL BODY IMPORT =============
     if (importType === "vms") {
       console.log("Processing VMS email body import");
@@ -1072,8 +1206,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    
+
     // ============= ADELPHIA XLSX IMPORT =============
+    if (importType === "adelphia") {
     // Find XLSX attachment
     const xlsxAttachment = attachments.find((att: { filename?: string; content?: string; id?: string }) => 
       att.filename?.toLowerCase().endsWith(".xlsx") || att.filename?.toLowerCase().endsWith(".xls")
@@ -1312,7 +1447,8 @@ Deno.serve(async (req) => {
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-    
+    }
+
   } catch (error: unknown) {
     console.error("Email import error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";

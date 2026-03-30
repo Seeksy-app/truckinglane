@@ -31,6 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TranscriptViewerModal } from "./TranscriptViewerModal";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { toast } from "@/hooks/use-toast";
 
 interface ElevenLabsCall {
@@ -391,8 +392,8 @@ export const AICallsTab = ({ calls, leads, aiBookings, elevenLabsCalls = [] }: A
                           <TableCell className="text-sm">
                             {format(parseISO(call.created_at), "MMM d, h:mm a")}
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {call.external_number || "—"}
+                          <TableCell className="text-sm">
+                            <PhoneDisplay phone={call.external_number} />
                           </TableCell>
                           <TableCell className="text-sm">
                             {call.call_duration_secs ? `${call.call_duration_secs}s` : "—"}

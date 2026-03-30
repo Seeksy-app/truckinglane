@@ -32,6 +32,7 @@ import { LeadExpandedRow } from "./LeadExpandedRow";
 import { CarrierBadge } from "./CarrierBadge";
 import { LeadResolvePanel } from "./LeadResolvePanel";
 import { HotLeadTimer } from "./HotLeadTimer";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -425,8 +426,8 @@ export const LeadsTable = ({
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {lead.caller_phone}
+                  <TableCell className="text-sm">
+                    <PhoneDisplay phone={lead.caller_phone} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">

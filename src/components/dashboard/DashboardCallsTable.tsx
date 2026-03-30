@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Json } from "@/integrations/supabase/types";
@@ -251,8 +252,8 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                         <TableCell className="text-sm">
                           {format(parseISO(call.created_at), "MMM d, h:mm a")}
                         </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {phoneNumber}
+                        <TableCell className="text-sm">
+                          <PhoneDisplay phone={phoneNumber} />
                         </TableCell>
                         <TableCell className="text-sm">
                           {call.duration_secs ? `${call.duration_secs}s` : "—"}

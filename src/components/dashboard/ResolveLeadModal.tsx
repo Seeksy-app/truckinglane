@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -461,7 +462,7 @@ export function ResolveLeadModal({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Phone className="h-4 w-4" />
-                  <span className="font-mono">{lead.caller_phone}</span>
+                  <PhoneDisplay phone={lead.caller_phone} className="text-muted-foreground" />
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { Phone, User, Hash, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { HotLeadTimer } from "./HotLeadTimer";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -66,11 +67,9 @@ export function LeadsToCallHeader({ leads, onOpenAI }: LeadsToCallHeaderProps) {
               </span>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm">
               <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-sm font-mono text-primary">
-                {lead.caller_phone}
-              </span>
+              <PhoneDisplay phone={lead.caller_phone} className="text-primary" />
             </div>
             
             {lead.load_id && (

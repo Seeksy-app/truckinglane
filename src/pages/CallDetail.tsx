@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Phone } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 
@@ -128,9 +129,10 @@ export default function CallDetail() {
               <h1 className="text-2xl font-serif font-semibold text-foreground">
                 {displayTitle}
               </h1>
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                {call.external_number || "—"} · {format(parseISO(call.created_at), "MMM d, yyyy h:mm a")}
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                <Phone className="h-4 w-4 shrink-0" />
+                <PhoneDisplay phone={call.external_number} className="text-muted-foreground" />
+                <span> · {format(parseISO(call.created_at), "MMM d, yyyy h:mm a")}</span>
                 {call.duration_secs != null && ` · ${call.duration_secs}s`}
               </p>
             </div>

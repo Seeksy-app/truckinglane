@@ -43,6 +43,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { isOpenLoadForNewCard } from "@/lib/newLoadsFromImport";
+import { getErrorMessage } from "@/lib/utils";
 import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
@@ -819,7 +820,7 @@ const Dashboard = () => {
         onError: (e) => {
           toast({
             title: "Could not save NEW view",
-            description: e instanceof Error ? e.message : String(e),
+            description: getErrorMessage(e),
             variant: "destructive",
           });
         },

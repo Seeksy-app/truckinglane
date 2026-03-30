@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { LeadGenLayout } from '@/components/leadgen/LeadGenLayout';
+import { PhoneDisplay } from '@/components/ui/phone-display';
 import { FitScoreInline } from '@/components/leadgen/FitScoreBadge';
 
 interface ScoreBreakdown {
@@ -287,7 +288,7 @@ export default function Accounts() {
                         {account.contact_phone && (
                           <span className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
-                            {account.contact_phone}
+                            <PhoneDisplay phone={account.contact_phone} />
                           </span>
                         )}
                       </div>

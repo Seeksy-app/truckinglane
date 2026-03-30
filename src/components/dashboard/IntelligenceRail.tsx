@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -738,9 +739,9 @@ export function IntelligenceRail({
                                         <p className="text-sm font-medium text-foreground truncate">
                                           {lead.caller_name || lead.caller_company || lead.caller_phone}
                                         </p>
-                                        <p className="text-[10px] text-muted-foreground truncate">
-                                          {lead.caller_phone}
-                                        </p>
+                                        <div className="text-[10px] text-muted-foreground truncate">
+                                          <PhoneDisplay phone={lead.caller_phone} className="text-muted-foreground" />
+                                        </div>
                                       </div>
                                     </div>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

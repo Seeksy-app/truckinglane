@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Package, 
@@ -410,7 +411,7 @@ export function LeadResolvePanel({
                 <User className="h-3.5 w-3.5 shrink-0" />
                 <span className="font-medium text-foreground truncate">{lead.caller_name || "Unknown"}</span>
                 <span className="text-muted-foreground/50">•</span>
-                <span className="font-mono text-xs">{lead.caller_phone}</span>
+                <PhoneDisplay phone={lead.caller_phone} />
               </div>
             </div>
             <Badge className={cn(

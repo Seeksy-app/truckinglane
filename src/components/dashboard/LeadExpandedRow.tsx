@@ -22,6 +22,7 @@ import { ResolveLeadModal } from "./ResolveLeadModal";
 import type { Tables, Json } from "@/integrations/supabase/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_STYLES } from "@/lib/leadStatusDisplay";
 import { cn } from "@/lib/utils";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 
 const AudioPlayer = ({ url }: { url: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -719,9 +720,7 @@ export const LeadExpandedRow = ({
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
           <div>
             <span className="text-xs uppercase tracking-wide text-muted-foreground block mb-1">Phone</span>
-            <a href={`tel:${lead.caller_phone}`} className="font-mono font-medium text-primary hover:underline">
-              {lead.caller_phone}
-            </a>
+            <PhoneDisplay phone={lead.caller_phone} asLink className="font-medium" />
           </div>
           <div>
             <span className="text-xs uppercase tracking-wide text-muted-foreground block mb-1">Load #</span>

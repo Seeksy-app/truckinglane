@@ -16,6 +16,7 @@ import {
 import { format } from "date-fns";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Tables } from "@/integrations/supabase/types";
@@ -484,7 +485,9 @@ function LeadDetailContent() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Phone Number</p>
-                    <p className="font-medium font-mono">{lead.caller_phone}</p>
+                    <p className="font-medium">
+                      <PhoneDisplay phone={lead.caller_phone} />
+                    </p>
                   </div>
                 </div>
 

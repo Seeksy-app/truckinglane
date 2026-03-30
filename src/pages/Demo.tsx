@@ -29,6 +29,7 @@ import {
   Bell,
   User,
 } from "lucide-react";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 import { Logo } from "@/components/Logo";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -418,11 +419,11 @@ function DemoDashboardContent() {
                           key={call.id}
                           className="hover:bg-muted/30 transition-colors"
                         >
-                          <td className="px-4 py-3 font-mono text-sm">
-                            {call.caller_phone}
+                          <td className="px-4 py-3 text-sm">
+                            <PhoneDisplay phone={call.caller_phone} />
                           </td>
-                          <td className="px-4 py-3 font-mono text-sm">
-                            {call.receiver_phone}
+                          <td className="px-4 py-3 text-sm">
+                            <PhoneDisplay phone={call.receiver_phone} />
                           </td>
                           <td className="px-4 py-3">
                             <span

@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ChevronDown, ChevronUp, Info, ExternalLink, Clock, Phone, Flame } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { PhoneDisplay } from "@/components/ui/phone-display";
 
 interface ItemBase {
   id: string;
@@ -179,8 +180,8 @@ export const ExpandedListPanel = ({
             </div>
             <div className="flex items-center gap-2 min-w-0">
               <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-              <span className="font-mono text-xs truncate">
-                {item.caller_phone}
+              <span className="text-xs truncate inline-block max-w-full">
+                <PhoneDisplay phone={item.caller_phone} />
               </span>
               {item.caller_company && (
                 <span className="text-xs text-muted-foreground truncate hidden sm:inline">
@@ -223,8 +224,8 @@ export const ExpandedListPanel = ({
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="font-mono text-xs truncate">
-              {item.external_number || "—"}
+            <span className="text-xs truncate inline-block max-w-full">
+              <PhoneDisplay phone={item.external_number} />
             </span>
           </div>
           {item.call_summary_title && (

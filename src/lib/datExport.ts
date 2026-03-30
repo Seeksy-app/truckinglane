@@ -86,6 +86,16 @@ function getCurrentDate(): string {
   return `${month}/${day}/${year}`;
 }
 
+/** DAT Contact Method must be the dispatch phone number (routes calls to Stephen). */
+const DAT_CONTACT_METHOD_PHONE = "941-621-2397";
+
+/** DAT requires a weight; use 1 lbs when load weight is missing or zero. */
+function datExportWeightLbs(weightLbs: number | null | undefined): string {
+  const n = weightLbs == null ? NaN : Number(weightLbs);
+  if (!Number.isFinite(n) || n <= 0) return "1";
+  return String(Math.round(n));
+}
+
 // Map trailer type to DAT equipment code
 // templateType is used to default Adelphia and VMS to Flatbed
 function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
@@ -134,9 +144,8 @@ function mapLoadToDAT(load: Load): Record<string, string> {
   // Use current date for first two columns
   const currentDate = getCurrentDate();
   
-  // Default weight to 47,000 if empty
-  const weightValue = load.weight_lbs ? String(load.weight_lbs) : "47000";
-  
+  const weightValue = datExportWeightLbs(load.weight_lbs);
+
   return {
     "Pickup Earliest*": currentDate,
     "Pickup Latest": currentDate,
@@ -152,7 +161,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "DAT Loadboard Rate": "",
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
-    "Contact Method*": "primary phone",
+    "Contact Method*": DAT_CONTACT_METHOD_PHONE,
     "Origin City*": load.pickup_city || "",
     "Origin State*": cleanState(load.pickup_state),
     // R / U / W / X: keep headers; fixed values per DAT template spec

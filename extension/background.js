@@ -1,6 +1,5 @@
-// Trucking Lane — background: AI leads + Aljex spot auto-submit queue
-// Aljex route.php table scraping / "CITY ST" parsing lives in aljex-spot-injector.js
-// (parseCityStateFromAljexCell, scrapeAljexRouteBoardCityRows).
+// Trucking Lane — background: AI leads + Aljex spot auto-submit queue.
+// Big 500 (aljex_big500) is ingested only via parse-big500.py on the VPS, not from the extension.
 
 const SUPABASE_URL = "https://vjgakkomhphvdbwjjwiv.supabase.co";
 const SUPABASE_ANON_KEY =

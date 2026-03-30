@@ -1,70 +1,7 @@
 /**
  * Aljex spot form autofill — runs on https://dandl.aljex.com/route.php*
- *
- * route.php load-board scraping: use parseCityStateFromAljexCell() for "CITY ST" cells
- * (e.g. "WI KAUKAUNA", "AL CENTRE") — state = first 2 chars, city = rest after first space.
- * scrapeAljexRouteBoardCityRows() reads Pick Up + Consignee columns (not facility-name cells).
+ * Page-driven loads: email templates (spot queue) only. No Big 500 board scraping here.
  */
-
-/**
- * Pick Up / Consignee cells: "AL CENTRE", "WI KAUKAUNA" → 2-letter state + city after space.
- */
-function parseCityStateFromAljexCell(raw) {
-  const s = String(raw || "")
-    .trim()
-    .replace(/\s+/g, " ");
-  if (!s) return { city: "", state: "" };
-  if (s.length >= 3 && s[2] === " ") {
-    const state = s.slice(0, 2).toUpperCase();
-    const city = s.slice(3).trim();
-    if (/^[A-Z]{2}$/.test(state)) return { state, city };
-  }
-  const sp = s.indexOf(" ");
-  if (sp > 0) {
-    const first = s.slice(0, sp).toUpperCase();
-    const rest = s.slice(sp + 1).trim();
-    if (first.length === 2 && /^[A-Z]{2}$/.test(first)) return { state: first, city: rest };
-  }
-  return { city: s, state: "" };
-}
-
-/**
- * Scrape visible tables on route.php: Pick Up + Consignee columns → city/state (not facility names).
- */
-function scrapeAljexRouteBoardCityRows() {
-  const out = [];
-  const tables = document.querySelectorAll("table");
-  for (const table of tables) {
-    const hdrTr = table.querySelector("thead tr") || table.querySelector("tr");
-    if (!hdrTr) continue;
-    const headers = [...hdrTr.querySelectorAll("th, td")].map((el) =>
-      (el.textContent || "").trim()
-    );
-    const norm = (h) => h.replace(/\s+/g, " ").trim();
-    const pickIdx = headers.findIndex((h) => /^pick\s*up$/i.test(norm(h)));
-    const consIdx = headers.findIndex((h) => /consignee/i.test(norm(h)));
-    if (pickIdx < 0 || consIdx < 0) continue;
-    const bodyRows = table.querySelectorAll("tbody tr");
-    for (const tr of bodyRows) {
-      const cells = [...tr.querySelectorAll("td")];
-      if (cells.length <= Math.max(pickIdx, consIdx)) continue;
-      const pick = parseCityStateFromAljexCell(cells[pickIdx]?.textContent || "");
-      const cons = parseCityStateFromAljexCell(cells[consIdx]?.textContent || "");
-      out.push({
-        pickup_city: pick.city,
-        pickup_state: pick.state,
-        dest_city: cons.city,
-        dest_state: cons.state,
-      });
-    }
-  }
-  return out;
-}
-
-if (typeof window !== "undefined") {
-  window.__TL_parseCityStateFromAljexCell = parseCityStateFromAljexCell;
-  window.__TL_scrapeAljexRouteBoardCityRows = scrapeAljexRouteBoardCityRows;
-}
 
 /** Aljex CustID by loads.template_type (no customer_name column). */
 const TEMPLATE_TO_CUST_ID = {

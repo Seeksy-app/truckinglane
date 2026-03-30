@@ -43,7 +43,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { isOpenLoadForNewCard } from "@/lib/newLoadsFromImport";
-import { getErrorMessage } from "@/lib/utils";
+import { getErrorMessage, isoTimestampNow } from "@/lib/utils";
 import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
@@ -529,11 +529,19 @@ const Dashboard = () => {
 
   const markNewLoadsViewedMutation = useMutation({
     mutationFn: async () => {
-      const now = new Date().toISOString();
-      const { error } = await supabase.from("agent_new_loads_view").upsert(
-        { agent_id: user!.id, last_viewed_new_at: now, updated_at: now },
-        { onConflict: "agent_id" },
-      );
+      const viewedAtIso = isoTimestampNow();
+      const row: {
+        agent_id: string;
+        last_viewed_new_at: string;
+        updated_at: string;
+      } = {
+        agent_id: user!.id,
+        last_viewed_new_at: viewedAtIso,
+        updated_at: viewedAtIso,
+      };
+      const { error } = await supabase.from("agent_new_loads_view").upsert(row, {
+        onConflict: "agent_id",
+      });
       if (error) throw error;
     },
     onSuccess: () => {

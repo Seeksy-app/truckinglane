@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Use for Postgres `timestamptz` — always a string, never `new Date()` or `Date.now()`. */
+export function isoTimestampNow(): string {
+  return new Date().toISOString();
+}
+
 /** US E.164 (+1…) and 10-digit local: +1 318-372-8933 / 318-372-8933. Other formats returned trimmed. */
 export function formatDisplayPhone(raw: string | null | undefined): string {
   if (raw == null || raw === "") return "—";
@@ -27,9 +32,15 @@ export function formatDisplayPhone(raw: string | null | undefined): string {
 /** Supabase/PostgREST errors are plain objects, not Error — avoids "[object Object]" in toasts. */
 export function getErrorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
-  if (typeof e === "object" && e !== null && "message" in e) {
-    const m = (e as { message: unknown }).message;
-    if (typeof m === "string") return m;
+  if (typeof e === "object" && e !== null) {
+    const o = e as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    if (typeof o.message === "string" && o.message.trim()) {
+      const parts = [o.message.trim()];
+      if (typeof o.details === "string" && o.details.trim()) parts.push(o.details.trim());
+      if (typeof o.hint === "string" && o.hint.trim()) parts.push(o.hint.trim());
+      if (typeof o.code === "string" && o.code.trim()) parts.push(`[${o.code.trim()}]`);
+      return parts.join(" — ");
+    }
   }
   try {
     return JSON.stringify(e);

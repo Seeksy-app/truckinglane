@@ -1,7 +1,7 @@
-import { cn, formatDisplayPhone } from "@/lib/utils";
+import { cn, formatPhone } from "@/lib/utils";
 
-/** +3px vs surrounding text; use with `formatDisplayPhone` inside custom `<a href="tel:…">` wrappers */
-export const phoneDisplayClassName = "font-mono tabular-nums [font-size:calc(1em+3px)]";
+/** Monospace phone digits; body text size comes from global root (see index.css). */
+export const phoneDisplayClassName = "font-mono tabular-nums";
 
 const phoneTextClass = phoneDisplayClassName;
 
@@ -13,7 +13,7 @@ type PhoneDisplayProps = {
 };
 
 export function PhoneDisplay({ phone, className, asLink }: PhoneDisplayProps) {
-  const text = formatDisplayPhone(phone);
+  const text = formatPhone(phone);
   if (asLink && phone && phone.trim() && phone.toLowerCase() !== "unknown") {
     return (
       <a

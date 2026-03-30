@@ -303,10 +303,14 @@ async function showLeadNotification(lead) {
 function formatPhoneNumber(phone) {
   if (!phone) return "No phone";
   const cleaned = phone.replace(/\D/g, "");
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 11 && cleaned[0] === "1") {
-    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  const ten =
+    cleaned.length === 11 && cleaned[0] === "1"
+      ? cleaned.slice(1)
+      : cleaned.length === 10
+        ? cleaned
+        : null;
+  if (ten && ten.length === 10) {
+    return `${ten.slice(0, 3)}-${ten.slice(3, 6)}-${ten.slice(6)}`;
   }
   return phone;
 }

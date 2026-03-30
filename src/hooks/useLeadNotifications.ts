@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
 import { playLeadNotificationDing } from "@/lib/leadNotificationSound";
+import { formatPhone } from "@/lib/utils";
 
 export type LeadNotificationOptions = {
   /** Agency to filter realtime inserts (use effective agency id on dashboard, incl. impersonation). */
@@ -94,13 +95,8 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
           }
 
           if (settings.chat_desktop && "Notification" in window && Notification.permission === "granted") {
-            const phone = newLead.caller_phone || "Unknown";
-            const digits = phone.replace(/\D/g, "");
-            const nationalDigits = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-            const formattedPhone =
-              nationalDigits.length === 10
-                ? `(${nationalDigits.slice(0, 3)}) ${nationalDigits.slice(3, 6)}-${nationalDigits.slice(6)}`
-                : phone;
+            const rawPhone = newLead.caller_phone?.trim();
+            const formattedPhone = rawPhone ? formatPhone(rawPhone) : "Unknown";
 
             const parts: string[] = [];
             if (newLead.caller_name) parts.push(newLead.caller_name);

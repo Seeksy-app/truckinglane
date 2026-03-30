@@ -22,7 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { formatDisplayPhone } from '@/lib/utils';
+import { formatPhone } from '@/lib/utils';
 import { phoneDisplayClassName } from '@/components/ui/phone-display';
 
 interface AccountEvent {
@@ -353,7 +353,7 @@ export default function AccountDetail() {
                       <div className="text-sm text-muted-foreground mb-1">Phone</div>
                       <a href={`tel:${account.contact_phone}`} className="flex items-center gap-1">
                         <Phone className="h-4 w-4" />
-                        <span className={phoneDisplayClassName}>{formatDisplayPhone(account.contact_phone)}</span>
+                        <span className={phoneDisplayClassName}>{formatPhone(account.contact_phone)}</span>
                       </a>
                     </div>
                   )}

@@ -5,6 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, CheckCircle, XCircle, Archive, Upload, Clock, TrendingUp, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  resolveImportActivityLabel,
+  type ImportRunRow,
+  type LoadTsRow,
+} from '@/lib/loadActivityImportLabels';
 
 interface Breakdown {
   new?: number;
@@ -13,6 +18,8 @@ interface Breakdown {
   duplicates_removed?: number;
   sheets?: number;
   source?: string;
+  /** Set on some sync breakdowns (e.g. Google Sheets) */
+  template_type?: string;
   // DAT export fields (legacy API push)
   posted?: number;
   already_on_dat?: number;
@@ -39,10 +46,16 @@ interface LoadActivityLogsProps {
   agencyId: string;
 }
 
+type ActivityQueryData = {
+  logs: LogEntry[];
+  runs: ImportRunRow[];
+  loadsWindow: LoadTsRow[];
+};
+
 export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
-  const { data: logs, isLoading } = useQuery({
+  const { data: activityData, isLoading } = useQuery({
     queryKey: ['load_activity_logs', agencyId],
-    queryFn: async () => {
+    queryFn: async (): Promise<ActivityQueryData> => {
       const { data, error } = await supabase
         .from('email_import_logs')
         .select('id, sender_email, subject, status, error_message, imported_count, raw_headers, created_at')
@@ -57,11 +70,47 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
         if (e.startsWith("dat-export@")) return false;
         return true;
       });
-      return rows;
+
+      if (rows.length === 0) {
+        return { logs: [], runs: [], loadsWindow: [] };
+      }
+
+      const { data: runsData, error: runsError } = await supabase
+        .from('load_import_runs')
+        .select('template_type, created_at')
+        .eq('agency_id', agencyId)
+        .order('created_at', { ascending: false })
+        .limit(400);
+
+      if (runsError) throw runsError;
+
+      const logTimes = rows.map((r) => new Date(r.created_at).getTime());
+      const minT = Math.min(...logTimes) - 120_000;
+      const maxT = Math.max(...logTimes) + 180_000;
+
+      const { data: loadsData, error: loadsError } = await supabase
+        .from('loads')
+        .select('template_type, updated_at')
+        .eq('agency_id', agencyId)
+        .gte('updated_at', new Date(minT).toISOString())
+        .lte('updated_at', new Date(maxT).toISOString())
+        .limit(2000);
+
+      if (loadsError) throw loadsError;
+
+      return {
+        logs: rows,
+        runs: (runsData ?? []) as ImportRunRow[],
+        loadsWindow: (loadsData ?? []) as LoadTsRow[],
+      };
     },
     enabled: !!agencyId,
     refetchInterval: 30000,
   });
+
+  const logs = activityData?.logs;
+  const runs = activityData?.runs ?? [];
+  const loadsWindow = activityData?.loadsWindow ?? [];
 
   const getIcon = (senderEmail: string, status: string) => {
     if (status === 'failed') return <XCircle className="h-4 w-4 text-destructive" />;
@@ -184,7 +233,7 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">
-                      {getEventLabel(log.sender_email)}
+                      {resolveImportActivityLabel(log, runs, loadsWindow, getEventLabel)}
                     </span>
                     {getBadgeVariant(log.sender_email, log.status)}
                   </div>

@@ -384,7 +384,15 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
 
   // Log with full breakdown in raw_headers
   const sheetsProcessed = new Set(parsedLoads.map(l => l.sheet_name)).size;
-  const breakdown = { new: newCount, updated: updatedCount, archived: archivedCount, duplicates_removed: dedupedCount, sheets: sheetsProcessed, source };
+  const breakdown = {
+    new: newCount,
+    updated: updatedCount,
+    archived: archivedCount,
+    duplicates_removed: dedupedCount,
+    sheets: sheetsProcessed,
+    source,
+    template_type: TEMPLATE_TYPE,
+  };
   const summaryParts = [`${newCount} new`, `${updatedCount} updated`];
   if (archivedCount > 0) summaryParts.push(`${archivedCount} removed`);
   if (dedupedCount > 0) summaryParts.push(`${dedupedCount} dupes dropped`);

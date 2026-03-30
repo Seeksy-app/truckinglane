@@ -1,6 +1,6 @@
 import { cn, formatPhone } from "@/lib/utils";
 
-/** Monospace phone digits; body text size comes from global root (see index.css). */
+/** Monospace phone digits; optional `className` for weight/size in specific contexts. */
 export const phoneDisplayClassName = "font-mono tabular-nums";
 
 const phoneTextClass = phoneDisplayClassName;

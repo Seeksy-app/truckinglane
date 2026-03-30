@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR } from "@/lib/loadDashboardFilters";
 
 type Load = Tables<"loads">;
 
@@ -21,6 +22,7 @@ export function useLoads() {
         .from("loads")
         .select("*")
         .eq("is_active", true)
+        .or(LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR)
         .order("ship_date", { ascending: true });
 
       // If super admin is impersonating, filter by the impersonated agency

@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, Clock, XCircle } from "lucide-react";
+import {
+  LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR,
+  LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR_REST,
+} from "@/lib/loadDashboardFilters";
 
 interface FailedLoad {
   id: string;
@@ -34,17 +38,21 @@ export function DATStatusCard() {
       const { data } = await supabase
         .from("loads")
         .select("id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .or(LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR);
 
       const { data: session } = await supabase.auth.getSession();
       const token = session?.session?.access_token;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      const resp = await fetch(
-        `${supabaseUrl}/rest/v1/loads?is_active=eq.true&select=id,dat_posted_at`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` } }
-      );
+      const datPostedUrl = new URL(`${supabaseUrl}/rest/v1/loads`);
+      datPostedUrl.searchParams.set("is_active", "eq.true");
+      datPostedUrl.searchParams.set("select", "id,dat_posted_at");
+      datPostedUrl.searchParams.set("or", LOADS_EXCLUDE_ARCHIVED_DISPATCH_OR_REST);
+      const resp = await fetch(datPostedUrl.toString(), {
+        headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` },
+      });
       const datStatus: any[] = await resp.json();
       const datMap = new Map(datStatus.map((l: any) => [l.id, l.dat_posted_at]));
 

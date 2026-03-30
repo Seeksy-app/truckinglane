@@ -152,7 +152,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "DAT Loadboard Rate": "",
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
-    "Contact Method*": "941-621-2397",
+    "Contact Method*": "primary phone",
     "Origin City*": load.pickup_city || "",
     "Origin State*": cleanState(load.pickup_state),
     // R / U / W / X: keep headers; fixed values per DAT template spec

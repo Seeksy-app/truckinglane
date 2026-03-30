@@ -4,7 +4,7 @@ import type { Tables } from "@/integrations/supabase/types";
 type Load = Tables<"loads">;
 
 /** Stored on loads ingested from Aljex scrape / bookmarklet / sync (not manual Dispatch Status from exports). */
-export const ALJEX_SCRAPED_DISPATCH_STATUS = "available" as const;
+export const ALJEX_SCRAPED_DISPATCH_STATUS = "open" as const;
 
 /**
  * Reads an Aljex scrape / CSV row status (load board OPEN vs COVERED).

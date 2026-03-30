@@ -1,4 +1,6 @@
 // Trucking Lane — background: AI leads + Aljex spot auto-submit queue
+// Aljex route.php table scraping / "CITY ST" parsing lives in aljex-spot-injector.js
+// (parseCityStateFromAljexCell, scrapeAljexRouteBoardCityRows).
 
 const SUPABASE_URL = "https://vjgakkomhphvdbwjjwiv.supabase.co";
 const SUPABASE_ANON_KEY =

@@ -67,7 +67,7 @@ function scrapeAljexLoadsRowPassesStatusFilter(row: Record<string, string>): boo
   return s === "OPEN";
 }
 
-const ALJEX_SCRAPED_DISPATCH_STATUS = "available";
+const ALJEX_SCRAPED_DISPATCH_STATUS = "open";
 
 // ============= HELPERS =============
 
@@ -108,10 +108,14 @@ function calculateRateFields(rateRaw: number | null, weightLbs: number | null, i
   const invoiceTotal = isPerTon && weightTons > 0
     ? Math.round(rateRaw * weightTons)
     : Math.round(rateRaw);
+  const targetPay =
+    isPerTon && weightTons > 0
+      ? Math.round((rateRaw - 10) * weightTons)
+      : Math.round(invoiceTotal * 0.80);
   return {
     rate_raw: rateRaw, is_per_ton: isPerTon,
     customer_invoice_total: invoiceTotal,
-    target_pay: Math.round(invoiceTotal * 0.80),
+    target_pay: targetPay,
     target_commission: Math.round(invoiceTotal * 0.20),
     max_pay: Math.round(invoiceTotal * 0.85),
     max_commission: Math.round(invoiceTotal * 0.15),

@@ -54,7 +54,7 @@ function scrapeAljexLoadsRowPassesStatusFilter(row: Record<string, string>): boo
   return s === "OPEN";
 }
 
-const ALJEX_SCRAPED_DISPATCH_STATUS = "available";
+const ALJEX_SCRAPED_DISPATCH_STATUS = "open";
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -209,8 +209,11 @@ function calculateRateFields(rateRaw: number | null, weightLbs: number | null, i
     invoiceTotal = Math.round(rate);
   }
   
-  // Calculate pay and commissions
-  const targetPay = Math.round(invoiceTotal * 0.80);
+  // Per-ton: carrier target = ($/ton − $10) × tons; flat: 80% of invoice
+  const targetPay =
+    isPerTon && weightTons > 0
+      ? Math.round((rate - 10) * weightTons)
+      : Math.round(invoiceTotal * 0.80);
   const targetCommission = Math.round(invoiceTotal * 0.20);
   const maxPay = Math.round(invoiceTotal * 0.85);
   const maxCommission = Math.round(invoiceTotal * 0.15);

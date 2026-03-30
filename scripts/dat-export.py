@@ -34,6 +34,43 @@ def dat_export_weight_lbs(weight_lbs: Any) -> str:
     return str(int(round(n)))
 
 
+def clean_state(state: Any) -> str:
+    if not state:
+        return ""
+    return str(state).split("/")[0].strip()
+
+
+def parse_city_state_from_dot_embedded(city_raw: Any, state_raw: Any) -> tuple[str, str]:
+    """If city looks like IVYLAND.PA and state is empty, split city + 2-letter state."""
+    city = ("" if city_raw is None else str(city_raw)).strip()
+    state = ("" if state_raw is None else str(state_raw)).strip()
+    if city and not state:
+        idx = city.rfind(".")
+        if idx > 0 and idx < len(city) - 1:
+            suffix = city[idx + 1 :].strip()
+            if len(suffix) == 2 and suffix.isalpha():
+                return city[:idx].strip(), suffix.upper()
+    return city, state
+
+
+def destination_resolved_for_dat(load: dict[str, Any]) -> tuple[str, str]:
+    c, s = parse_city_state_from_dot_embedded(load.get("dest_city"), load.get("dest_state"))
+    return c, clean_state(s)
+
+
+def is_exportable_load(load: dict[str, Any]) -> bool:
+    """Match datExport.ts isExportableLoad."""
+    pc = (load.get("pickup_city") or "").upper().strip()
+    if pc.startswith("PICK UP") or pc.startswith("NOTE") or pc.startswith("***"):
+        return False
+    if not (load.get("pickup_city") or "").strip() and not (load.get("dest_city") or "").strip():
+        return False
+    dc, ds = destination_resolved_for_dat(load)
+    if not dc.strip() or not ds.strip():
+        return False
+    return True
+
+
 def normalize_dat_equipment_code(raw: Any) -> str:
     """Normalize to DAT-valid F / V / R; empty or unknown → F. Keep in sync with datExport.ts."""
     s = ("" if raw is None else str(raw)).strip().upper()
@@ -66,11 +103,6 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
     trailer_footage = load.get("trailer_footage")
     length_value = str(trailer_footage) if trailer_footage else "48"
 
-    def clean_state(state: Any) -> str:
-        if not state:
-            return ""
-        return str(state).split("/")[0].strip()
-
     trailer = (load.get("trailer_type") or "").strip()
     trailer_l = trailer.lower()
     tt = load.get("template_type") or ""
@@ -101,6 +133,11 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
 
     w = dat_export_weight_lbs(load.get("weight_lbs"))
 
+    ocity, ostate = parse_city_state_from_dot_embedded(
+        load.get("pickup_city"), load.get("pickup_state")
+    )
+    dcity, dstate = destination_resolved_for_dat(load)
+
     return {
         "Pickup Earliest*": current_date,
         "Pickup Latest": current_date,
@@ -117,11 +154,11 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
         "Allow DAT Loadboard Booking": "no",
         "Use Extended Network": "no",
         "Contact Method*": DAT_CONTACT_METHOD,
-        "Origin City*": str(load.get("pickup_city") or ""),
-        "Origin State*": clean_state(load.get("pickup_state")),
+        "Origin City*": ocity,
+        "Origin State*": clean_state(ostate),
         "Origin Postal Code": "",
-        "Destination City*": str(load.get("dest_city") or ""),
-        "Destination State*": clean_state(load.get("dest_state")),
+        "Destination City*": dcity,
+        "Destination State*": dstate,
         "Destination Postal Code": "",
         "Comment": "",
         "Commodity": "",
@@ -168,6 +205,8 @@ def generate_dat_csv(loads: list[dict[str, Any]]) -> str:
     w = csv.DictWriter(buf, fieldnames=list(DAT_COLUMNS), extrasaction="ignore")
     w.writeheader()
     for load in loads:
+        if not is_exportable_load(load):
+            continue
         row = map_load_to_dat_row(load)
         w.writerow({k: row.get(k, "") for k in DAT_COLUMNS})
     return buf.getvalue()

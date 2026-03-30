@@ -150,11 +150,40 @@ function cleanState(state: string | null | undefined): string {
   return state.split("/")[0].trim();
 }
 
+/**
+ * If city looks like "IVYLAND.PA" and state is empty, split into city + 2-letter state.
+ */
+function parseCityStateFromDotEmbedded(
+  cityRaw: string | null | undefined,
+  stateRaw: string | null | undefined,
+): { city: string; state: string } {
+  let city = (cityRaw ?? "").trim();
+  const state = (stateRaw ?? "").trim();
+
+  if (city && !state) {
+    const idx = city.lastIndexOf(".");
+    if (idx > 0 && idx < city.length - 1) {
+      const suffix = city.slice(idx + 1).trim();
+      if (/^[A-Za-z]{2}$/.test(suffix)) {
+        return { city: city.slice(0, idx).trim(), state: suffix.toUpperCase() };
+      }
+    }
+  }
+  return { city, state };
+}
+
+function datExportDestinationResolved(load: Load): { city: string; state: string } {
+  const { city, state } = parseCityStateFromDotEmbedded(load.dest_city, load.dest_state);
+  return { city, state: cleanState(state) };
+}
+
 // Check if a load is a valid exportable load (not a template note/instruction row)
 function isExportableLoad(load: Load): boolean {
   const city = (load.pickup_city || "").toUpperCase();
   if (city.startsWith("PICK UP") || city.startsWith("NOTE") || city.startsWith("***")) return false;
   if (!load.pickup_city && !load.dest_city) return false;
+  const dest = datExportDestinationResolved(load);
+  if (!dest.city.trim() || !dest.state.trim()) return false;
   return true;
 }
 
@@ -167,6 +196,9 @@ function mapLoadToDAT(load: Load): Record<string, string> {
   const currentDate = getCurrentDate();
   
   const weightValue = datExportWeightLbs(load.weight_lbs);
+
+  const origin = parseCityStateFromDotEmbedded(load.pickup_city, load.pickup_state);
+  const dest = datExportDestinationResolved(load);
 
   return {
     "Pickup Earliest*": currentDate,
@@ -184,12 +216,12 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Allow DAT Loadboard Booking": "no",
     "Use Extended Network": "no",
     "Contact Method*": DAT_CONTACT_METHOD,
-    "Origin City*": load.pickup_city || "",
-    "Origin State*": cleanState(load.pickup_state),
+    "Origin City*": origin.city,
+    "Origin State*": cleanState(origin.state),
     // R / U / W / X: keep headers; fixed values per DAT template spec
     "Origin Postal Code": "",
-    "Destination City*": load.dest_city || "",
-    "Destination State*": cleanState(load.dest_state),
+    "Destination City*": dest.city,
+    "Destination State*": dest.state,
     "Destination Postal Code": "",
     "Comment": "",
     "Commodity": "",

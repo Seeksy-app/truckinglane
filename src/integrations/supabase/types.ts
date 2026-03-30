@@ -502,6 +502,32 @@ export type Database = {
           },
         ]
       }
+      agent_new_loads_view: {
+        Row: {
+          agent_id: string
+          last_viewed_new_at: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          last_viewed_new_at: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          last_viewed_new_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_new_loads_view_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_call_summaries: {
         Row: {
           agency_id: string | null

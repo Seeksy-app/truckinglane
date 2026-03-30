@@ -42,7 +42,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
-import { isOpenLoadInLatestImportBatch } from "@/lib/newLoadsFromImport";
+import { isOpenLoadForNewCard } from "@/lib/newLoadsFromImport";
 import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
@@ -510,30 +510,40 @@ const Dashboard = () => {
     return getDateWindow("today", timezone);
   }, [timezone]);
 
-  // Latest import batch bounds (load_activity_logs action=import) — drives NEW loads count
-  const { data: importBounds } = useQuery({
-    queryKey: ["load_import_bounds", effectiveAgencyId],
+  /** Per-agent: last time this user opened the NEW card (not shared with other agents). */
+  const { data: newLoadsViewState } = useQuery({
+    queryKey: ["agent_new_loads_view", user?.id],
     queryFn: async () => {
-      if (!effectiveAgencyId) {
-        return { lastImportAt: null as string | null, previousImportAt: null as string | null };
-      }
       const { data, error } = await supabase
-        .from("load_activity_logs")
-        .select("created_at")
-        .eq("agency_id", effectiveAgencyId)
-        .eq("action", "import")
-        .order("created_at", { ascending: false })
-        .limit(2);
+        .from("agent_new_loads_view")
+        .select("last_viewed_new_at")
+        .eq("agent_id", user!.id)
+        .maybeSingle();
       if (error) throw error;
-      const rows = data ?? [];
-      return {
-        lastImportAt: rows[0]?.created_at ?? null,
-        previousImportAt: rows[1]?.created_at ?? null,
-      };
+      return data;
     },
-    enabled: !!effectiveAgencyId,
+    enabled: !!user,
     refetchInterval: 30000,
   });
+
+  const markNewLoadsViewedMutation = useMutation({
+    mutationFn: async () => {
+      const now = new Date().toISOString();
+      const { error } = await supabase.from("agent_new_loads_view").upsert(
+        { agent_id: user!.id, last_viewed_new_at: now, updated_at: now },
+        { onConflict: "agent_id" },
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agent_new_loads_view", user?.id] });
+    },
+  });
+
+  const newLoadsCutoffIso = useMemo(() => {
+    if (newLoadsViewState?.last_viewed_new_at) return newLoadsViewState.last_viewed_new_at;
+    return new Date(todayWindow.startTs).toISOString();
+  }, [newLoadsViewState?.last_viewed_new_at, todayWindow.startTs]);
 
   // Fetch agent_daily_state for current user's today KPIs
   const { data: agentDailyState } = useQuery({
@@ -594,11 +604,8 @@ const Dashboard = () => {
       return bookedAt >= todayStart && bookedAt <= todayEnd;
     }).length;
     
-    // New = open loads from the latest import batch only (see load_activity_logs, import action)
-    const bounds = importBounds ?? { lastImportAt: null as string | null, previousImportAt: null as string | null };
-    const newLoadsCount = loads.filter((l) =>
-      isOpenLoadInLatestImportBatch(l, bounds.lastImportAt, bounds.previousImportAt),
-    ).length;
+    // New = open-dispatch loads (all template types) created after this agent's last NEW click (or start of today)
+    const newLoadsCount = loads.filter((l) => isOpenLoadForNewCard(l, newLoadsCutoffIso)).length;
 
     return {
       openToday: openLoadsCount,
@@ -608,7 +615,7 @@ const Dashboard = () => {
       bookedToday: bookedTodayCount,
       newLoads: newLoadsCount,
     };
-  }, [loads, leads, calls, todayWindow, importBounds]);
+  }, [loads, leads, calls, todayWindow, newLoadsCutoffIso]);
 
   // Filtered data for each mode
   const filteredOpenLoads = useMemo(() => {
@@ -773,12 +780,9 @@ const Dashboard = () => {
     return result;
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
-  // New loads filtered: same rules as NEW stat (latest import batch from load_activity_logs)
+  // New loads filtered: same rules as NEW stat (per-agent cutoff + dispatch open)
   const filteredNewLoads = useMemo(() => {
-    const bounds = importBounds ?? { lastImportAt: null as string | null, previousImportAt: null as string | null };
-    let result = loads.filter((l) =>
-      isOpenLoadInLatestImportBatch(l, bounds.lastImportAt, bounds.previousImportAt),
-    );
+    let result = loads.filter((l) => isOpenLoadForNewCard(l, newLoadsCutoffIso));
     if (searchQuery.trim()) {
       const searchTerms = normalizeStateSearch(searchQuery);
       const isStateAbbr = searchQuery.trim().length === 2 && /^[a-zA-Z]{2}$/.test(searchQuery.trim());
@@ -795,7 +799,7 @@ const Dashboard = () => {
       });
     }
     return result;
-  }, [loads, searchQuery, importBounds]);
+  }, [loads, searchQuery, newLoadsCutoffIso]);
 
   useEffect(() => {
     if (prevNewLoadsCountRef.current === null) {
@@ -811,6 +815,15 @@ const Dashboard = () => {
   const handleModeChange = (next: DashboardMode) => {
     if (next === "new") {
       setNewPulseDismissed(true);
+      markNewLoadsViewedMutation.mutate(undefined, {
+        onError: (e) => {
+          toast({
+            title: "Could not save NEW view",
+            description: e instanceof Error ? e.message : String(e),
+            variant: "destructive",
+          });
+        },
+      });
     }
     setMode(next);
   };

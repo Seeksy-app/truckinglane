@@ -55,9 +55,10 @@ export const DashboardStats = ({
       inactiveClass:
         "bg-card border-border hover:border-[hsl(280,70%,50%)]/50 hover:bg-[hsl(280,70%,50%)]/5",
       tooltip: {
-        scope: "Agency",
-        range: "Open loads since last view",
-        description: "Open loads created after you last opened NEW (or today’s morning window).",
+        scope: "You",
+        range: "Open loads since you last opened NEW",
+        description:
+          "Dispatch-open loads from any source (imports, Big 500, etc.) with created_at after your last NEW click, or after today’s start if you haven’t opened NEW yet. Each agent has their own count.",
       },
     },
     {

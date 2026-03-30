@@ -176,7 +176,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       setImportState("success");
       setImportResult({ imported: result.imported, archived: result.archived });
       queryClient.invalidateQueries({ queryKey: ["loads"] });
-      queryClient.invalidateQueries({ queryKey: ["load_import_bounds"] });
     } catch (error) {
       console.error("Import error:", error);
       setImportState("error");

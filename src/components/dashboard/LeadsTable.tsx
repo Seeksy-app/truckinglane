@@ -33,6 +33,7 @@ import { CarrierBadge } from "./CarrierBadge";
 import { LeadResolvePanel } from "./LeadResolvePanel";
 import { HotLeadTimer } from "./HotLeadTimer";
 import { PhoneDisplay } from "@/components/ui/phone-display";
+import { formatPhone } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -420,7 +421,7 @@ export const LeadsTable = ({
                     <Checkbox
                       checked={selectedIds.has(lead.id)}
                       onCheckedChange={() => toggleSelect(lead.id)}
-                      aria-label={`Select lead ${lead.caller_phone}`}
+                      aria-label={`Select lead ${formatPhone(lead.caller_phone)}`}
                     />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">

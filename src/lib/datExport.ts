@@ -86,8 +86,10 @@ function getCurrentDate(): string {
   return `${month}/${day}/${year}`;
 }
 
-/** DAT Contact Method column value (not a phone number in this field). */
+/** DAT Contact Method* column — label only; dispatch phone goes in Comment. */
 const DAT_CONTACT_METHOD = "primary phone";
+/** DAT Comment column — dispatch phone for call routing. */
+const DAT_COMMENT_PHONE = "941-621-2397";
 
 /** DAT requires a weight; use 1 lbs when load weight is missing or zero. */
 function datExportWeightLbs(weightLbs: number | null | undefined): string {
@@ -223,7 +225,7 @@ function mapLoadToDAT(load: Load): Record<string, string> {
     "Destination City*": dest.city,
     "Destination State*": dest.state,
     "Destination Postal Code": "",
-    "Comment": "",
+    "Comment": DAT_COMMENT_PHONE,
     "Commodity": "",
     "Reference ID": ""
   };

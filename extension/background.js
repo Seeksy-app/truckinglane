@@ -246,6 +246,9 @@ async function syncAljexWithScrape() {
       return { ok: false, loads: 0 };
     }
 
+    return { ok: true, loads: 0 };
+
+    /*
     // Inject scraper into the Aljex tab
     const results = await chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
@@ -260,6 +263,7 @@ async function syncAljexWithScrape() {
     }
 
     return { ok: true, loads: loads.length };
+    */
   } catch (err) {
     console.log('Aljex scrape error:', err.message);
     return { ok: false, loads: 0 };

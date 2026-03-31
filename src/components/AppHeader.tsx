@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp, ExternalLink } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -374,6 +374,17 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Export Pending to DAT
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          window.open("https://dandl.aljex.com/route.php", "_blank", "noopener,noreferrer");
+                          toast.info(
+                            "Aljex opened in a new tab. If you are logged in, the TruckingLane extension can submit pending spot loads automatically."
+                          );
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Push to Aljex
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {

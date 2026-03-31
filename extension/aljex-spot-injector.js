@@ -1,13 +1,18 @@
 /**
  * Aljex Spot auto-submit content script.
- * Runs on https://dandl.aljex.com/route.php*
+ * Runs on https://dandl.aljex.com/*
  *
- * Fetches candidate loads from VPS /get-unsubmitted-loads every 30 minutes,
- * fills Add Spot form, saves, scrapes Spot #, and calls /mark-aljex-submitted.
+ * On each page load: POST VPS /get-unsubmitted-loads; if any loads, runCycle immediately.
+ * Background can also invoke runCycle via chrome.runtime (sync alarm).
+ * Fills Add Spot form, saves, scrapes Spot #, and mark-aljex-submitted via background.
  */
 
 const SUBMIT_DELAY_MS = 3000;
 const ADD_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
+
+/** Same VPS + key as extension background (get-unsubmitted-loads). */
+const VPS_URL = "http://187.77.217.123:3098";
+const TRIGGER_KEY = "tl-trigger-7b747d391801b8e5f55b4542";
 
 const FIXED_SELECT_VALUES = {
   mode: "Brokerage",
@@ -132,7 +137,7 @@ function isAddSpotPage() {
 
 function formValuesFromLoad(load) {
   const src = parseSourceRow(load.source_row);
-  const isCentury = load.template_type === "Century";
+  const isCentury = load.template_type === "century_xlsx";
   const shipD = isCentury
     ? plusDays(parseEmailReceivedDate(src) || nowDate(), 1)
     : nowDate();
@@ -143,8 +148,8 @@ function formValuesFromLoad(load) {
       adelphia_xlsx: "ADELPHIA METALS",
       vms_email: "VMS",
       oldcastle_gsheet: "OLDCASTLE",
-      Century: "CENTURY",
-    }[load.template_type] || "CENTURY");
+      century_xlsx: "CENTURY ENTERPRISES",
+    }[load.template_type] || "CENTURY ENTERPRISES");
   let rate = Number(load.customer_invoice_total || 0);
   if (isCentury && (!rate || Number.isNaN(rate))) rate = 0;
   return {
@@ -270,3 +275,37 @@ chrome.runtime.onMessage.addListener((msg) => {
     runCycle(msg.loads);
   }
 });
+
+async function fetchUnsubmittedLoads() {
+  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
+    method: "POST",
+    headers: {
+      "X-TL-Trigger-Key": TRIGGER_KEY,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    console.warn("[aljex-spot] get-unsubmitted-loads HTTP", res.status);
+    return [];
+  }
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    return [];
+  }
+  return Array.isArray(data.loads) ? data.loads : [];
+}
+
+void (async () => {
+  try {
+    const loads = await fetchUnsubmittedLoads();
+    if (loads.length === 0) {
+      console.log("[aljex-spot] No unsubmitted loads (skip auto-run)");
+      return;
+    }
+    runCycle(loads);
+  } catch (e) {
+    console.warn("[aljex-spot] Auto-run fetch failed:", e);
+  }
+})();

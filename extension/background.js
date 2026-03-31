@@ -248,22 +248,20 @@ async function syncAljexWithScrape() {
 
     return { ok: true, loads: 0 };
 
-    /*
     // Inject scraper into the Aljex tab
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      func: scrapeAljexLoads
-    });
-
-    const loads = results[0]?.result || [];
-    console.log(`Scraped ${loads.length} loads from Aljex`);
-
-    if (loads.length > 0) {
-      await pushLoadsToSupabase(loads);
-    }
-
-    return { ok: true, loads: loads.length };
-    */
+    // const results = await chrome.scripting.executeScript({
+    //   target: { tabId: tabs[0].id },
+    //   func: scrapeAljexLoads
+    // });
+    //
+    // const loads = results[0]?.result || [];
+    // console.log(`Scraped ${loads.length} loads from Aljex`);
+    //
+    // if (loads.length > 0) {
+    //   await pushLoadsToSupabase(loads);
+    // }
+    //
+    // return { ok: true, loads: loads.length };
   } catch (err) {
     console.log('Aljex scrape error:', err.message);
     return { ok: false, loads: 0 };

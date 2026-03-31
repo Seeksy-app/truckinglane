@@ -230,7 +230,7 @@ async function syncCookiesOnly() {
 // ── ALJEX: SYNC COOKIE + SCRAPE LOADS ─────────────────────────
 async function syncAljexWithScrape() {
   // First sync the cookie to VPS
-  await syncAljexCookie();
+  // await syncAljexCookie();
 
   // Then scrape loads from the authenticated tab
   try {

@@ -7,7 +7,6 @@
 const DRY_RUN = true;
 
 const SUBMIT_DELAY_MS = 3000;
-const ADD_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
 
 const FIXED_SELECT_VALUES = {
   mode: "Brokerage",
@@ -151,6 +150,120 @@ function isAddSpotPage() {
   return ok;
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** True when Add Spot form fields are present (URL-independent). */
+function hasAddSpotFormFields() {
+  let nameHasSpot = false;
+  for (const inp of document.querySelectorAll("input[name]")) {
+    if ((inp.getAttribute("name") || "").toLowerCase().includes("spot")) {
+      nameHasSpot = true;
+      break;
+    }
+  }
+  const hasCore =
+    !!document.querySelector('input[name="fld2"]') &&
+    !!document.querySelector('input[name="fld1"]');
+  const ok = nameHasSpot || hasCore;
+  log("hasAddSpotFormFields:", ok, { nameHasSpot, hasCore });
+  return ok;
+}
+
+function isReadyForAddSpotFill() {
+  return isAddSpotPage() || hasAddSpotFormFields();
+}
+
+function findShipmentsNavControl() {
+  const scopes = document.querySelectorAll(
+    "nav a, nav button, nav span, header a, header button, .menu a, .menu button, [class*='menu'] a, [class*='nav'] a, [id*='menu'] a, [id*='nav'] a, [class*='Menu'] a"
+  );
+  for (const el of scopes) {
+    if (!el.offsetParent) continue;
+    const t = el.textContent.replace(/\s+/g, " ").trim();
+    if (t === "Shipments" || /^Shipments(\s|$)/i.test(t)) {
+      log("findShipmentsNavControl: found", el.tagName, t);
+      return el;
+    }
+  }
+  const broad = document.querySelectorAll("a, button, span");
+  for (const el of broad) {
+    if (!el.offsetParent) continue;
+    const t = el.textContent.replace(/\s+/g, " ").trim();
+    if (t === "Shipments") {
+      log("findShipmentsNavControl: found (broad)", el.tagName);
+      return el;
+    }
+  }
+  warn("findShipmentsNavControl: not found");
+  return null;
+}
+
+function findAddSpotLoadMenuItem() {
+  const scopes = document.querySelectorAll(
+    "a, button, span, li, td, div[role='menuitem'], div[onclick]"
+  );
+  for (const el of scopes) {
+    if (!el.offsetParent) continue;
+    const t = el.textContent.replace(/\s+/g, " ").trim();
+    if (/^Add Spot Load$/i.test(t) || t === "Add Spot Load") {
+      log("findAddSpotLoadMenuItem: exact match", el.tagName);
+      return el;
+    }
+  }
+  for (const el of scopes) {
+    if (!el.offsetParent) continue;
+    const t = el.textContent.replace(/\s+/g, " ").trim();
+    if (/Add Spot Load/i.test(t) && t.length < 48) {
+      log("findAddSpotLoadMenuItem: loose match", el.tagName, t.slice(0, 40));
+      return el;
+    }
+  }
+  warn("findAddSpotLoadMenuItem: not found");
+  return null;
+}
+
+async function waitForAddSpotFormReady(timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (hasAddSpotFormFields()) return true;
+    await sleep(150);
+  }
+  return false;
+}
+
+async function navigateToAddSpotViaMenu() {
+  log("navigateToAddSpotViaMenu: start");
+  if (isReadyForAddSpotFill()) {
+    log("navigateToAddSpotViaMenu: already ready");
+    return;
+  }
+
+  const shipEl = findShipmentsNavControl();
+  if (!shipEl) {
+    throw new Error("Shipments menu control not found");
+  }
+  log("navigateToAddSpotViaMenu: clicking Shipments");
+  shipEl.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  shipEl.click();
+  await sleep(500);
+
+  const addEl = findAddSpotLoadMenuItem();
+  if (!addEl) {
+    throw new Error("Add Spot Load menu item not found");
+  }
+  log("navigateToAddSpotViaMenu: clicking Add Spot Load");
+  addEl.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  addEl.click();
+
+  const ready = await waitForAddSpotFormReady(15000);
+  if (!ready) {
+    throw new Error("Add Spot form did not appear after menu navigation");
+  }
+  log("navigateToAddSpotViaMenu: form detected");
+}
+
 function formValuesFromLoad(load) {
   const src = parseSourceRow(load.source_row);
   const isCentury = load.template_type === "century_xlsx";
@@ -240,13 +353,12 @@ async function submitOne(load) {
     return { status: "skipped", reason: "already_has_spot_number" };
   }
 
-  if (!isAddSpotPage()) {
-    log("submitOne: navigating to Add Spot URL");
-    window.location.href = ADD_SPOT_URL;
-    await new Promise((r) => setTimeout(r, 1800));
+  if (!isReadyForAddSpotFill()) {
+    log("submitOne: opening Add Spot via Shipments → Add Spot Load (menu clicks)");
+    await navigateToAddSpotViaMenu();
   }
-  if (!isAddSpotPage()) {
-    warn("submitOne: validation — not on Add Spot page after navigation");
+  if (!isReadyForAddSpotFill()) {
+    warn("submitOne: Add Spot form not available after menu navigation");
     throw new Error("Unable to reach Add Spot page");
   }
 

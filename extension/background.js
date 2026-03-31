@@ -99,7 +99,9 @@ async function uploadBig500(downloadItem, aljexTab) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'sync-now') {
-    runFullSync().then(() => sendResponse({ success: true }));
+    runFullSync()
+      .then(() => triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message)))
+      .then(() => sendResponse({ success: true }));
     return true;
   }
   if (msg.action === 'get-status') {
@@ -119,6 +121,7 @@ async function runFullSync() {
   
   // Also trigger Big 500 export
   triggerBig500Export().catch(e => console.log('Big 500 trigger error:', e.message));
+  triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message));
 
   if (aljexResult.status === 'fulfilled') {
     results.aljex = aljexResult.value.ok;
@@ -137,6 +140,18 @@ async function runFullSync() {
 
   console.log('Sync complete:', status);
   return results;
+}
+
+async function triggerAljexSpotInjector() {
+  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/route.php*' });
+  if (tabs.length === 0) {
+    // Skip silently when no Aljex tab is open.
+    return;
+  }
+  await chrome.scripting.executeScript({
+    target: { tabId: tabs[0].id },
+    files: ['aljex-spot-injector.js'],
+  });
 }
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────

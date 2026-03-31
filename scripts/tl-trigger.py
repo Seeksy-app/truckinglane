@@ -195,6 +195,34 @@ def health():
     return jsonify({"ok": True})
 
 
+@app.post("/get-unsubmitted-loads")
+def get_unsubmitted_loads():
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    url = (
+        f"{SUPABASE_URL}/rest/v1/loads"
+        "?select=id,load_number,template_type,dispatch_status,ship_date,pickup_city,pickup_state,dest_city,dest_state,"
+        "weight_lbs,trailer_type,customer_invoice_total,source_row,aljex_submitted,aljex_spot_number"
+        "&agency_id=eq.25127efb-6eef-412a-a5d0-3d8242988323"
+        "&template_type=in.(adelphia_xlsx,vms_email,oldcastle_gsheet,Century)"
+        "&or=(aljex_submitted.is.null,aljex_submitted.eq.false)"
+        "&or=(dispatch_status.eq.available,dispatch_status.eq.open)"
+        "&limit=100"
+    )
+    headers = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Accept": "application/json",
+    }
+    r = requests.get(url, headers=headers, timeout=30)
+    if r.status_code != 200:
+        return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
+    rows = r.json() if r.text else []
+    return jsonify({"success": True, "loads": rows})
+
+
 @app.post("/mark-aljex-submitted")
 def mark_aljex_submitted():
     ok, err = require_trigger_key()
@@ -204,10 +232,10 @@ def mark_aljex_submitted():
     body = request.get_json(silent=True) or {}
     load_id = body.get("load_id")
     spot = body.get("aljex_spot_number")
-    if not load_id or spot is None or str(spot).strip() == "":
-        return jsonify({"error": "load_id and aljex_spot_number required"}), 400
+    if not load_id:
+        return jsonify({"error": "load_id required"}), 400
 
-    spot_str = str(spot).strip()
+    spot_str = str(spot).strip() if spot is not None else None
     now_iso = datetime.now(timezone.utc).isoformat()
 
     url = f"{SUPABASE_URL}/rest/v1/loads?id=eq.{load_id}"
@@ -220,8 +248,9 @@ def mark_aljex_submitted():
     payload = {
         "aljex_submitted": True,
         "aljex_submitted_at": now_iso,
-        "aljex_spot_number": spot_str,
     }
+    if spot_str:
+        payload["aljex_spot_number"] = spot_str
 
     r = requests.patch(url, json=payload, headers=headers, timeout=30)
     if r.status_code not in (200, 204):

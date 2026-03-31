@@ -66,6 +66,7 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
             caller_company: string | null;
             equipment_type: string | null;
             is_high_intent: boolean | null;
+            intent_score: number | null;
             notes: string | null;
             created_at: string;
           };
@@ -73,14 +74,26 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
           const equipment = newLead.equipment_type?.trim();
           const carrierLine = equipment || newLead.caller_company?.trim() || null;
 
+          const rawPhone = newLead.caller_phone?.trim();
+          const formattedPhone = rawPhone ? formatPhone(rawPhone) : "Unknown";
+          const intentLine =
+            newLead.intent_score != null
+              ? `Intent: ${newLead.intent_score}%`
+              : newLead.is_high_intent
+                ? "High intent"
+                : null;
+          const clickToLead = () => {
+            window.location.href = `/leads/${newLead.id}`;
+          };
+
           toast({
             title: "New lead incoming!",
-            description: equipment
-              ? `Equipment: ${equipment}`
-              : carrierLine
-                ? carrierLine
-                : undefined,
+            description: [formattedPhone, intentLine, equipment ? `Equipment: ${equipment}` : null]
+              .filter(Boolean)
+              .join(" • "),
             duration: 6000,
+            className: "cursor-pointer hover:bg-muted/40 transition-colors",
+            onClick: clickToLead,
           });
 
           if (!soundMuted && audioCtxRef.current) {
@@ -95,13 +108,11 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
           }
 
           if (settings.chat_desktop && "Notification" in window && Notification.permission === "granted") {
-            const rawPhone = newLead.caller_phone?.trim();
-            const formattedPhone = rawPhone ? formatPhone(rawPhone) : "Unknown";
-
             const parts: string[] = [];
             if (newLead.caller_name) parts.push(newLead.caller_name);
             if (newLead.caller_company) parts.push(newLead.caller_company);
             parts.push(formattedPhone);
+            if (newLead.intent_score != null) parts.push(`Intent ${newLead.intent_score}%`);
             const summary = newLead.notes?.slice(0, 100);
             const body = summary
               ? `${parts.join(" • ")}\n${summary}${newLead.notes && newLead.notes.length > 100 ? "..." : ""}`
@@ -116,10 +127,7 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
 
             notification.onclick = () => {
               window.focus();
-              const url = new URL(window.location.href);
-              url.pathname = "/dashboard";
-              url.searchParams.set("lead", newLead.caller_phone);
-              window.location.href = url.toString();
+              window.location.href = `/leads/${newLead.id}`;
               notification.close();
             };
 

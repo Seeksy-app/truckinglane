@@ -104,6 +104,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .then(() => sendResponse({ success: true }));
     return true;
   }
+  if (msg.action === 'get-unsubmitted-loads') {
+    fetch(`${VPS_URL}/get-unsubmitted-loads`, {
+      method: 'POST',
+      headers: {
+        'x-trigger-key': TRIGGER_KEY,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          throw new Error('Invalid JSON from /get-unsubmitted-loads');
+        }
+        sendResponse({ success: true, ...(data || {}) });
+      })
+      .catch((e) => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
+  if (msg.action === 'mark-aljex-submitted') {
+    fetch(`${VPS_URL}/mark-aljex-submitted`, {
+      method: 'POST',
+      headers: {
+        'x-trigger-key': TRIGGER_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        load_id: msg.load_id,
+        aljex_spot_number: msg.aljex_spot_number ?? null,
+      }),
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = {};
+        }
+        sendResponse({ success: true, ...(data || {}) });
+      })
+      .catch((e) => sendResponse({ success: false, error: e.message || String(e) }));
+    return true;
+  }
   if (msg.action === 'get-status') {
     chrome.storage.local.get(['lastSync', 'lastStatus', 'aljexOk', 'datOk', 'loadsScraped'], sendResponse);
     return true;

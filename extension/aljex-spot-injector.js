@@ -6,8 +6,6 @@
  * fills Add Spot form, saves, scrapes Spot #, and calls /mark-aljex-submitted.
  */
 
-const VPS_BASE = "http://187.77.217.123:3098";
-const TRIGGER_KEY = "tl-trigger-7b747d391801b8e5f55b4542";
 const POLL_EVERY_MS = 30 * 60 * 1000;
 const SUBMIT_DELAY_MS = 3000;
 const ADD_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
@@ -134,18 +132,10 @@ function isAddSpotPage() {
 }
 
 async function fetchUnsubmittedLoads() {
-  const res = await fetch(`${VPS_BASE}/get-unsubmitted-loads`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-TL-Trigger-Key": TRIGGER_KEY,
-    },
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || `get-unsubmitted-loads failed (${res.status})`);
+  const payload = await chrome.runtime.sendMessage({ action: "get-unsubmitted-loads" });
+  if (!payload?.success) {
+    throw new Error(payload?.error || "get-unsubmitted-loads failed");
   }
-  const payload = await res.json();
   return Array.isArray(payload.loads) ? payload.loads : [];
 }
 
@@ -217,17 +207,13 @@ function clickSave() {
 }
 
 async function markSubmitted(loadId, spotNumber) {
-  const res = await fetch(`${VPS_BASE}/mark-aljex-submitted`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-TL-Trigger-Key": TRIGGER_KEY,
-    },
-    body: JSON.stringify({ load_id: loadId, aljex_spot_number: spotNumber || null }),
+  const payload = await chrome.runtime.sendMessage({
+    action: "mark-aljex-submitted",
+    load_id: loadId,
+    aljex_spot_number: spotNumber || null,
   });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t || `mark-aljex-submitted failed (${res.status})`);
+  if (!payload?.success) {
+    throw new Error(payload?.error || "mark-aljex-submitted failed");
   }
 }
 

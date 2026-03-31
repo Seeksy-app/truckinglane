@@ -1,166 +1,48 @@
-// Trucking Lane - Popup Script
+function updateUI(data) {
+  const aljexEl = document.getElementById('aljex-status');
+  const datEl = document.getElementById('dat-status');
+  const lastSyncEl = document.getElementById('last-sync');
+  const loadsEl = document.getElementById('loads-count');
+  const noteEl = document.getElementById('tab-note');
 
-const SUPABASE_URL = 'https://vjgakkomhphvdbwjjwiv.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZ2Fra29taHBodmRid2pqd2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTIzNjMsImV4cCI6MjA4MjA2ODM2M30.mQRJK5Bj04P-hxwIWkVxG7lXiXI4daMs59UuxU2w1Ow';
+  aljexEl.textContent = data.aljexOk === true ? 'Connected' : data.aljexOk === false ? 'Log into Aljex' : 'Not synced';
+  aljexEl.style.color = data.aljexOk === true ? '#4ade80' : data.aljexOk === false ? '#f87171' : '#fbbf24';
 
-document.addEventListener('DOMContentLoaded', async () => {
-  const loggedOutEl = document.getElementById('loggedOut');
-  const loggedInEl = document.getElementById('loggedIn');
-  const loginForm = document.getElementById('loginForm');
-  const errorEl = document.getElementById('error');
-  const pendingCountEl = document.getElementById('pendingCount');
-  const big500StatusEl = document.getElementById('big500Status');
+  datEl.textContent = data.datOk === true ? 'Connected' : data.datOk === false ? 'Open DAT tab' : 'Not synced';
+  datEl.style.color = data.datOk === true ? '#4ade80' : data.datOk === false ? '#f87171' : '#fbbf24';
 
-  function formatShortTime(iso) {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    } catch {
-      return '';
+  loadsEl.textContent = data.loadsScraped != null ? `${data.loadsScraped} loads` : '-';
+
+  if (data.lastSync) {
+    lastSyncEl.textContent = 'Last sync: ' + new Date(data.lastSync).toLocaleTimeString();
+  } else {
+    lastSyncEl.textContent = 'Not synced yet';
+  }
+
+  // Check if Aljex tab is open
+  chrome.tabs.query({ url: 'https://dandl.aljex.com/*' }, (tabs) => {
+    if (tabs.length === 0) {
+      noteEl.textContent = 'Open Aljex tab to enable load scraping';
+    } else {
+      noteEl.textContent = 'Aljex tab open - loads will auto-scrape';
+      noteEl.style.color = '#4ade80';
     }
-  }
-
-  function refreshBig500Status() {
-    if (!big500StatusEl) return;
-    chrome.storage.local.get(['big500_last_sync'], (s) => {
-      const row = s.big500_last_sync;
-      if (!row?.at) {
-        big500StatusEl.classList.add('hidden');
-        return;
-      }
-      big500StatusEl.classList.remove('hidden');
-      if (row.ok) {
-        big500StatusEl.classList.remove('error');
-        big500StatusEl.textContent = `Big 500 synced · ${formatShortTime(row.at)}`;
-      } else {
-        big500StatusEl.classList.add('error');
-        big500StatusEl.textContent = `Big 500 sync failed · ${(row.error || '').slice(0, 80)}`;
-      }
-    });
-  }
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.big500_last_sync) refreshBig500Status();
   });
+}
 
-  // Check if already logged in
-  const { accessToken } = await chrome.storage.local.get(['accessToken']);
-  
-  refreshBig500Status();
+chrome.runtime.sendMessage({ action: 'get-status' }, updateUI);
 
-  if (accessToken) {
-    showLoggedInState();
-    await fetchPendingCount();
-  }
-  
-  function showLoggedInState() {
-    loggedOutEl.classList.add('hidden');
-    loggedInEl.classList.remove('hidden');
-  }
-  
-  function showLoggedOutState() {
-    loggedInEl.classList.add('hidden');
-    loggedOutEl.classList.remove('hidden');
-  }
-  
-  function showError(message) {
-    errorEl.textContent = message;
-    errorEl.classList.remove('hidden');
-  }
-  
-  function hideError() {
-    errorEl.classList.add('hidden');
-  }
-  
-  // Get today's date at midnight UTC for filtering
-  function getTodayMidnightUTC() {
-    const now = new Date();
-    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    return midnight.toISOString();
-  }
-  
-  async function fetchPendingCount() {
-    try {
-      const { accessToken } = await chrome.storage.local.get(['accessToken']);
-      
-      if (!accessToken) return;
-      
-      const todayStart = getTodayMidnightUTC();
-      
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/leads?status=eq.pending&created_at=gte.${todayStart}&select=id`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'count=exact'
-          }
-        }
-      );
-      
-      if (response.ok) {
-        const count = response.headers.get('content-range')?.split('/')[1] || '0';
-        pendingCountEl.textContent = count;
-      }
-    } catch (error) {
-      console.error('Error fetching count:', error);
-    }
-  }
-  
-  // Login form submission
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    hideError();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
+document.getElementById('sync-btn').addEventListener('click', () => {
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  btn.textContent = 'Syncing...';
+  chrome.runtime.sendMessage({ action: 'sync-now' }, () => {
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ action: 'get-status' }, (data) => {
+        updateUI(data);
+        btn.disabled = false;
+        btn.textContent = 'Sync Now';
       });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error_description || data.msg || 'Login failed');
-      }
-      
-      // Save token and notify background
-      await chrome.runtime.sendMessage({
-        type: 'LOGIN',
-        accessToken: data.access_token
-      });
-      
-      showLoggedInState();
-      await fetchPendingCount();
-      
-    } catch (error) {
-      showError(error.message);
-    }
-  });
-  
-  // Logout button
-  document.getElementById('logout').addEventListener('click', async () => {
-    await chrome.runtime.sendMessage({ type: 'LOGOUT' });
-    showLoggedOutState();
-  });
-  
-  // Check now button
-  document.getElementById('checkNow').addEventListener('click', async () => {
-    await chrome.runtime.sendMessage({ type: 'CHECK_NOW' });
-    await fetchPendingCount();
-  });
-  
-  // Open dashboard button
-  document.getElementById('openDashboard').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://truckinglane.com/dashboard' });
+    }, 3000);
   });
 });

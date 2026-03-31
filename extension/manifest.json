@@ -1,13 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Trucking Lane — Leads & Aljex Spot Submit",
-  "version": "1.2.0",
-  "description": "AI lead notifications and automatic Aljex spot load submission for TruckingLanes.",
-  "permissions": ["notifications", "alarms", "storage", "tabs", "webRequest", "cookies"],
+  "name": "TruckingLane Auto Sync",
+  "version": "2.1",
+  "description": "Automatically syncs Aljex session and DAT token to TruckingLane VPS every 25 minutes",
+  "permissions": [
+    "cookies",
+    "alarms",
+    "storage",
+    "tabs",
+    "scripting",
+    "downloads"
+  ],
   "host_permissions": [
-    "https://vjgakkomhphvdbwjjwiv.supabase.co/*",
     "https://dandl.aljex.com/*",
-    "http://187.77.217.123:3098/*"
+    "http://dandl.aljex.com/*",
+    "https://*.aljex.com/*",
+    "https://one.dat.com/*",
+    "http://187.77.217.123:3098/*",
+    "https://axel.podlogix.io/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -15,21 +25,14 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
     }
   },
   "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://dandl.aljex.com/route.php*"],
-      "js": ["aljex-spot-injector.js"],
-      "run_at": "document_idle"
-    }
-  ]
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
 }

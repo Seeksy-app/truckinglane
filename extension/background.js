@@ -173,7 +173,7 @@ async function runFullSync() {
   ]);
   
   // Also trigger Big 500 export
-  triggerBig500Export().catch(e => console.log('Big 500 trigger error:', e.message));
+  // triggerBig500Export().catch(e => console.log('Big 500 trigger error:', e.message));
   triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message));
 
   if (aljexResult.status === 'fulfilled') {

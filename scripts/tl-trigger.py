@@ -36,6 +36,44 @@ TL_TRIGGER_KEY = os.environ.get("TL_TRIGGER_KEY", "tl-trigger-7b747d391801b8e5f5
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vjgakkomhphvdbwjjwiv.supabase.co").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
+# Full key set for /insert-aljex-loads so PostgREST upsert rows share identical columns.
+_ALJEX_LOAD_UPSERT_TEMPLATE = {
+    "agency_id": None,
+    "template_type": None,
+    "load_number": None,
+    "dispatch_status": None,
+    "status": None,
+    "pickup_city": None,
+    "pickup_state": None,
+    "pickup_zip": None,
+    "dest_city": None,
+    "dest_state": None,
+    "dest_zip": None,
+    "ship_date": None,
+    "commodity": None,
+    "weight_lbs": None,
+    "miles": None,
+    "is_per_ton": False,
+    "customer_invoice_total": 0,
+    "target_pay": 0,
+    "max_pay": 0,
+    "rate_raw": None,
+    "is_active": True,
+    "trailer_type": None,
+    "source_row": None,
+    "pickup_location_raw": None,
+    "dest_location_raw": None,
+    "delivery_date": None,
+}
+
+
+def _normalize_aljex_load_row(load: dict) -> dict:
+    out = dict(_ALJEX_LOAD_UPSERT_TEMPLATE)
+    for k, v in load.items():
+        if k in out:
+            out[k] = v
+    return out
+
 DAT_SEARCH_URL = "https://freight.api.dat.com/search/v2/loads"
 _DAT_LANE_CACHE: dict[str, tuple[float, dict]] = {}
 _DAT_LANE_CACHE_LOCK = threading.Lock()
@@ -232,6 +270,13 @@ def insert_aljex_loads():
         return jsonify({"error": "loads array required"}), 400
     if len(loads) == 0:
         return jsonify({"success": True, "count": 0, "updated": datetime.now(timezone.utc).isoformat()})
+
+    normalized: list[dict] = []
+    for row in loads:
+        if not isinstance(row, dict):
+            return jsonify({"error": "each load must be a JSON object"}), 400
+        normalized.append(_normalize_aljex_load_row(row))
+    loads = normalized
 
     url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=load_number,template_type,agency_id"
     headers = {

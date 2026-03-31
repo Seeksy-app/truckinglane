@@ -1,6 +1,6 @@
 /**
  * Aljex Spot auto-submit — content script on https://dandl.aljex.com/*
- * Loads come from the extension service worker (VPS fetch). No direct VPS calls here.
+ * Loads only arrive via background → tab message { type: "PUSH_LOADS", loads }.
  */
 
 /** When true: fill form only, do not click Save; process a single load. */
@@ -397,11 +397,11 @@ async function runCycle(rows) {
     warn("runCycle: already running — skip");
     return;
   }
-  const batch = pickLoads(rows);
-  if (batch.length === 0) {
-    log("runCycle: no loads to process");
+  if (rows === undefined || !Array.isArray(rows) || rows.length === 0) {
+    log("no loads provided");
     return;
   }
+  const batch = pickLoads(rows);
 
   running = true;
   let cycleSubmitted = 0;
@@ -444,17 +444,13 @@ async function runCycle(rows) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  const push =
-    msg?.type === "PUSH_LOADS" ||
-    msg?.action === "run-injection-cycle";
-  if (!push || !Array.isArray(msg.loads)) {
+  if (msg?.type !== "PUSH_LOADS") {
     return false;
   }
 
   log("Message received", {
     type: msg.type,
-    action: msg.action,
-    loadCount: msg.loads.length,
+    loadCount: Array.isArray(msg.loads) ? msg.loads.length : 0,
     pageUrl: location.href,
   });
 

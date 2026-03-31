@@ -2,8 +2,8 @@
  * Aljex Spot auto-submit content script.
  * Runs on https://dandl.aljex.com/*
  *
- * runCycle() with no args fetches loads from VPS, then submits. Same on window focus.
- * With an array arg, uses that list (background sync / message).
+ * On DOMContentLoaded and window focus: fetch unsubmitted loads from VPS; if any, runCycle(loads).
+ * Background can pass loads via chrome.runtime message or executeScript.
  * Fills Add Spot form, saves, scrapes Spot #, and mark-aljex-submitted via background.
  */
 
@@ -257,20 +257,7 @@ async function fetchUnsubmittedLoads() {
 
 async function runCycle(rows) {
   if (running) return;
-
-  let loads = rows;
-  if (loads === undefined) {
-    try {
-      loads = await fetchUnsubmittedLoads();
-    } catch (e) {
-      console.warn("[aljex-spot] fetchUnsubmittedLoads failed:", e);
-      return;
-    }
-  }
-  if (!Array.isArray(loads)) {
-    loads = [];
-  }
-  if (loads.length === 0) {
+  if (!Array.isArray(rows) || rows.length === 0) {
     console.log("[aljex-spot] No unsubmitted loads");
     return;
   }
@@ -282,7 +269,7 @@ async function runCycle(rows) {
   try {
     if (!isLoggedIntoAljex()) return;
 
-    for (const load of loads) {
+    for (const load of rows) {
       try {
         const res = await submitOne(load);
         if (res.status === "skipped") {
@@ -304,14 +291,35 @@ async function runCycle(rows) {
   }
 }
 
+async function fetchAndRunCycleIfAny() {
+  let loads;
+  try {
+    loads = await fetchUnsubmittedLoads();
+  } catch (e) {
+    console.warn("[aljex-spot] fetchUnsubmittedLoads failed:", e);
+    return;
+  }
+  if (!Array.isArray(loads) || loads.length === 0) return;
+  void runCycle(loads);
+}
+
+function scheduleFetchOnDomReady() {
+  const go = () => void fetchAndRunCycleIfAny();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", go, { once: true });
+  } else {
+    go();
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.action === 'run-injection-cycle' && Array.isArray(msg.loads)) {
     void runCycle(msg.loads);
   }
 });
 
-window.addEventListener("focus", () => {
-  void runCycle();
-});
+scheduleFetchOnDomReady();
 
-void runCycle();
+window.addEventListener("focus", () => {
+  void fetchAndRunCycleIfAny();
+});

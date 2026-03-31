@@ -190,9 +190,122 @@ def require_trigger_key() -> tuple[bool, tuple]:
     return True, ()
 
 
+def _set_env_var_in_file(path: str, key: str, value: str) -> None:
+    line = f"{key}={value}"
+    existing: list[str] = []
+    try:
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as f:
+                existing = f.read().splitlines()
+    except OSError:
+        existing = []
+
+    replaced = False
+    out: list[str] = []
+    for l in existing:
+        if l.startswith(f"{key}="):
+            out.append(line)
+            replaced = True
+        else:
+            out.append(l)
+    if not replaced:
+        out.append(line)
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(out).rstrip() + "\n")
+
+
 @app.get("/health")
 def health():
     return jsonify({"ok": True})
+
+
+@app.post("/insert-aljex-loads")
+def insert_aljex_loads():
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    loads = body.get("loads")
+    if not isinstance(loads, list):
+        return jsonify({"error": "loads array required"}), 400
+    if len(loads) == 0:
+        return jsonify({"success": True, "count": 0, "updated": datetime.now(timezone.utc).isoformat()})
+
+    url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=load_number,template_type,agency_id"
+    headers = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,missing=default",
+    }
+    r = requests.post(url, json=loads, headers=headers, timeout=60)
+    if r.status_code not in (200, 201):
+        return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
+
+    return jsonify(
+        {
+            "success": True,
+            "count": len(loads),
+            "updated": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+@app.post("/update-aljex-cookie")
+def update_aljex_cookie():
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    cookie = str(body.get("cookie") or "").strip()
+    full_cookie_string = str(body.get("fullCookieString") or "").strip()
+    cookies = body.get("cookies") or []
+    if not cookie and not full_cookie_string:
+        return jsonify({"error": "cookie or fullCookieString required"}), 400
+
+    env_path = "/root/.truckinglane-dat.env"
+    _set_env_var_in_file(env_path, "ALJEX_COOKIE", cookie or full_cookie_string)
+
+    try:
+        with open("/root/.aljex-cookies.json", "w", encoding="utf-8") as f:
+            json.dump(cookies, f, ensure_ascii=False)
+    except OSError as e:
+        return jsonify({"error": f"failed to write /root/.aljex-cookies.json: {e}"}), 500
+
+    return jsonify({"success": True, "updated": datetime.now(timezone.utc).isoformat()})
+
+
+@app.post("/update-dat-token")
+def update_dat_token():
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    token = str(body.get("token") or "").strip()
+    if not token:
+        return jsonify({"error": "token required"}), 400
+
+    _set_env_var_in_file("/root/.truckinglane-dat.env", "DAT_BEARER_TOKEN", token)
+    return jsonify({"success": True, "updated": datetime.now(timezone.utc).isoformat()})
+
+
+@app.post("/update-dat-cookies")
+def update_dat_cookies():
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    cookies = str(body.get("cookies") or "").strip()
+    if not cookies:
+        return jsonify({"error": "cookies required"}), 400
+
+    _set_env_var_in_file("/root/.truckinglane-dat.env", "DAT_COOKIES", cookies)
+    return jsonify({"success": True, "updated": datetime.now(timezone.utc).isoformat()})
 
 
 @app.post("/get-unsubmitted-loads")

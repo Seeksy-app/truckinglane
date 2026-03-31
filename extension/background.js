@@ -200,10 +200,7 @@ async function triggerAljexSpotInjector() {
     // Skip silently when no Aljex tab is open.
     return;
   }
-  await chrome.scripting.executeScript({
-    target: { tabId: tabs[0].id },
-    files: ['aljex-spot-injector.js'],
-  });
+  await chrome.tabs.sendMessage(tabs[0].id, { action: 'run-injection-cycle' });
 }
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────

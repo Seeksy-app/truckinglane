@@ -279,3 +279,9 @@ if (/^https:\/\/dandl\.aljex\.com\/route\.php/i.test(location.href)) {
   runCycle();
   setInterval(runCycle, POLL_EVERY_MS);
 }
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.action === 'run-injection-cycle') {
+    runCycle();
+  }
+});

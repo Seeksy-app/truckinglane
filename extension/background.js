@@ -77,7 +77,7 @@ async function uploadBig500(downloadItem, aljexTab) {
     const res = await fetch(`${VPS_URL}/upload-big500`, {
       method: 'POST',
       headers: {
-        'x-trigger-key': TRIGGER_KEY,
+        'X-TL-Trigger-Key': TRIGGER_KEY,
         'Content-Type': 'text/plain'
       },
       body: csvText
@@ -108,7 +108,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     fetch(`${VPS_URL}/get-unsubmitted-loads`, {
       method: 'POST',
       headers: {
-        'x-trigger-key': TRIGGER_KEY,
+        'X-TL-Trigger-Key': TRIGGER_KEY,
         'Content-Type': 'application/json',
       },
     })
@@ -132,7 +132,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     fetch(`${VPS_URL}/mark-aljex-submitted`, {
       method: 'POST',
       headers: {
-        'x-trigger-key': TRIGGER_KEY,
+        'X-TL-Trigger-Key': TRIGGER_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -203,7 +203,7 @@ async function triggerAljexSpotInjector() {
   const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
     method: 'POST',
     headers: {
-      'x-trigger-key': TRIGGER_KEY,
+      'X-TL-Trigger-Key': TRIGGER_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -494,7 +494,7 @@ async function triggerBig500Export() {
       
       const vpsResp = await fetch(`${VPS_URL}/upload-big500`, {
         method: 'POST',
-        headers: { 'x-trigger-key': TRIGGER_KEY, 'Content-Type': 'text/plain' },
+        headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'text/plain' },
         body: csvText
       });
       const vpsResult = await vpsResp.json();
@@ -511,7 +511,7 @@ async function pushLoadsToSupabase(loads) {
     const res = await fetch(`${VPS_URL}/insert-aljex-loads`, {
       method: 'POST',
       headers: {
-        'x-trigger-key': TRIGGER_KEY,
+        'X-TL-Trigger-Key': TRIGGER_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ loads })
@@ -535,7 +535,7 @@ async function syncAljexCookie() {
 
     const response = await fetch(`${VPS_URL}/update-aljex-cookie`, {
       method: 'POST',
-      headers: { 'x-trigger-key': TRIGGER_KEY, 'Content-Type': 'application/json' },
+      headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         cookie: primaryCookie,
         fullCookieString: cookieString,
@@ -574,7 +574,7 @@ async function syncDatToken() {
         if (token) {
           const res = await fetch(`${VPS_URL}/update-dat-token`, {
             method: 'POST',
-            headers: { 'x-trigger-key': TRIGGER_KEY, 'Content-Type': 'application/json' },
+            headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ token })
           });
           if (res.ok) return true;
@@ -587,7 +587,7 @@ async function syncDatToken() {
       const cookieString = datCookies.map(c => `${c.name}=${c.value}`).join('; ');
       const res = await fetch(`${VPS_URL}/update-dat-cookies`, {
         method: 'POST',
-        headers: { 'x-trigger-key': TRIGGER_KEY, 'Content-Type': 'application/json' },
+        headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ cookies: cookieString })
       });
       return res.ok;

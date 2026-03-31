@@ -377,7 +377,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          window.open("https://dandl.aljex.com/route.php", "_blank", "noopener,noreferrer");
+                          window.open("https://dandl.aljex.com/route.php", "_blank");
                           toast.info(
                             "Aljex opened in a new tab. If you are logged in, the TruckingLane extension can submit pending spot loads automatically."
                           );

@@ -2,8 +2,8 @@
  * Aljex Spot auto-submit content script.
  * Runs on https://dandl.aljex.com/*
  *
- * On each page load: POST VPS /get-unsubmitted-loads; if any loads, runCycle immediately.
- * Background can also invoke runCycle via chrome.runtime (sync alarm).
+ * runCycle() with no args fetches loads from VPS, then submits. Same on window focus.
+ * With an array arg, uses that list (background sync / message).
  * Fills Add Spot form, saves, scrapes Spot #, and mark-aljex-submitted via background.
  */
 
@@ -234,8 +234,47 @@ async function submitOne(load) {
   return { status: "submitted", spot: spot || null };
 }
 
+async function fetchUnsubmittedLoads() {
+  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
+    method: "POST",
+    headers: {
+      "X-TL-Trigger-Key": TRIGGER_KEY,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    console.warn("[aljex-spot] get-unsubmitted-loads HTTP", res.status);
+    return [];
+  }
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    return [];
+  }
+  return Array.isArray(data.loads) ? data.loads : [];
+}
+
 async function runCycle(rows) {
   if (running) return;
+
+  let loads = rows;
+  if (loads === undefined) {
+    try {
+      loads = await fetchUnsubmittedLoads();
+    } catch (e) {
+      console.warn("[aljex-spot] fetchUnsubmittedLoads failed:", e);
+      return;
+    }
+  }
+  if (!Array.isArray(loads)) {
+    loads = [];
+  }
+  if (loads.length === 0) {
+    console.log("[aljex-spot] No unsubmitted loads");
+    return;
+  }
+
   running = true;
   let cycleSubmitted = 0;
   let cycleSkipped = 0;
@@ -243,12 +282,7 @@ async function runCycle(rows) {
   try {
     if (!isLoggedIntoAljex()) return;
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      console.log("[aljex-spot] No unsubmitted loads");
-      return;
-    }
-
-    for (const load of rows) {
+    for (const load of loads) {
       try {
         const res = await submitOne(load);
         if (res.status === "skipped") {
@@ -272,40 +306,12 @@ async function runCycle(rows) {
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg?.action === 'run-injection-cycle' && Array.isArray(msg.loads)) {
-    runCycle(msg.loads);
+    void runCycle(msg.loads);
   }
 });
 
-async function fetchUnsubmittedLoads() {
-  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
-    method: "POST",
-    headers: {
-      "X-TL-Trigger-Key": TRIGGER_KEY,
-      "Content-Type": "application/json",
-    },
-  });
-  if (!res.ok) {
-    console.warn("[aljex-spot] get-unsubmitted-loads HTTP", res.status);
-    return [];
-  }
-  let data = {};
-  try {
-    data = await res.json();
-  } catch {
-    return [];
-  }
-  return Array.isArray(data.loads) ? data.loads : [];
-}
+window.addEventListener("focus", () => {
+  void runCycle();
+});
 
-void (async () => {
-  try {
-    const loads = await fetchUnsubmittedLoads();
-    if (loads.length === 0) {
-      console.log("[aljex-spot] No unsubmitted loads (skip auto-run)");
-      return;
-    }
-    runCycle(loads);
-  } catch (e) {
-    console.warn("[aljex-spot] Auto-run fetch failed:", e);
-  }
-})();
+void runCycle();

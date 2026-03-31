@@ -8,13 +8,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create('auto-sync', { periodInMinutes: SYNC_INTERVAL_MINUTES });
-  chrome.alarms.create('cookie-sync', { periodInMinutes: 25 });
+  // chrome.alarms.create('cookie-sync', { periodInMinutes: 25 });
   runFullSync();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'auto-sync') runFullSync();
-  if (alarm.name === 'cookie-sync') syncCookiesOnly();
+  // if (alarm.name === 'cookie-sync') syncCookiesOnly();
 });
 
 // ── WATCH FOR BIG 500 CSV DOWNLOADS ──────────────────────
@@ -223,7 +223,7 @@ async function triggerAljexSpotInjector() {
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────
 async function syncCookiesOnly() {
-  await syncAljexCookie();
+  // await syncAljexCookie();
   await syncDatToken();
 }
 

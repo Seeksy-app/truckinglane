@@ -34,5 +34,12 @@
     "16": "icon.png",
     "48": "icon.png",
     "128": "icon.png"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://dandl.aljex.com/*"],
+      "js": ["aljex-spot-injector.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

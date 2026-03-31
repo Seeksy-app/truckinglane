@@ -29,7 +29,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { UserPlus, XCircle, ChevronDown, RotateCcw, Building2, Truck, ExternalLink, Trash2 } from "lucide-react";
 import { LeadExpandedRow } from "./LeadExpandedRow";
-import { CarrierBadge } from "./CarrierBadge";
 import { LeadResolvePanel } from "./LeadResolvePanel";
 import { HotLeadTimer } from "./HotLeadTimer";
 import { PhoneDisplay } from "@/components/ui/phone-display";
@@ -372,9 +371,8 @@ export const LeadsTable = ({
               />
             </TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Date</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Phone</TableHead>
+            <TableHead className="w-[180px] text-xs uppercase tracking-wide font-medium text-muted-foreground">Phone</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Company</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Carrier</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
             <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Follow-Up</TableHead>
             {showClaimedBy && (
@@ -427,13 +425,13 @@ export const LeadsTable = ({
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="w-[180px] text-sm whitespace-nowrap">
                     <PhoneDisplay
                       phone={lead.caller_phone}
-                      className="font-semibold text-[0.95rem]"
+                      className="font-semibold text-[0.95rem] whitespace-nowrap"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-[220px]">
                     <div className="flex items-center gap-1.5">
                       <span>{lead.caller_company || "—"}</span>
                       {/* Shipper & Equipment Tags */}
@@ -478,9 +476,6 @@ export const LeadsTable = ({
                         </Tooltip>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <CarrierBadge notes={lead.notes} compact />
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {(isPending || isClaimed) && (

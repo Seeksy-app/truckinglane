@@ -6,7 +6,6 @@
  * fills Add Spot form, saves, scrapes Spot #, and calls /mark-aljex-submitted.
  */
 
-const POLL_EVERY_MS = 30 * 60 * 1000;
 const SUBMIT_DELAY_MS = 3000;
 const ADD_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
 
@@ -131,14 +130,6 @@ function isAddSpotPage() {
   return /[?&]fpweb_fn=spot\b/i.test(location.href) && /[?&]what=new\b/i.test(location.href);
 }
 
-async function fetchUnsubmittedLoads() {
-  const payload = await chrome.runtime.sendMessage({ action: "get-unsubmitted-loads" });
-  if (!payload?.success) {
-    throw new Error(payload?.error || "get-unsubmitted-loads failed");
-  }
-  return Array.isArray(payload.loads) ? payload.loads : [];
-}
-
 function formValuesFromLoad(load) {
   const src = parseSourceRow(load.source_row);
   const isCentury = load.template_type === "Century";
@@ -238,7 +229,7 @@ async function submitOne(load) {
   return { status: "submitted", spot: spot || null };
 }
 
-async function runCycle() {
+async function runCycle(rows) {
   if (running) return;
   running = true;
   let cycleSubmitted = 0;
@@ -247,8 +238,7 @@ async function runCycle() {
   try {
     if (!isLoggedIntoAljex()) return;
 
-    const rows = await fetchUnsubmittedLoads();
-    if (!rows.length) {
+    if (!Array.isArray(rows) || rows.length === 0) {
       console.log("[aljex-spot] No unsubmitted loads");
       return;
     }
@@ -275,13 +265,8 @@ async function runCycle() {
   }
 }
 
-if (/^https:\/\/dandl\.aljex\.com\/route\.php/i.test(location.href)) {
-  runCycle();
-  setInterval(runCycle, POLL_EVERY_MS);
-}
-
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.action === 'run-injection-cycle') {
-    runCycle();
+  if (msg?.action === 'run-injection-cycle' && Array.isArray(msg.loads)) {
+    runCycle(msg.loads);
   }
 });

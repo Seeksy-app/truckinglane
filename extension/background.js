@@ -200,7 +200,25 @@ async function triggerAljexSpotInjector() {
     // Skip silently when no Aljex tab is open.
     return;
   }
-  await chrome.tabs.sendMessage(tabs[0].id, { action: 'run-injection-cycle' });
+  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
+    method: 'POST',
+    headers: {
+      'x-trigger-key': TRIGGER_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text || `get-unsubmitted-loads HTTP ${res.status}`);
+  }
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error('Invalid JSON from /get-unsubmitted-loads');
+  }
+  const loads = Array.isArray(data.loads) ? data.loads : [];
+  await chrome.tabs.sendMessage(tabs[0].id, { action: 'run-injection-cycle', loads });
 }
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────

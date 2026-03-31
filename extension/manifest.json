@@ -19,6 +19,16 @@
     "http://187.77.217.123:3098/*",
     "https://axel.podlogix.io/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://truckinglane.com/*",
+      "https://www.truckinglane.com/*",
+      "https://*.truckinglane.com/*",
+      "https://*.vercel.app/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*"
+    ]
+  },
   "background": {
     "service_worker": "background.js"
   },

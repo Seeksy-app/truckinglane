@@ -161,6 +161,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.storage.local.get(['lastSync', 'lastStatus', 'aljexOk', 'datOk', 'loadsScraped'], sendResponse);
     return true;
   }
+  if (msg.action === 'push-to-aljex') {
+    triggerAljexSpotInjector()
+      .then(() => sendResponse({ success: true }))
+      .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    return true;
+  }
+});
+
+chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+  if (msg?.action === 'push-to-aljex') {
+    triggerAljexSpotInjector()
+      .then(() => sendResponse({ success: true }))
+      .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    return true;
+  }
 });
 
 // ── FULL SYNC: cookies + scrape loads + DAT token ─────────────
@@ -196,14 +211,23 @@ async function runFullSync() {
 }
 
 async function triggerAljexSpotInjector() {
-  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
-  if (tabs.length === 0) return;
-
   const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
     method: 'POST',
-    headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'application/json' },
+    headers: {
+      'X-TL-Trigger-Key': TRIGGER_KEY,
+      'Content-Type': 'application/json',
+    },
   });
-  const data = await res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text || `get-unsubmitted-loads HTTP ${res.status}`);
+  }
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error('Invalid JSON from /get-unsubmitted-loads');
+  }
   const loads = Array.isArray(data.loads) ? data.loads : [];
 
   if (loads.length === 0) {
@@ -211,10 +235,18 @@ async function triggerAljexSpotInjector() {
     return;
   }
 
-  await chrome.scripting.executeScript({
-    target: { tabId: tabs[0].id },
-    func: (loadsArg) => runCycle(loadsArg),
-    args: [loads],
+  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
+  if (tabs.length === 0) {
+    console.log('[aljex-spot] No Aljex tab open — cannot push loads');
+    return;
+  }
+
+  const tabId = tabs[0].id;
+  const payload = { type: 'PUSH_LOADS', loads };
+  chrome.tabs.sendMessage(tabId, payload, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[aljex-spot] sendMessage to Aljex tab:', chrome.runtime.lastError.message);
+    }
   });
 }
 

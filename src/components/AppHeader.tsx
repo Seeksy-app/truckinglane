@@ -32,6 +32,7 @@ import {
   fetchDatPendingLoadsForExport,
 } from '@/lib/datExport';
 import { useLoads } from '@/hooks/useLoads';
+import { sendPushToAljexToExtension } from '@/lib/chromeExtension';
 type ImportState = "idle" | "loading" | "success" | "error";
 
 interface ImportResult {
@@ -377,7 +378,15 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
-                          toast.info("Switch to your Aljex tab to push loads automatically");
+                          toast.info(
+                            "Pushing loads to Aljex — switch to your Aljex tab to monitor progress"
+                          );
+                          const sent = sendPushToAljexToExtension();
+                          if (!sent) {
+                            toast.warning(
+                              "Could not reach the TruckingLane extension. Use Chrome with the extension installed and set VITE_TRUCKINGLANE_EXTENSION_ID."
+                            );
+                          }
                         }}
                       >
                         <Send className="h-4 w-4 mr-2" />

@@ -1,18 +1,13 @@
 /**
- * Aljex Spot auto-submit content script.
- * Runs on https://dandl.aljex.com/*
- *
- * On DOMContentLoaded and window focus: fetch unsubmitted loads from VPS; if any, runCycle(loads).
- * Background can pass loads via chrome.runtime message or executeScript.
- * Fills Add Spot form, saves, scrapes Spot #, and mark-aljex-submitted via background.
+ * Aljex Spot auto-submit — content script on https://dandl.aljex.com/*
+ * Loads come from the extension service worker (VPS fetch). No direct VPS calls here.
  */
+
+/** When true: fill form only, do not click Save; process a single load. */
+const DRY_RUN = true;
 
 const SUBMIT_DELAY_MS = 3000;
 const ADD_SPOT_URL = "https://dandl.aljex.com/route.php?fpweb_fn=spot&what=new";
-
-/** Same VPS + key as extension background (get-unsubmitted-loads). */
-const VPS_URL = "http://187.77.217.123:3098";
-const TRIGGER_KEY = "tl-trigger-7b747d391801b8e5f55b4542";
 
 const FIXED_SELECT_VALUES = {
   mode: "Brokerage",
@@ -25,6 +20,14 @@ const FIXED_SELECT_VALUES = {
 };
 
 let running = false;
+
+function log(...args) {
+  console.log("[aljex-spot]", ...args);
+}
+
+function warn(...args) {
+  console.warn("[aljex-spot]", ...args);
+}
 
 function nowDate() {
   const d = new Date();
@@ -88,24 +91,31 @@ function equipmentToAljex(raw) {
   return "FLATBED";
 }
 
-function setInputBySelectors(selectors, value) {
+function setInputBySelectors(selectors, value, fieldLabel) {
   for (const s of selectors) {
     const el = document.querySelector(s);
+    log(`field "${fieldLabel}": selector "${s}" →`, el ? "FOUND" : "miss");
     if (el) {
       el.value = value;
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
+      log(`field "${fieldLabel}": assigned value`, String(value).slice(0, 80));
       return true;
     }
   }
+  warn(`field "${fieldLabel}": NO matching element for selectors`, selectors);
   return false;
 }
 
-function setSelectByText(selectors, wantedText) {
+function setSelectByText(selectors, wantedText, fieldLabel) {
   const want = String(wantedText || "").trim().toUpperCase();
-  if (!want) return false;
+  if (!want) {
+    warn(`select "${fieldLabel}": empty wanted text`);
+    return false;
+  }
   for (const s of selectors) {
     const sel = document.querySelector(s);
+    log(`select "${fieldLabel}": selector "${s}" →`, sel && sel.options ? "FOUND" : "miss");
     if (!sel || !sel.options) continue;
     const opt = Array.from(sel.options).find(
       (o) => o.text.trim().toUpperCase() === want || o.value.trim().toUpperCase() === want
@@ -113,9 +123,11 @@ function setSelectByText(selectors, wantedText) {
     if (opt) {
       sel.value = opt.value;
       sel.dispatchEvent(new Event("change", { bubbles: true }));
+      log(`select "${fieldLabel}": set to`, wantedText);
       return true;
     }
   }
+  warn(`select "${fieldLabel}": no option matched`, wantedText, "selectors:", selectors);
   return false;
 }
 
@@ -128,11 +140,15 @@ function scrapeSpotNumber() {
 
 function isLoggedIntoAljex() {
   const txt = (document.body.innerText || "").toLowerCase();
-  return !(txt.includes("sign in") || txt.includes("password") || txt.includes("login"));
+  const bad = txt.includes("sign in") || txt.includes("password") || txt.includes("login");
+  log("isLoggedIntoAljex:", !bad);
+  return !bad;
 }
 
 function isAddSpotPage() {
-  return /[?&]fpweb_fn=spot\b/i.test(location.href) && /[?&]what=new\b/i.test(location.href);
+  const ok = /[?&]fpweb_fn=spot\b/i.test(location.href) && /[?&]what=new\b/i.test(location.href);
+  log("isAddSpotPage:", ok, location.href);
+  return ok;
 }
 
 function formValuesFromLoad(load) {
@@ -171,25 +187,27 @@ function formValuesFromLoad(load) {
 }
 
 function fillAddSpotForm(v) {
-  setInputBySelectors(['input[name="fld2"]'], v.shipDate);
-  setInputBySelectors(['input[name="fld8"]', 'input[name="fld11"]', 'input[name="purge_date"]'], v.purgeDate);
-  setInputBySelectors(['input[name="fld1"]'], v.customer);
-  setInputBySelectors(['input[name="fld3"]', "#pcity"], v.originCity);
-  setInputBySelectors(['input[name="fld33"]', "#pstate"], v.originState);
-  setInputBySelectors(['input[name="fld4"]', "#ccity"], v.destCity);
-  setInputBySelectors(['input[name="fld34"]', "#cstate"], v.destState);
-  setInputBySelectors(['input[name="fld6"]'], v.weight);
-  setInputBySelectors(['input[name="fld10"]', 'input[name="custlh"]'], v.customerRate);
-  setInputBySelectors(['input[name="custlh"]'], v.customerRate);
-  setSelectByText(['select[name="fld50"]'], v.equip);
+  log("fillAddSpotForm: starting field assignments");
+  setInputBySelectors(['input[name="fld2"]'], v.shipDate, "ship (fld2)");
+  setInputBySelectors(['input[name="fld8"]', 'input[name="fld11"]', 'input[name="purge_date"]'], v.purgeDate, "purge");
+  setInputBySelectors(['input[name="fld1"]'], v.customer, "customer (fld1)");
+  setInputBySelectors(['input[name="fld3"]', "#pcity"], v.originCity, "origin city");
+  setInputBySelectors(['input[name="fld33"]', "#pstate"], v.originState, "origin state");
+  setInputBySelectors(['input[name="fld4"]', "#ccity"], v.destCity, "dest city");
+  setInputBySelectors(['input[name="fld34"]', "#cstate"], v.destState, "dest state");
+  setInputBySelectors(['input[name="fld6"]'], v.weight, "weight");
+  setInputBySelectors(['input[name="fld10"]', 'input[name="custlh"]'], v.customerRate, "customer rate");
+  setInputBySelectors(['input[name="custlh"]'], v.customerRate, "custlh");
+  setSelectByText(['select[name="fld50"]'], v.equip, "equipment fld50");
 
-  setSelectByText(['select[name="fld74"]', 'select[name="customer_rate_type"]'], FIXED_SELECT_VALUES.customerRateType);
-  setSelectByText(['select[name="fld_loadboard"]', 'select[name="load_boards"]'], FIXED_SELECT_VALUES.loadBoards);
-  setSelectByText(['select[name="fld_mode"]', 'select[name="mode"]'], FIXED_SELECT_VALUES.mode);
-  setSelectByText(['select[name="fld_createdby"]', 'select[name="created_by"]'], FIXED_SELECT_VALUES.createdBy);
-  setSelectByText(['select[name="fld_office"]', 'select[name="office"]'], FIXED_SELECT_VALUES.office);
-  setSelectByText(['select[name="fld_disp"]', 'select[name="assigned_disp"]'], FIXED_SELECT_VALUES.assignedDisp);
-  setSelectByText(['select[name="fld_salesrep"]', 'select[name="sales_rep"]'], FIXED_SELECT_VALUES.salesRep);
+  setSelectByText(['select[name="fld74"]', 'select[name="customer_rate_type"]'], FIXED_SELECT_VALUES.customerRateType, "customer rate type");
+  setSelectByText(['select[name="fld_loadboard"]', 'select[name="load_boards"]'], FIXED_SELECT_VALUES.loadBoards, "load boards");
+  setSelectByText(['select[name="fld_mode"]', 'select[name="mode"]'], FIXED_SELECT_VALUES.mode, "mode");
+  setSelectByText(['select[name="fld_createdby"]', 'select[name="created_by"]'], FIXED_SELECT_VALUES.createdBy, "created by");
+  setSelectByText(['select[name="fld_office"]', 'select[name="office"]'], FIXED_SELECT_VALUES.office, "office");
+  setSelectByText(['select[name="fld_disp"]', 'select[name="assigned_disp"]'], FIXED_SELECT_VALUES.assignedDisp, "assigned disp");
+  setSelectByText(['select[name="fld_salesrep"]', 'select[name="sales_rep"]'], FIXED_SELECT_VALUES.salesRep, "sales rep");
+  log("fillAddSpotForm: done");
 }
 
 function clickSave() {
@@ -197,6 +215,7 @@ function clickSave() {
     document.querySelector('input[value="Save"]') ||
     document.querySelector('button[value="Save"]') ||
     document.querySelector('input[name="save"]');
+  log("clickSave: Save control", save ? save.tagName : "NOT FOUND");
   if (!save) return false;
   save.click();
   return true;
@@ -214,51 +233,61 @@ async function markSubmitted(loadId, spotNumber) {
 }
 
 async function submitOne(load) {
+  log("submitOne: load", load?.load_number || load?.id, "DRY_RUN=", DRY_RUN);
+
   if (load.aljex_spot_number) {
+    log("submitOne: skipped — already has aljex_spot_number");
     return { status: "skipped", reason: "already_has_spot_number" };
   }
 
   if (!isAddSpotPage()) {
+    log("submitOne: navigating to Add Spot URL");
     window.location.href = ADD_SPOT_URL;
     await new Promise((r) => setTimeout(r, 1800));
   }
-  if (!isAddSpotPage()) throw new Error("Unable to reach Add Spot page");
+  if (!isAddSpotPage()) {
+    warn("submitOne: validation — not on Add Spot page after navigation");
+    throw new Error("Unable to reach Add Spot page");
+  }
 
   const vals = formValuesFromLoad(load);
+  log("submitOne: computed form values", vals);
   fillAddSpotForm(vals);
-  if (!clickSave()) throw new Error("Save button not found");
+
+  if (DRY_RUN) {
+    log("submitOne: DRY_RUN — skipping Save click and mark-aljex-submitted");
+    return { status: "dry_run" };
+  }
+
+  if (!clickSave()) {
+    warn("submitOne: Save button not found — abort");
+    throw new Error("Save button not found");
+  }
 
   await new Promise((r) => setTimeout(r, 2500));
   const spot = scrapeSpotNumber();
+  log("submitOne: scraped spot #", spot || "(empty)");
   await markSubmitted(load.id, spot || null);
   return { status: "submitted", spot: spot || null };
 }
 
-async function fetchUnsubmittedLoads() {
-  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
-    method: "POST",
-    headers: {
-      "X-TL-Trigger-Key": TRIGGER_KEY,
-      "Content-Type": "application/json",
-    },
-  });
-  if (!res.ok) {
-    console.warn("[aljex-spot] get-unsubmitted-loads HTTP", res.status);
-    return [];
+function pickLoads(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  if (DRY_RUN) {
+    log("DRY_RUN: processing first load only (of", rows.length, ")");
+    return rows.slice(0, 1);
   }
-  let data = {};
-  try {
-    data = await res.json();
-  } catch {
-    return [];
-  }
-  return Array.isArray(data.loads) ? data.loads : [];
+  return rows;
 }
 
 async function runCycle(rows) {
-  if (running) return;
-  if (!Array.isArray(rows) || rows.length === 0) {
-    console.log("[aljex-spot] No unsubmitted loads");
+  if (running) {
+    warn("runCycle: already running — skip");
+    return;
+  }
+  const batch = pickLoads(rows);
+  if (batch.length === 0) {
+    log("runCycle: no loads to process");
     return;
   }
 
@@ -267,59 +296,58 @@ async function runCycle(rows) {
   let cycleSkipped = 0;
   let cycleFailed = 0;
   try {
-    if (!isLoggedIntoAljex()) return;
+    if (!isLoggedIntoAljex()) {
+      warn("runCycle: not logged in — abort");
+      return;
+    }
 
-    for (const load of rows) {
+    for (const load of batch) {
       try {
         const res = await submitOne(load);
         if (res.status === "skipped") {
           cycleSkipped += 1;
           continue;
         }
+        if (res.status === "dry_run") {
+          log("runCycle: dry run complete for one load");
+          break;
+        }
         cycleSubmitted += 1;
       } catch (e) {
         cycleFailed += 1;
-        console.warn(`[aljex-spot] Failed ${load.load_number || load.id}:`, e);
+        warn(`runCycle: failed load ${load.load_number || load.id}:`, e);
       }
-      await new Promise((r) => setTimeout(r, SUBMIT_DELAY_MS));
+      if (!DRY_RUN) {
+        await new Promise((r) => setTimeout(r, SUBMIT_DELAY_MS));
+      }
     }
   } catch (e) {
-    console.warn("[aljex-spot] Cycle error:", e);
+    warn("runCycle: error", e);
   } finally {
     running = false;
-    console.log(`[aljex-spot] Summary: ${cycleSubmitted} submitted, ${cycleSkipped} skipped, ${cycleFailed} failed`);
+    log(
+      `Summary: ${cycleSubmitted} submitted, ${cycleSkipped} skipped, ${cycleFailed} failed, DRY_RUN=${DRY_RUN}`
+    );
   }
 }
 
-async function fetchAndRunCycleIfAny() {
-  let loads;
-  try {
-    loads = await fetchUnsubmittedLoads();
-  } catch (e) {
-    console.warn("[aljex-spot] fetchUnsubmittedLoads failed:", e);
-    return;
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  const push =
+    msg?.type === "PUSH_LOADS" ||
+    msg?.action === "run-injection-cycle";
+  if (!push || !Array.isArray(msg.loads)) {
+    return false;
   }
-  if (!Array.isArray(loads) || loads.length === 0) return;
-  void runCycle(loads);
-}
 
-function scheduleFetchOnDomReady() {
-  const go = () => void fetchAndRunCycleIfAny();
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", go, { once: true });
-  } else {
-    go();
-  }
-}
+  log("Message received", {
+    type: msg.type,
+    action: msg.action,
+    loadCount: msg.loads.length,
+    pageUrl: location.href,
+  });
 
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.action === 'run-injection-cycle' && Array.isArray(msg.loads)) {
-    void runCycle(msg.loads);
-  }
-});
-
-scheduleFetchOnDomReady();
-
-window.addEventListener("focus", () => {
-  void fetchAndRunCycleIfAny();
+  runCycle(msg.loads)
+    .then(() => sendResponse({ ok: true }))
+    .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
+  return true;
 });

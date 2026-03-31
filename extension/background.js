@@ -196,30 +196,26 @@ async function runFullSync() {
 }
 
 async function triggerAljexSpotInjector() {
-  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/route.php*' });
-  if (tabs.length === 0) {
-    // Skip silently when no Aljex tab is open.
-    return;
-  }
+  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
+  if (tabs.length === 0) return;
+
   const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
     method: 'POST',
-    headers: {
-      'X-TL-Trigger-Key': TRIGGER_KEY,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'application/json' },
   });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(text || `get-unsubmitted-loads HTTP ${res.status}`);
-  }
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error('Invalid JSON from /get-unsubmitted-loads');
-  }
+  const data = await res.json();
   const loads = Array.isArray(data.loads) ? data.loads : [];
-  await chrome.tabs.sendMessage(tabs[0].id, { action: 'run-injection-cycle', loads });
+
+  if (loads.length === 0) {
+    console.log('[aljex-spot] No unsubmitted loads');
+    return;
+  }
+
+  await chrome.scripting.executeScript({
+    target: { tabId: tabs[0].id },
+    func: (loadsArg) => runCycle(loadsArg),
+    args: [loads],
+  });
 }
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────

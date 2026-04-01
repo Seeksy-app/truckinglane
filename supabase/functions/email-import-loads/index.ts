@@ -986,6 +986,7 @@ Deno.serve(async (req) => {
           is_active: true,
           board_date: today,
           archived_at: null,
+          dispatch_status: "open",
         }));
         
         const { error: insertError } = await supabase
@@ -1161,6 +1162,7 @@ Deno.serve(async (req) => {
           is_active: true,
           board_date: today,
           archived_at: null,
+          dispatch_status: "open",
         }));
         
         const { error: insertError } = await supabase
@@ -1396,6 +1398,7 @@ Deno.serve(async (req) => {
         is_active: true,
         board_date: today,
         archived_at: null,
+        dispatch_status: "open",
       }));
       
       const { error: insertError } = await supabase

@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
         max_pay: Math.round(rate - 5),
         rate_raw: rate,
         commodity,
-        dispatch_status: "available",
+        dispatch_status: "open",
         status: "open",
         is_active: true,
         dat_posted_at: null,

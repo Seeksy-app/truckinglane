@@ -61,27 +61,13 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
 }
 
 /**
- * Modal pending counts: active rows not yet posted to DAT, grouped client-side by source.
- * Matches COUNT(*) WHERE dat_posted_at IS NULL AND is_active = true (per template_type group).
+ * Modal pending counts per source. Uses exact `count` queries (no 1000-row cap).
+ * Trucker Tools: only `template_type`, `dat_posted_at IS NULL`, `is_active` — no dispatch or location filters.
  */
 export async function fetchDatPendingCountsBySource(
   supabase: SupabaseClient,
   opts: { role: string | null; impersonatedAgencyId: string | null },
 ): Promise<Record<DatExportSourceGroupId, number>> {
-  let q = supabase
-    .from("loads")
-    .select("id, template_type")
-    .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
-    .is("dat_posted_at", null)
-    .eq("is_active", true);
-
-  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
-    q = q.eq("agency_id", opts.impersonatedAgencyId);
-  }
-
-  const { data, error } = await q;
-  if (error) throw error;
-  const rows = data || [];
   const init: Record<DatExportSourceGroupId, number> = {
     big500: 0,
     spot: 0,
@@ -91,14 +77,28 @@ export async function fetchDatPendingCountsBySource(
     century: 0,
     truckertools: 0,
   };
-  for (const row of rows) {
-    const tt = row.template_type as string;
-    for (const g of DAT_EXPORT_SOURCE_GROUPS) {
-      if ((g.templateTypes as readonly string[]).includes(tt)) {
-        init[g.id] += 1;
-      }
+
+  for (const g of DAT_EXPORT_SOURCE_GROUPS) {
+    let q = supabase
+      .from("loads")
+      .select("*", { count: "exact", head: true })
+      .in("template_type", [...g.templateTypes])
+      .is("dat_posted_at", null)
+      .eq("is_active", true);
+
+    if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+      q = q.eq("agency_id", opts.impersonatedAgencyId);
     }
+
+    if (g.id !== "truckertools") {
+      q = q.in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
+    }
+
+    const { count, error } = await q;
+    if (error) throw error;
+    init[g.id] = count ?? 0;
   }
+
   return init;
 }
 
@@ -116,44 +116,102 @@ export async function fetchDatPendingLoadsForSourceGroups(
   const types = [...templateSet];
   if (types.length === 0) return [];
 
-  let q = supabase
-    .from("loads")
-    .select("*")
-    .in("template_type", types)
-    .is("dat_posted_at", null)
-    .eq("is_active", true)
-    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
-    .order("ship_date", { ascending: true });
+  const hasTruckertools = types.includes("truckertools");
+  const otherTypes = types.filter((t) => t !== "truckertools");
+  const rows: Load[] = [];
 
-  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
-    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  if (hasTruckertools) {
+    let qtt = supabase
+      .from("loads")
+      .select("*")
+      .eq("template_type", "truckertools")
+      .is("dat_posted_at", null)
+      .eq("is_active", true)
+      .order("ship_date", { ascending: true });
+
+    if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+      qtt = qtt.eq("agency_id", opts.impersonatedAgencyId);
+    }
+
+    const { data: ttData, error: ttError } = await qtt;
+    if (ttError) throw ttError;
+    rows.push(...((ttData || []) as Load[]));
   }
 
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data || []).filter(isExportableLoad);
+  if (otherTypes.length > 0) {
+    let q = supabase
+      .from("loads")
+      .select("*")
+      .in("template_type", otherTypes)
+      .is("dat_posted_at", null)
+      .eq("is_active", true)
+      .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
+      .order("ship_date", { ascending: true });
+
+    if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+      q = q.eq("agency_id", opts.impersonatedAgencyId);
+    }
+
+    const { data, error } = await q;
+    if (error) throw error;
+    rows.push(...((data || []) as Load[]));
+  }
+
+  rows.sort((a, b) => {
+    const sa = String(a.ship_date ?? "");
+    const sb = String(b.ship_date ?? "");
+    if (sa !== sb) return sa.localeCompare(sb);
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  return rows.filter(isExportableLoad);
 }
 
 export async function fetchDatPendingLoadsForExport(
   supabase: SupabaseClient,
   opts: { role: string | null; impersonatedAgencyId: string | null },
 ): Promise<Load[]> {
+  const allTypes = [...DAT_ELIGIBLE_TEMPLATE_TYPES];
+  const otherTypes = allTypes.filter((t) => t !== "truckertools");
+  const rows: Load[] = [];
+
+  let qtt = supabase
+    .from("loads")
+    .select("*")
+    .eq("template_type", "truckertools")
+    .is("dat_posted_at", null)
+    .eq("is_active", true)
+    .order("ship_date", { ascending: true });
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    qtt = qtt.eq("agency_id", opts.impersonatedAgencyId);
+  }
+  const { data: ttData, error: ttError } = await qtt;
+  if (ttError) throw ttError;
+  rows.push(...((ttData || []) as Load[]));
+
   let q = supabase
     .from("loads")
     .select("*")
-    .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
+    .in("template_type", otherTypes)
     .is("dat_posted_at", null)
     .eq("is_active", true)
     .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
     .order("ship_date", { ascending: true });
-
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);
   }
-
   const { data, error } = await q;
   if (error) throw error;
-  return (data || []).filter(isExportableLoad);
+  rows.push(...((data || []) as Load[]));
+
+  rows.sort((a, b) => {
+    const sa = String(a.ship_date ?? "");
+    const sb = String(b.ship_date ?? "");
+    if (sa !== sb) return sa.localeCompare(sb);
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  return rows.filter(isExportableLoad);
 }
 
 /** In-memory pending filter (e.g. when only dashboard `loads` are available). Same rules as fetch, minus inactive rows not in `loads`. */
@@ -328,6 +386,9 @@ function datExportDestinationResolved(load: Load): { city: string; state: string
 
 // Check if a load is a valid exportable load (not a template note/instruction row)
 export function isExportableLoad(load: Load): boolean {
+  if (load.template_type === "truckertools") {
+    return true;
+  }
   const city = (load.pickup_city || "").toUpperCase();
   if (city.startsWith("PICK UP") || city.startsWith("NOTE") || city.startsWith("***")) return false;
   if (!templateTypeRequiresOriginDestForDatExport(load.template_type)) {

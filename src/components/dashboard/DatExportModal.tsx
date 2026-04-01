@@ -20,6 +20,7 @@ import {
   fetchDatPendingCountsBySource,
   fetchDatPendingLoadsForSourceGroups,
   downloadDATExport,
+  isExportableLoad,
   markDATExportComplete,
 } from "@/lib/datExport";
 import type { UserRole } from "@/hooks/useUserRole";
@@ -129,16 +130,19 @@ export function DatExportModal({
         role,
         impersonatedAgencyId,
       });
-      if (loads.length === 0) {
+      const exportableLoads = loads.filter(isExportableLoad);
+      if (exportableLoads.length === 0) {
         toast.error("No exportable pending loads for the selected sources (check row filters or missing data)");
         return;
       }
       const filename = `DAT_Export_${new Date().toISOString().split("T")[0]}.csv`;
-      downloadDATExport(loads, filename);
+      downloadDATExport(exportableLoads, filename);
 
       const postedAt = new Date().toISOString();
       const loadNumbers = [
-        ...new Set(loads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0)),
+        ...new Set(
+          exportableLoads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0),
+        ),
       ];
       const chunkSize = 120;
       if (loadNumbers.length > 0) {
@@ -155,7 +159,7 @@ export function DatExportModal({
           }
         }
       } else {
-        const ids = [...new Set(loads.map((l) => l.id))];
+        const ids = [...new Set(exportableLoads.map((l) => l.id))];
         const { error } = await supabase
           .from("loads")
           .update({ dat_posted_at: postedAt })
@@ -171,13 +175,13 @@ export function DatExportModal({
         sender_email: "dat-csv-export@truckinglane.com",
         subject: null,
         status: "success",
-        imported_count: loads.length,
+        imported_count: exportableLoads.length,
         raw_headers: {
           mode: "csv",
           source: "DAT CSV Export",
           agent_name: agentName,
-          count: loads.length,
-          exported: loads.length,
+          count: exportableLoads.length,
+          exported: exportableLoads.length,
           sources: groupIds,
         },
         error_message: null,
@@ -192,7 +196,7 @@ export function DatExportModal({
       queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
       queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
       queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-      toast.success(`${loads.length} loads exported to DAT`);
+      toast.success(`${exportableLoads.length} loads exported to DAT`);
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");

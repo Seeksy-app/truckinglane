@@ -267,16 +267,16 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     <span className="hidden sm:inline">Analytics</span>
                   </Button>
                   
-                  {/* Import Loads dropdown */}
+                  {/* Loads dropdown: import, DAT exports */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant={location.pathname === '/csv-converter' ? 'secondary' : 'ghost'}
+                        variant="ghost"
                         size="sm"
                         className="gap-2 relative"
                       >
                         <FileSpreadsheet className="h-4 w-4" />
-                        <span className="hidden sm:inline">Import Loads</span>
+                        <span className="hidden sm:inline">Loads</span>
                         <ChevronDown className="h-3 w-3" />
                         {hasNewExport && (
                           <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
@@ -342,10 +342,9 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                         <Download className="h-4 w-4 mr-2" />
                         Export Pending to DAT
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/csv-converter')}>
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        CSV Converter
+                      <DropdownMenuItem onClick={() => setDatExportModalOpen(true)}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export to DAT
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -534,24 +533,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
               <span className="hidden sm:inline">Help</span>
             </Button>
             <NotificationCenter />
-            {showAgencyNav && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 shrink-0"
-                    aria-label="Export to DAT"
-                    onClick={() => setDatExportModalOpen(true)}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Export to DAT</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Export pending loads to DAT CSV by source</TooltipContent>
-              </Tooltip>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">

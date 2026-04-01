@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 
 try:
@@ -358,6 +359,82 @@ def health():
     return jsonify({"ok": True})
 
 
+def _fetch_existing_load_numbers(aid: str, template_type: str, load_numbers: list[str]) -> set[str]:
+    if not load_numbers or not SERVICE_KEY:
+        return set()
+    headers = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Accept": "application/json",
+    }
+    found: set[str] = set()
+    for i in range(0, len(load_numbers), 120):
+        chunk = load_numbers[i : i + 120]
+        in_list = ",".join(f'"{str(n).replace(chr(34), "")}"' for n in chunk)
+        params = {
+            "select": "load_number",
+            "agency_id": f"eq.{aid}",
+            "template_type": f"eq.{template_type}",
+            "load_number": f"in.({in_list})",
+        }
+        r = requests.get(f"{SUPABASE_URL}/rest/v1/loads", headers=headers, params=params, timeout=60)
+        if r.status_code != 200:
+            print(f"[insert-aljex-loads] prefetch error {r.status_code}: {(r.text or '')[:300]}")
+            continue
+        for row in r.json() or []:
+            ln = row.get("load_number")
+            if ln is not None:
+                found.add(str(ln))
+    return found
+
+
+def _insert_email_import_log(
+    agency_id: str,
+    template_type: str,
+    imported_count: int,
+    new_c: int,
+    updated_c: int,
+    dupes_c: int,
+    *,
+    supports_removal: bool = False,
+    removed_c: int = 0,
+) -> None:
+    if not SERVICE_KEY:
+        return
+    raw_headers: dict = {
+        "template_type": template_type,
+        "new": new_c,
+        "updated": updated_c,
+        "dupes_dropped": dupes_c,
+        "duplicates_removed": dupes_c,
+        "supports_removal": supports_removal,
+    }
+    if supports_removal and removed_c > 0:
+        raw_headers["removed"] = removed_c
+        raw_headers["archived"] = removed_c
+    body = {
+        "agency_id": agency_id,
+        "sender_email": "vps@insert-aljex-loads",
+        "subject": f"Import sync ({template_type})",
+        "status": "success",
+        "imported_count": imported_count,
+        "raw_headers": raw_headers,
+    }
+    r = requests.post(
+        f"{SUPABASE_URL}/rest/v1/email_import_logs",
+        headers={
+            "apikey": SERVICE_KEY,
+            "Authorization": f"Bearer {SERVICE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        json=body,
+        timeout=30,
+    )
+    if r.status_code not in (200, 201):
+        print(f"[insert-aljex-loads] email_import_logs insert failed: {r.status_code} {(r.text or '')[:500]}")
+
+
 @app.post("/insert-aljex-loads")
 def insert_aljex_loads():
     ok, err = require_trigger_key()
@@ -369,7 +446,18 @@ def insert_aljex_loads():
     if not isinstance(loads, list):
         return jsonify({"error": "loads array required"}), 400
     if len(loads) == 0:
-        return jsonify({"success": True, "count": 0, "updated": datetime.now(timezone.utc).isoformat()})
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify(
+            {
+                "ok": True,
+                "success": True,
+                "new": 0,
+                "updated": 0,
+                "dupes_dropped": 0,
+                "count": 0,
+                "updated_at": now_iso,
+            }
+        )
 
     # Trucker Tools: raw extension row before column whitelist (journalctl -u tl-trigger -f)
     tt_rows = [
@@ -386,7 +474,42 @@ def insert_aljex_loads():
             return jsonify({"error": "each load must be a JSON object"}), 400
         row = _remap_truckertools_load_from_api(row)
         normalized.append(_normalize_aljex_load_row(row))
-    loads = normalized
+
+    triple_counts: dict[tuple[str, str, str], int] = defaultdict(int)
+    triple_last: dict[tuple[str, str, str], dict] = {}
+    for row in normalized:
+        aid = row.get("agency_id")
+        tt = row.get("template_type")
+        ln = row.get("load_number")
+        if aid is None or tt is None or ln is None:
+            return jsonify({"error": "each load needs agency_id, template_type, load_number"}), 400
+        key = (str(aid), str(tt), str(ln))
+        triple_counts[key] += 1
+        triple_last[key] = row
+    deduped = list(triple_last.values())
+    dupes_total = len(normalized) - len(deduped)
+
+    dupes_by_pair: dict[tuple[str, str], int] = defaultdict(int)
+    for (aid, tt, _ln), c in triple_counts.items():
+        if c > 1:
+            dupes_by_pair[(aid, tt)] += c - 1
+
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in deduped:
+        groups[(str(row["agency_id"]), str(row["template_type"]))].append(row)
+
+    log_payloads: list[tuple[str, str, int, int, int, int]] = []
+    total_new = 0
+    total_updated = 0
+    for (aid, tt), grp in groups.items():
+        nums = [str(r["load_number"]) for r in grp]
+        ex = _fetch_existing_load_numbers(aid, tt, nums)
+        new_c = sum(1 for n in nums if n not in ex)
+        upd_c = len(nums) - new_c
+        total_new += new_c
+        total_updated += upd_c
+        dc = dupes_by_pair.get((aid, tt), 0)
+        log_payloads.append((aid, tt, len(grp), new_c, upd_c, dc))
 
     url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=load_number,template_type,agency_id"
     headers = {
@@ -395,15 +518,22 @@ def insert_aljex_loads():
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,missing=default",
     }
-    r = requests.post(url, json=loads, headers=headers, timeout=60)
+    r = requests.post(url, json=deduped, headers=headers, timeout=60)
     if r.status_code not in (200, 201):
         return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
 
+    for aid, tt, ic, new_c, upd_c, dc in log_payloads:
+        _insert_email_import_log(aid, tt, ic, new_c, upd_c, dc, supports_removal=False)
+
     return jsonify(
         {
+            "ok": True,
             "success": True,
-            "count": len(loads),
-            "updated": datetime.now(timezone.utc).isoformat(),
+            "new": total_new,
+            "updated": total_updated,
+            "dupes_dropped": dupes_total,
+            "count": len(deduped),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
     )
 

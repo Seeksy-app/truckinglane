@@ -77,6 +77,25 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+async function countNewUpdatedForImport(
+  supabase: ReturnType<typeof createClient>,
+  agencyId: string,
+  templateType: string,
+  loadNumbers: string[],
+): Promise<{ new: number; updated: number }> {
+  if (loadNumbers.length === 0) return { new: 0, updated: 0 };
+  const { data, error } = await supabase
+    .from("loads")
+    .select("load_number")
+    .eq("agency_id", agencyId)
+    .eq("template_type", templateType)
+    .in("load_number", loadNumbers);
+  if (error) console.error("countNewUpdatedForImport:", error);
+  const existing = new Set((data ?? []).map((r: { load_number: string }) => String(r.load_number)));
+  const newC = loadNumbers.filter((n) => !existing.has(String(n))).length;
+  return { new: newC, updated: loadNumbers.length - newC };
+}
+
 // ============= XLSX PARSING =============
 function parseXLSX(buffer: ArrayBuffer, sheetName: string, headerRow: number): Record<string, string>[] {
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -783,9 +802,19 @@ Deno.serve(async (req) => {
     }
     const safeLoads = Array.from(loadsByNumber.values());
     console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique loads`);
-    
+    const skippedCount = mappedLoads.length - safeLoads.length;
+
+    let newCount = 0;
+    let updatedCount = 0;
+    let archivedCount = 0;
+
     // Only upsert if there are safe loads to import
     if (safeLoads.length > 0) {
+      const currentLoadNumbers = safeLoads.map((l) => String(l.load_number));
+      const nu = await countNewUpdatedForImport(supabase, agencyId, templateType, currentLoadNumbers);
+      newCount = nu.new;
+      updatedCount = nu.updated;
+
       // Upsert loads with is_active=true and board_date=today
       // Use upsert to handle duplicate load_number values (updates existing, inserts new)
       const today = new Date().toISOString().split("T")[0];
@@ -814,7 +843,6 @@ Deno.serve(async (req) => {
       console.log(`Upserted ${loadsWithBoardDate.length} loads`);
       
       // Archive loads NOT in the new batch (removed from source file)
-      const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
       const { data: archivedData } = await supabase
         .from("loads")
         .update({ is_active: false, archived_at: new Date().toISOString() })
@@ -825,14 +853,37 @@ Deno.serve(async (req) => {
         .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
         .select("id");
       
-      const archivedCount = archivedData?.length || 0;
+      archivedCount = archivedData?.length || 0;
       console.log(`Archived ${archivedCount} loads not in current batch`);
     }
     
     const importedCount = safeLoads.length;
-    const skippedCount = mappedLoads.length - safeLoads.length;
     
     console.log(`Imported ${importedCount} loads, skipped ${skippedCount} protected loads`);
+
+    const rawHeaders: Record<string, unknown> = {
+      template_type: templateType,
+      source: "import-loads",
+      file_name: fileName,
+      new: newCount,
+      updated: updatedCount,
+      dupes_dropped: skippedCount,
+      duplicates_removed: skippedCount,
+      supports_removal: true,
+    };
+    if (archivedCount > 0) {
+      rawHeaders.removed = archivedCount;
+      rawHeaders.archived = archivedCount;
+    }
+
+    await supabase.from("email_import_logs").insert({
+      agency_id: agencyId,
+      sender_email: "file-upload@import-loads",
+      subject: `${templateType}: ${fileName}`,
+      status: "success",
+      imported_count: importedCount,
+      raw_headers: rawHeaders,
+    });
     
     // Update batch with archived count
     if (batchData?.id) {

@@ -89,6 +89,53 @@ function parseDate(value: string | undefined | null): string | null {
   return null;
 }
 
+async function countNewUpdatedForImport(
+  supabase: ReturnType<typeof createClient>,
+  agencyId: string,
+  templateType: string,
+  loadNumbers: string[],
+): Promise<{ new: number; updated: number }> {
+  if (loadNumbers.length === 0) return { new: 0, updated: 0 };
+  const { data, error } = await supabase
+    .from("loads")
+    .select("load_number")
+    .eq("agency_id", agencyId)
+    .eq("template_type", templateType)
+    .in("load_number", loadNumbers);
+  if (error) console.error("countNewUpdatedForImport:", error);
+  const existing = new Set((data ?? []).map((r: { load_number: string }) => String(r.load_number)));
+  const newC = loadNumbers.filter((n) => !existing.has(String(n))).length;
+  return { new: newC, updated: loadNumbers.length - newC };
+}
+
+function mergeImportActivityHeaders(
+  emailHeaders: unknown,
+  breakdown: {
+    template_type: string;
+    new: number;
+    updated: number;
+    dupes_dropped: number;
+    removed?: number;
+    supports_removal: boolean;
+  },
+): Record<string, unknown> {
+  const base =
+    emailHeaders && typeof emailHeaders === "object" && !Array.isArray(emailHeaders)
+      ? { ...(emailHeaders as Record<string, unknown>) }
+      : {};
+  base.template_type = breakdown.template_type;
+  base.new = breakdown.new;
+  base.updated = breakdown.updated;
+  base.dupes_dropped = breakdown.dupes_dropped;
+  base.duplicates_removed = breakdown.dupes_dropped;
+  base.supports_removal = breakdown.supports_removal;
+  if (breakdown.supports_removal && typeof breakdown.removed === "number" && breakdown.removed > 0) {
+    base.removed = breakdown.removed;
+    base.archived = breakdown.removed;
+  }
+  return base;
+}
+
 function parseTarpRequired(value: string | undefined | null): boolean {
   if (!value) return false;
   const upper = String(value).toUpperCase().trim();
@@ -973,13 +1020,21 @@ Deno.serve(async (req) => {
       }
       const safeLoads = Array.from(loadsByNumber.values());
       console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique loads`);
-      
+      const dupesDroppedVms = mappedLoads.length - safeLoads.length;
+
       let importedCount = 0;
       let archivedNotInBatch = 0;
+      let newCountVms = 0;
+      let updatedCountVms = 0;
       const loadNumberNotInList = (nums: string[]) =>
         `(${nums.map((n) => `"${String(n).replace(/"/g, "")}"`).join(",")})`;
 
       if (safeLoads.length > 0) {
+        const currentLoadNumbers = safeLoads.map((l) => String(l.load_number));
+        const nu = await countNewUpdatedForImport(supabase, agency.id, "vms_email", currentLoadNumbers);
+        newCountVms = nu.new;
+        updatedCountVms = nu.updated;
+
         const today = new Date().toISOString().split("T")[0];
         const loadsWithBoardDate = safeLoads.map(load => ({
           ...load,
@@ -1017,7 +1072,6 @@ Deno.serve(async (req) => {
         importedCount = safeLoads.length;
         
         // Archive loads not in this email's load numbers (never delete)
-        const currentLoadNumbers = safeLoads.map(l => String(l.load_number));
         const { data: archivedRows } = await supabase
           .from("loads")
           .update({
@@ -1050,7 +1104,14 @@ Deno.serve(async (req) => {
         subject: subject,
         status: "success",
         imported_count: importedCount,
-        raw_headers: emailHeaders,
+        raw_headers: mergeImportActivityHeaders(emailHeaders, {
+          template_type: "vms_email",
+          new: newCountVms,
+          updated: updatedCountVms,
+          dupes_dropped: dupesDroppedVms,
+          removed: archivedNotInBatch,
+          supports_removal: true,
+        }),
       });
       
       // Note: No confirmation emails to external senders - import logs are visible in admin dashboard
@@ -1153,9 +1214,23 @@ Deno.serve(async (req) => {
         loadsByNumber.set(load.load_number as string, load);
       }
       const safeLoads = Array.from(loadsByNumber.values());
-      
+      const dupesDroppedOc = mappedLoads.length - safeLoads.length;
+
       let importedCount = 0;
+      let newCountOc = 0;
+      let updatedCountOc = 0;
+      let archivedCountOc = 0;
       if (safeLoads.length > 0) {
+        const currentLoadNumbers = safeLoads.map((l) => String(l.load_number));
+        const nuOc = await countNewUpdatedForImport(
+          supabase,
+          agency.id,
+          "oldcastle_gsheet",
+          currentLoadNumbers,
+        );
+        newCountOc = nuOc.new;
+        updatedCountOc = nuOc.updated;
+
         const today = new Date().toISOString().split("T")[0];
         const loadsWithBoardDate = safeLoads.map(load => ({
           ...load,
@@ -1191,7 +1266,6 @@ Deno.serve(async (req) => {
         importedCount = safeLoads.length;
         
         // Archive loads NOT in the new batch
-        const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
         const { data: archivedData } = await supabase
           .from("loads")
           .update({ is_active: false, archived_at: new Date().toISOString() })
@@ -1202,8 +1276,8 @@ Deno.serve(async (req) => {
           .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
           .select("id");
         
-        const archivedCount = archivedData?.length || 0;
-        console.log(`Archived ${archivedCount} Oldcastle loads not in current batch`);
+        archivedCountOc = archivedData?.length || 0;
+        console.log(`Archived ${archivedCountOc} Oldcastle loads not in current batch`);
         
         await postLoadsToX(safeLoads);
       }
@@ -1214,7 +1288,14 @@ Deno.serve(async (req) => {
         subject: subject,
         status: "success",
         imported_count: importedCount,
-        raw_headers: emailHeaders,
+        raw_headers: mergeImportActivityHeaders(emailHeaders, {
+          template_type: "oldcastle_gsheet",
+          new: newCountOc,
+          updated: updatedCountOc,
+          dupes_dropped: dupesDroppedOc,
+          removed: archivedCountOc,
+          supports_removal: true,
+        }),
       });
       
       return new Response(JSON.stringify({
@@ -1388,10 +1469,19 @@ Deno.serve(async (req) => {
     }
     const safeLoads = Array.from(loadsByNumber.values());
     console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique Adelphia loads`);
-    
+    const dupesDroppedAdel = mappedLoads.length - safeLoads.length;
+
     let importedCount = 0;
-    
+    let newCountAdel = 0;
+    let updatedCountAdel = 0;
+    let archivedCountAdel = 0;
+
     if (safeLoads.length > 0) {
+      const currentLoadNumbers = safeLoads.map((l) => String(l.load_number));
+      const nuAdel = await countNewUpdatedForImport(supabase, agency.id, "adelphia_xlsx", currentLoadNumbers);
+      newCountAdel = nuAdel.new;
+      updatedCountAdel = nuAdel.updated;
+
       const today = new Date().toISOString().split("T")[0];
       const loadsWithBoardDate = safeLoads.map(load => ({
         ...load,
@@ -1429,7 +1519,6 @@ Deno.serve(async (req) => {
       importedCount = safeLoads.length;
       
       // Archive loads NOT in the new batch (never delete)
-      const currentLoadNumbers = safeLoads.map(l => String(l.load_number));
       const adelNotIn = `(${currentLoadNumbers.map((n) => `"${String(n).replace(/"/g, "")}"`).join(",")})`;
       const { data: archivedData } = await supabase
         .from("loads")
@@ -1445,8 +1534,8 @@ Deno.serve(async (req) => {
         .not("load_number", "in", adelNotIn)
         .select("id");
       
-      const archivedCount = archivedData?.length || 0;
-      console.log(`Archived ${archivedCount} Adelphia loads not in current batch`);
+      archivedCountAdel = archivedData?.length || 0;
+      console.log(`Archived ${archivedCountAdel} Adelphia loads not in current batch`);
       
       // Post new loads to X
       await postLoadsToX(safeLoads);
@@ -1461,7 +1550,14 @@ Deno.serve(async (req) => {
       subject: subject,
       status: "success",
       imported_count: importedCount,
-      raw_headers: emailHeaders,
+      raw_headers: mergeImportActivityHeaders(emailHeaders, {
+        template_type: "adelphia_xlsx",
+        new: newCountAdel,
+        updated: updatedCountAdel,
+        dupes_dropped: dupesDroppedAdel,
+        removed: archivedCountAdel,
+        supports_removal: true,
+      }),
     });
     
     // Note: No confirmation emails to external senders - import logs are visible in admin dashboard

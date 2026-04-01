@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, CheckCircle, XCircle, Archive, Upload, Clock, TrendingUp, RefreshCw, Trash2 } from 'lucide-react';
+import { Package, CheckCircle, XCircle, Archive, Upload, Clock, ArrowUp, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   resolveImportActivityLabel,
@@ -16,6 +16,10 @@ interface Breakdown {
   updated?: number;
   archived?: number;
   duplicates_removed?: number;
+  dupes_dropped?: number;
+  removed?: number;
+  /** When false, archived/removed counts are not shown as “removed” (e.g. spot push). */
+  supports_removal?: boolean;
   sheets?: number;
   source?: string;
   /** Set on some sync breakdowns (e.g. Google Sheets) */
@@ -181,20 +185,53 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
       return parts.length > 0 ? <div className="flex items-center gap-3 flex-wrap mt-1.5">{parts}</div> : null;
     }
 
-    // Import breakdown
+    // Import breakdown (aligned across VPS, email, and file imports)
     const parts = [];
-    if (b.new !== undefined && b.new > 0) parts.push(
-      <span key="new" className="flex items-center gap-0.5 text-green-600"><TrendingUp className="h-3 w-3" />{b.new} new</span>
-    );
-    if (b.updated !== undefined && b.updated > 0) parts.push(
-      <span key="upd" className="flex items-center gap-0.5 text-blue-600"><RefreshCw className="h-3 w-3" />{b.updated} updated</span>
-    );
-    if (b.archived !== undefined && b.archived > 0) parts.push(
-      <span key="arch" className="flex items-center gap-0.5 text-amber-600"><Archive className="h-3 w-3" />{b.archived} removed from sheet</span>
-    );
-    if (b.duplicates_removed !== undefined && b.duplicates_removed > 0) parts.push(
-      <span key="dup" className="flex items-center gap-0.5 text-muted-foreground"><Trash2 className="h-3 w-3" />{b.duplicates_removed} dupes dropped</span>
-    );
+    if (b.new !== undefined && b.new > 0) {
+      parts.push(
+        <span key="new" className="flex items-center gap-0.5 text-green-600">
+          <ArrowUp className="h-3 w-3" />
+          {b.new} new
+        </span>,
+      );
+    }
+    if (b.updated !== undefined && b.updated > 0) {
+      parts.push(
+        <span key="upd" className="flex items-center gap-0.5 text-blue-600">
+          <RefreshCw className="h-3 w-3" />
+          {b.updated} updated
+        </span>,
+      );
+    }
+    const dupes =
+      typeof b.dupes_dropped === "number"
+        ? b.dupes_dropped
+        : typeof b.duplicates_removed === "number"
+          ? b.duplicates_removed
+          : 0;
+    if (dupes > 0) {
+      parts.push(
+        <span key="dup" className="flex items-center gap-0.5 text-muted-foreground">
+          <Trash2 className="h-3 w-3" />
+          {dupes} dupes dropped
+        </span>,
+      );
+    }
+    const supportsRemoval = b.supports_removal !== false;
+    const removedCount =
+      typeof b.removed === "number"
+        ? b.removed
+        : supportsRemoval && typeof b.archived === "number"
+          ? b.archived
+          : 0;
+    if (supportsRemoval && removedCount > 0) {
+      parts.push(
+        <span key="rm" className="flex items-center gap-0.5 text-orange-600">
+          <Trash2 className="h-3 w-3" />
+          {removedCount} removed
+        </span>,
+      );
+    }
     return parts.length > 0 ? <div className="flex items-center gap-3 flex-wrap mt-1.5">{parts}</div> : null;
   };
 

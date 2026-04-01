@@ -16,7 +16,7 @@ def parse_num(val):
         return 0.0
 
 csv_text = sys.stdin.read()
-loads = []
+all_parsed = []
 batch_pro_numbers = set()
 open_count = 0
 archived_status_count = 0
@@ -72,7 +72,7 @@ for row in reader:
     elif is_archived_by_status:
         archived_status_count += 1
 
-    loads.append({
+    all_parsed.append({
         "agency_id": AGENCY_ID,
         "template_type": "aljex_big500",
         "load_number": pro_num,
@@ -102,12 +102,49 @@ for row in reader:
         })
     })
 
-print(f"Parsed {len(loads)} loads", flush=True)
-for l in loads[:5]:
+by_num = {}
+for l in all_parsed:
+    by_num[l["load_number"]] = l
+safe_loads = list(by_num.values())
+dupes_dropped = len(all_parsed) - len(safe_loads)
+
+def fetch_existing_load_numbers(load_numbers):
+    if not load_numbers:
+        return set()
+    found = set()
+    for i in range(0, len(load_numbers), 120):
+        chunk = load_numbers[i : i + 120]
+        in_list = ",".join(f'"{str(n).replace(chr(34), "")}"' for n in chunk)
+        url = (
+            f"{SUPABASE_URL}/rest/v1/loads?select=load_number"
+            f"&agency_id=eq.{AGENCY_ID}&template_type=eq.aljex_big500&load_number=in.({in_list})"
+        )
+        req = urllib.request.Request(
+            url,
+            headers={"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"},
+            method="GET",
+        )
+        try:
+            resp = urllib.request.urlopen(req, timeout=30)
+            for row in json.loads(resp.read().decode() or "[]"):
+                ln = row.get("load_number")
+                if ln is not None:
+                    found.add(str(ln))
+        except urllib.error.HTTPError as e:
+            print(f"ERROR prefetch: {e.code} {e.read().decode()[:200]}", flush=True)
+    return found
+
+nums = [str(l["load_number"]) for l in safe_loads]
+existing = fetch_existing_load_numbers(nums)
+new_count = sum(1 for n in nums if n not in existing)
+updated_count = len(nums) - new_count
+
+print(f"Parsed {len(all_parsed)} rows, {len(safe_loads)} unique loads ({dupes_dropped} dupes dropped)", flush=True)
+for l in safe_loads[:5]:
     ton_str = f"(${l['rate_raw']}/ton x {l['weight_lbs']/2000 if l['weight_lbs'] else 20:.0f}t)" if l['is_per_ton'] else ""
     print(f"  {l['load_number']}: {l['pickup_city']} {l['pickup_state']} -> {l['dest_city']} {l['dest_state']} | Rev: ${l['customer_invoice_total']:.0f} {ton_str} | Target: ${l['target_pay']:.0f}")
 
-data = json.dumps(loads).encode()
+data = json.dumps(safe_loads).encode()
 req = urllib.request.Request(
     f"{SUPABASE_URL}/rest/v1/loads?on_conflict=load_number,template_type,agency_id",
     data=data,
@@ -121,7 +158,7 @@ req = urllib.request.Request(
 )
 try:
     resp = urllib.request.urlopen(req, timeout=30)
-    print(f"SUCCESS - pushed {len(loads)} loads to Supabase")
+    print(f"SUCCESS - pushed {len(safe_loads)} loads to Supabase")
 except urllib.error.HTTPError as e:
     print(f"ERROR: {e.code} {e.read().decode()[:300]}")
     sys.exit(1)
@@ -168,3 +205,37 @@ for r in available_rows:
 
 print(f"Archive sweep archived {swept_count} loads", flush=True)
 print(f"Summary: {open_count} open, {archived_status_count} archived via status, {swept_count} archived via sweep", flush=True)
+
+log_body = {
+    "agency_id": AGENCY_ID,
+    "sender_email": "big500-sync@vps.truckinglane.com",
+    "subject": "Big 500 Import",
+    "status": "success",
+    "imported_count": len(safe_loads),
+    "raw_headers": {
+        "template_type": "aljex_big500",
+        "new": new_count,
+        "updated": updated_count,
+        "dupes_dropped": dupes_dropped,
+        "duplicates_removed": dupes_dropped,
+        "supports_removal": True,
+        "removed": swept_count,
+        "archived": swept_count,
+    },
+}
+try:
+    log_req = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/email_import_logs",
+        data=json.dumps(log_body).encode(),
+        headers={
+            "apikey": SERVICE_KEY,
+            "Authorization": f"Bearer {SERVICE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        method="POST",
+    )
+    urllib.request.urlopen(log_req, timeout=30)
+    print("Logged Big 500 import to email_import_logs", flush=True)
+except urllib.error.HTTPError as e:
+    print(f"WARN email_import_logs: {e.code} {e.read().decode()[:200]}", flush=True)

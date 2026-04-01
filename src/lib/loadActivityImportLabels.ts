@@ -3,9 +3,11 @@ const IMPORT_TEMPLATE_LABELS: Record<string, string> = {
   adelphia_xlsx: "Adelphia Import",
   vms_email: "VMS Import",
   century_xlsx: "Century Import",
+  Century: "Century Import",
   allied_xlsx: "Allied Import",
   aljex_big500: "Big 500 Import",
-  aljex_spot: "Spot Load Sync",
+  aljex_spot: "Aljex Spot Sync",
+  truckertools: "Trucker Tools Sync",
   oldcastle_gsheet: "Oldcastle Sync",
 };
 
@@ -20,7 +22,7 @@ export function labelFromTemplateType(templateType: string): string {
 export function templateTypeFromErrorMessage(msg: string | null): string | null {
   if (!msg) return null;
   const m = msg.match(
-    /\b(adelphia_xlsx|vms_email|century_xlsx|allied_xlsx|semco_xlsx|oldcastle_gsheet|aljex_big500|aljex_spot|aljex_flat)\b/,
+    /\b(adelphia_xlsx|vms_email|century_xlsx|Century|allied_xlsx|semco_xlsx|oldcastle_gsheet|aljex_big500|aljex_spot|aljex_flat|truckertools)\b/,
   );
   return m?.[1] ?? null;
 }

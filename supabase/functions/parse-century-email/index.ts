@@ -268,7 +268,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { error: upsertError } = await supabase.from("loads").upsert(finalRows, {
+    const centuryTemplate = "Century";
+    const byNum = new Map<string, Record<string, unknown>>();
+    for (const row of finalRows) {
+      byNum.set(String(row.load_number), row);
+    }
+    const safeRows = Array.from(byNum.values());
+    const dupesDropped = finalRows.length - safeRows.length;
+    const nums = safeRows.map((r) => String(r.load_number));
+    const { data: existRows } = await supabase
+      .from("loads")
+      .select("load_number")
+      .eq("agency_id", CENTURY_AGENCY_ID)
+      .eq("template_type", centuryTemplate)
+      .in("load_number", nums);
+    const existingSet = new Set(
+      (existRows ?? []).map((r: { load_number: string }) => String(r.load_number)),
+    );
+    const newCount = nums.filter((n) => !existingSet.has(n)).length;
+    const updatedCount = nums.length - newCount;
+
+    const { error: upsertError } = await supabase.from("loads").upsert(safeRows, {
       onConflict: "agency_id,template_type,load_number",
       ignoreDuplicates: false,
     });
@@ -288,20 +308,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    const mergedHeaders: Record<string, unknown> =
+      emailHeaders && typeof emailHeaders === "object" && !Array.isArray(emailHeaders)
+        ? { ...(emailHeaders as Record<string, unknown>) }
+        : {};
+    mergedHeaders.template_type = centuryTemplate;
+    mergedHeaders.new = newCount;
+    mergedHeaders.updated = updatedCount;
+    mergedHeaders.dupes_dropped = dupesDropped;
+    mergedHeaders.duplicates_removed = dupesDropped;
+    mergedHeaders.supports_removal = false;
+
     await supabase.from("email_import_logs").insert({
       agency_id: CENTURY_AGENCY_ID,
       sender_email: clean,
       subject,
       status: "success",
-      imported_count: finalRows.length,
-      raw_headers: emailHeaders,
+      imported_count: safeRows.length,
+      raw_headers: mergedHeaders,
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        imported: finalRows.length,
-        template_type: "Century",
+        imported: safeRows.length,
+        new: newCount,
+        updated: updatedCount,
+        dupes_dropped: dupesDropped,
+        template_type: centuryTemplate,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

@@ -50,6 +50,8 @@ export function getLoadBoardClientPrimaryLabel(templateType: string): string {
       return "VMS";
     case "oldcastle_gsheet":
       return "Oldcastle";
+    case "truckertools":
+      return "Trucker Tools";
     case "aljex_spot":
       return "Spot Loads";
     case "aljex_big500":

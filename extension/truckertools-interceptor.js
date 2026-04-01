@@ -16,6 +16,12 @@ console.log('[TruckingLane] Trucker Tools interceptor injected');
         "[TruckingLane] Event received, load count:",
         event.detail?.data?.length
       );
+      if (event.detail?.data?.[0]) {
+        console.log(
+          "[TruckingLane] Sample load:",
+          JSON.stringify(event.detail.data[0])
+        );
+      }
 
       const url = typeof d.url === "string" ? d.url : "";
       const authorization = d.authorization ?? null;

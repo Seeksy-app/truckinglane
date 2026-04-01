@@ -743,8 +743,22 @@ function mapTruckerToolsLoad(raw, idx) {
     raw.customerRate,
     raw.linehaul,
     raw.lineHaul,
-    raw.rateAmount
+    raw.rateAmount,
+    raw.brokerRate,
+    raw.offerRate,
+    raw.pay,
+    raw.carrierPay,
+    raw.totalPay
   );
+
+  const target_pay =
+    rate != null && Number.isFinite(rate) ? Math.round(rate * 0.8) : 0;
+  const max_pay =
+    rate != null && Number.isFinite(rate) ? Math.round(rate * 0.85) : 0;
+  const target_commission =
+    rate != null && Number.isFinite(rate) ? Math.round(rate - target_pay) : 0;
+  const max_commission =
+    rate != null && Number.isFinite(rate) ? Math.round(rate - max_pay) : 0;
 
   const id =
     raw.id ??
@@ -774,6 +788,12 @@ function mapTruckerToolsLoad(raw, idx) {
     weight_lbs,
     rate_raw: rate,
     customer_invoice_total: rate != null ? rate : 0,
+    target_pay,
+    max_pay,
+    target_commission,
+    max_commission,
+    commission_target_pct: rate != null && Number.isFinite(rate) ? 0.2 : 0,
+    commission_max_pct: rate != null && Number.isFinite(rate) ? 0.15 : 0,
     is_per_ton: false,
     is_active: true,
     source_row: JSON.stringify({

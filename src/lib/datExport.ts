@@ -15,6 +15,7 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "oldcastle_gsheet",
   "century_xlsx",
   "Century",
+  "truckertools",
 ] as const;
 
 /** Dispatch states that count as “pending DAT” (not yet posted, still on the board). */
@@ -28,6 +29,7 @@ export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "adelphia", label: "Adelphia", templateTypes: ["adelphia_xlsx"] as const },
   { id: "oldcastle", label: "Oldcastle", templateTypes: ["oldcastle_gsheet"] as const },
   { id: "century", label: "Century", templateTypes: ["century_xlsx", "Century"] as const },
+  { id: "truckertools", label: "Trucker Tools", templateTypes: ["truckertools"] as const },
 ] as const;
 
 export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
@@ -70,6 +72,7 @@ export async function fetchDatPendingCountsBySource(
     adelphia: 0,
     oldcastle: 0,
     century: 0,
+    truckertools: 0,
   };
   for (const row of rows) {
     const tt = row.template_type as string;
@@ -257,7 +260,8 @@ export function mapEquipmentCode(trailerType: string | null | undefined, templat
       templateType === "century_xlsx" ||
       templateType === "Century" ||
       templateType === "aljex_big500" ||
-      templateType === "aljex_spot"
+      templateType === "aljex_spot" ||
+      templateType === "truckertools"
     ) {
       raw = "F";
     }

@@ -169,6 +169,7 @@ export function LoadsTable({
           aljex_big500: 3,
           aljex_spot: 4,
           oldcastle_gsheet: 5,
+          truckertools: 6,
         };
         return (order[a] || 99) - (order[b] || 99);
       }),
@@ -213,6 +214,7 @@ export function LoadsTable({
           aljex_big500: 3,
           aljex_spot: 4,
           oldcastle_gsheet: 5,
+          truckertools: 6,
         };
         const aOrder = templateOrder[a.template_type] || 99;
         const bOrder = templateOrder[b.template_type] || 99;

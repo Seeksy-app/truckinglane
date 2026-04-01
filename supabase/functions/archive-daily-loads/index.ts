@@ -65,6 +65,17 @@ serve(async (req: Request) => {
       }
     }
 
+    // Flip today's pending Century loads active after midnight archive
+    const today = new Date().toISOString().split("T")[0];
+    await supabaseAdmin
+      .from("loads")
+      .update({ is_active: true })
+      .eq("template_type", "century_pdf")
+      .eq("ship_date", today)
+      .eq("is_active", false);
+
+    console.log("Century pending loads flipped active for", today);
+
     return new Response(
       JSON.stringify({ 
         success: true, 

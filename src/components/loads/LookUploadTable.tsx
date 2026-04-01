@@ -24,7 +24,10 @@ import {
   LOADS_TABLE_DENSE_CLASS,
   LOADS_TABLE_TOOLBAR_CLASS,
 } from "@/lib/loadTableDisplay";
-import { truckerToolsInvoiceColumnDisplay } from "@/lib/truckerToolsLoads";
+import {
+  truckerToolsInvoiceColumnDisplay,
+  truckerToolsNoRateRaw,
+} from "@/lib/truckerToolsLoads";
 
 type Load = Tables<"loads">;
 
@@ -374,9 +377,11 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                   })()}
                 </TableCell>
                 <TableCell className="text-center tabular-nums text-sm sm:text-base">
-                  {load.target_pay && load.target_pay > 0
-                    ? `$${load.target_pay.toLocaleString()}`
-                    : "TBD"}
+                  {truckerToolsNoRateRaw(load)
+                    ? "—"
+                    : load.target_pay && load.target_pay > 0
+                      ? `$${load.target_pay.toLocaleString()}`
+                      : "TBD"}
                 </TableCell>
                 <TableCell className="text-center align-middle text-sm sm:text-base">
                   <div className="flex justify-center">

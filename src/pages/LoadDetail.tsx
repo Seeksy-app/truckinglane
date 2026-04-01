@@ -497,21 +497,21 @@ function LoadDetailContent() {
                 <div>
                   <p className="text-sm text-muted-foreground">Target Pay</p>
                   <p className="text-lg font-semibold">
-                    {truckerToolsDollarDisplay(load.template_type, load.target_pay) ??
+                    {truckerToolsDollarDisplay(load, load.target_pay) ??
                       (load.target_pay ? `$${load.target_pay.toLocaleString()}` : "TBD")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Max Pay</p>
                   <p className="text-lg font-semibold">
-                    {truckerToolsDollarDisplay(load.template_type, load.max_pay) ??
+                    {truckerToolsDollarDisplay(load, load.max_pay) ??
                       (load.max_pay ? `$${load.max_pay.toLocaleString()}` : "—")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Target Commission</p>
                   <p className="text-lg font-semibold">
-                    {truckerToolsDollarDisplay(load.template_type, load.target_commission) ??
+                    {truckerToolsDollarDisplay(load, load.target_commission) ??
                       (load.target_commission ? `$${load.target_commission.toLocaleString()}` : "—")}
                   </p>
                 </div>

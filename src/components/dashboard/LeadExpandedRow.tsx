@@ -937,10 +937,7 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Invoice</span>
                     <span className="font-semibold text-blue-900">
-                      {truckerToolsDollarDisplay(
-                        attachedLoad.template_type,
-                        attachedLoad.customer_invoice_total,
-                      ) ??
+                      {truckerToolsDollarDisplay(attachedLoad, attachedLoad.customer_invoice_total) ??
                         (attachedLoad.customer_invoice_total
                           ? `$${Number(attachedLoad.customer_invoice_total).toLocaleString()}`
                           : "—")}
@@ -949,7 +946,7 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Target Pay</span>
                     <span className="font-semibold text-blue-900">
-                      {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.target_pay) ??
+                      {truckerToolsDollarDisplay(attachedLoad, attachedLoad.target_pay) ??
                         (attachedLoad.target_pay
                           ? `$${Number(attachedLoad.target_pay).toLocaleString()}`
                           : "—")}
@@ -958,7 +955,7 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Max Pay</span>
                     <span className="font-medium text-blue-900">
-                      {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.max_pay) ??
+                      {truckerToolsDollarDisplay(attachedLoad, attachedLoad.max_pay) ??
                         (attachedLoad.max_pay
                           ? `$${Number(attachedLoad.max_pay).toLocaleString()}`
                           : "—")}
@@ -967,10 +964,7 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Target Comm</span>
                     <span className="font-semibold text-emerald-700">
-                      {truckerToolsDollarDisplay(
-                        attachedLoad.template_type,
-                        attachedLoad.target_commission,
-                      ) ??
+                      {truckerToolsDollarDisplay(attachedLoad, attachedLoad.target_commission) ??
                         (attachedLoad.target_commission
                           ? `$${Number(attachedLoad.target_commission).toLocaleString()}`
                           : "—")}
@@ -979,10 +973,7 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Max Comm</span>
                     <span className="font-medium text-blue-900">
-                      {truckerToolsDollarDisplay(
-                        attachedLoad.template_type,
-                        attachedLoad.max_commission,
-                      ) ??
+                      {truckerToolsDollarDisplay(attachedLoad, attachedLoad.max_commission) ??
                         (attachedLoad.max_commission
                           ? `$${Number(attachedLoad.max_commission).toLocaleString()}`
                           : "—")}
@@ -1026,7 +1017,7 @@ export const LeadExpandedRow = ({
                 <div>
                   <span className="text-xs text-muted-foreground">Target Pay:</span>{" "}
                   <span className="font-medium">
-                    {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.target_pay) ??
+                    {truckerToolsDollarDisplay(attachedLoad, attachedLoad.target_pay) ??
                       (attachedLoad.target_pay
                         ? `$${Number(attachedLoad.target_pay).toLocaleString()}`
                         : "N/A")}
@@ -1035,7 +1026,7 @@ export const LeadExpandedRow = ({
                 <div>
                   <span className="text-xs text-muted-foreground">Max Pay:</span>{" "}
                   <span className="font-medium">
-                    {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.max_pay) ??
+                    {truckerToolsDollarDisplay(attachedLoad, attachedLoad.max_pay) ??
                       (attachedLoad.max_pay
                         ? `$${Number(attachedLoad.max_pay).toLocaleString()}`
                         : "N/A")}

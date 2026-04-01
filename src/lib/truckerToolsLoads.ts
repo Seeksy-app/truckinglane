@@ -6,37 +6,49 @@ export function isTruckerToolsLoad(templateType: string | null | undefined): boo
   return templateType === "truckertools";
 }
 
-/** Trucker Tools: "—" for null/0; positive amounts formatted. Returns undefined if not TT (caller uses normal rules). */
+/** TT rows with no linehaul from API: suppress $0 — show em dash for financial columns. */
+export function truckerToolsNoRateRaw(load: Pick<Load, "template_type" | "rate_raw">): boolean {
+  return (
+    load.template_type === "truckertools" &&
+    (load.rate_raw == null || Number(load.rate_raw) === 0)
+  );
+}
+
+/**
+ * Trucker Tools money cells: when rate_raw is null/0, always "—"; else "—" for null/0 value or formatted $.
+ * Returns undefined if not TT (caller uses normal rules).
+ */
 export function truckerToolsDollarDisplay(
-  templateType: string | null | undefined,
+  load: Pick<Load, "template_type" | "rate_raw">,
   value: number | null | undefined,
 ): string | undefined {
-  if (templateType !== "truckertools") return undefined;
+  if (load.template_type !== "truckertools") return undefined;
+  if (truckerToolsNoRateRaw(load)) return "—";
   if (value == null || value === 0) return "—";
   return `$${Number(value).toLocaleString()}`;
 }
 
-/** TT rate / linehaul: "—" when missing or ≤0. */
+/** TT rate / linehaul: "—" when rate_raw null or 0. */
 export function truckerToolsRateFieldDisplay(
   templateType: string | null | undefined,
   rateRaw: number | null | undefined,
   isPerTon: boolean,
 ): string | undefined {
   if (templateType !== "truckertools") return undefined;
-  if (rateRaw == null || Number(rateRaw) <= 0) return "—";
+  if (rateRaw == null || Number(rateRaw) === 0) return "—";
   if (isPerTon) return `$${Number(rateRaw).toLocaleString()}/ton`;
   return `$${Number(rateRaw).toLocaleString()}`;
 }
 
-/** Loads table Invoice column: same basis as flat vs per-ton invoice/rate. */
+/** Loads table Invoice column: when TT has no rate_raw, "—"; else invoice/rate as before. */
 export function truckerToolsInvoiceColumnDisplay(
   load: Pick<Load, "template_type" | "is_per_ton" | "rate_raw" | "customer_invoice_total">,
 ): { display: string; isPerTon: boolean } | null {
   if (load.template_type !== "truckertools") return null;
+  if (truckerToolsNoRateRaw(load)) {
+    return { display: "—", isPerTon: false };
+  }
   if (load.is_per_ton) {
-    if (load.rate_raw == null || Number(load.rate_raw) <= 0) {
-      return { display: "—", isPerTon: false };
-    }
     return { display: `$${Number(load.rate_raw).toLocaleString()}`, isPerTon: true };
   }
   const inv = load.customer_invoice_total;

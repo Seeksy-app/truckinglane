@@ -40,7 +40,10 @@ import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadDATExport, isExportableLoad } from "@/lib/datExport";
-import { truckerToolsInvoiceColumnDisplay } from "@/lib/truckerToolsLoads";
+import {
+  truckerToolsInvoiceColumnDisplay,
+  truckerToolsNoRateRaw,
+} from "@/lib/truckerToolsLoads";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -696,9 +699,11 @@ export function LoadsTable({
                     })()}
                   </TableCell>
                   <TableCell className="text-center tabular-nums text-sm sm:text-base">
-                    {load.target_pay && load.target_pay > 0
-                      ? `$${load.target_pay.toLocaleString()}`
-                      : "TBD"}
+                    {truckerToolsNoRateRaw(load)
+                      ? "—"
+                      : load.target_pay && load.target_pay > 0
+                        ? `$${load.target_pay.toLocaleString()}`
+                        : "TBD"}
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
                     <div className="flex justify-center">

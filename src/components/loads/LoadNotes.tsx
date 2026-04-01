@@ -27,7 +27,7 @@ const formatCurrency = (load: Load, value: number | null): string | null => {
   if (load.is_per_ton && (!load.weight_lbs || load.customer_invoice_total === 0)) {
     return "TBD";
   }
-  const tt = truckerToolsDollarDisplay(load.template_type, value);
+  const tt = truckerToolsDollarDisplay(load, value);
   if (tt !== undefined) return tt;
   if (!value && value !== 0) return null;
   return `$${value.toLocaleString()}`;

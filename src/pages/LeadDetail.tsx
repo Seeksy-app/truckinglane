@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   ArrowLeft, UserPlus, CheckCircle, XCircle, Phone, Building2, User, 
-  Sparkles, ChevronDown, AlertTriangle, Home, RefreshCw 
+  Sparkles, ChevronDown, AlertTriangle, Home, RefreshCw, MessageSquare 
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -23,6 +23,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type Lead = Tables<"leads">;
+type LeadSmsMessage = Tables<"lead_sms_messages">;
 type LeadStatus = "pending" | "claimed" | "closed";
 
 const statusStyles: Record<LeadStatus, string> = {
@@ -30,6 +31,53 @@ const statusStyles: Record<LeadStatus, string> = {
   claimed: "bg-blue-100 text-blue-800",
   closed: "bg-emerald-100 text-emerald-800",
 };
+
+function SmsThreadCard({ messages }: { messages: LeadSmsMessage[] }) {
+  if (messages.length === 0) return null;
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="font-serif text-xl flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-muted-foreground" />
+          SMS thread
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 max-h-[min(70vh,520px)] overflow-y-auto">
+        {messages.map((m) => {
+          const outbound = m.direction === "outbound";
+          return (
+            <div
+              key={m.id}
+              className={cn(
+                "flex",
+                outbound ? "justify-end" : "justify-start",
+              )}
+            >
+              <div
+                className={cn(
+                  "max-w-[90%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words",
+                  outbound
+                    ? "bg-primary text-primary-foreground rounded-br-sm"
+                    : "bg-muted text-foreground rounded-bl-sm",
+                )}
+              >
+                <p>{m.body}</p>
+                <p
+                  className={cn(
+                    "text-[10px] mt-1.5 tabular-nums",
+                    outbound ? "text-primary-foreground/80" : "text-muted-foreground",
+                  )}
+                >
+                  {outbound ? "Out" : "In"} · {format(new Date(m.created_at), "MMM d, h:mm a")}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
 
 function TranscriptSection({ transcript }: { transcript: string }) {
   const [isOpen, setIsOpen] = useState(true);
@@ -255,6 +303,20 @@ function LeadDetailContent() {
     },
   });
 
+  const { data: smsMessages = [] } = useQuery({
+    queryKey: ["lead_sms_messages", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lead_sms_messages")
+        .select("id, direction, body, created_at")
+        .eq("lead_id", id!)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as LeadSmsMessage[];
+    },
+    enabled: !!user && !!id,
+  });
+
   const { data: epcRow } = useQuery({
     queryKey: ["elevenlabs_post_calls", lead?.conversation_id, lead?.agency_id],
     queryFn: async () => {
@@ -385,6 +447,14 @@ function LeadDetailContent() {
       epcRow.transcript_summary?.trim() ||
       epcTranscript?.trim()
     );
+
+  const hasConversationBlock = !!(
+    conversation?.summary?.trim() ||
+    conversation?.transcript?.trim()
+  );
+  const hasSmsThread = smsMessages.length > 0;
+  const hasCallTranscriptColumn = hasConversationBlock || showElevenLabsCard;
+  const transcriptAndSmsSideBySide = hasSmsThread && hasCallTranscriptColumn;
 
   return (
     <div className="min-h-screen bg-background">
@@ -534,54 +604,114 @@ function LeadDetailContent() {
             </CardContent>
           </Card>
 
-          {/* Conversation Summary */}
-          {(conversation?.summary || conversation?.transcript) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-serif text-xl">Conversation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {conversation?.summary && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Summary</p>
-                    <p className="text-foreground whitespace-pre-wrap">{conversation.summary}</p>
-                  </div>
+          {/* Call transcript(s) + SMS booking thread (side-by-side on large screens when both exist) */}
+          {transcriptAndSmsSideBySide ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <div className="space-y-6 min-w-0">
+                {hasConversationBlock && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="font-serif text-xl">Conversation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {conversation?.summary && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">Summary</p>
+                          <p className="text-foreground whitespace-pre-wrap">{conversation.summary}</p>
+                        </div>
+                      )}
+
+                      {conversation?.transcript && (
+                        <>
+                          {conversation?.summary && <Separator className="my-6" />}
+                          <TranscriptSection transcript={conversation.transcript} />
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
 
-                {conversation?.transcript && (
-                  <>
-                    {conversation?.summary && <Separator className="my-6" />}
-                    <TranscriptSection transcript={conversation.transcript} />
-                  </>
+                {showElevenLabsCard && epcRow && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="font-serif text-xl font-semibold">
+                        {epcRow.call_summary_title?.trim() || "Call transcript"}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {epcRow.transcript_summary?.trim() && (
+                        <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                          {epcRow.transcript_summary}
+                        </p>
+                      )}
+                      {epcTranscript?.trim() && (
+                        <>
+                          {epcRow.transcript_summary?.trim() && <Separator />}
+                          <div>
+                            <p className="text-sm font-medium text-foreground mb-2">Transcript</p>
+                            <TranscriptTurnsList transcript={epcTranscript} />
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
-              </CardContent>
-            </Card>
-          )}
+              </div>
+              <SmsThreadCard messages={smsMessages} />
+            </div>
+          ) : (
+            <>
+              {hasConversationBlock && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif text-xl">Conversation</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {conversation?.summary && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Summary</p>
+                        <p className="text-foreground whitespace-pre-wrap">{conversation.summary}</p>
+                      </div>
+                    )}
 
-          {showElevenLabsCard && epcRow && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-serif text-xl font-semibold">
-                  {epcRow.call_summary_title?.trim() || "Call transcript"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {epcRow.transcript_summary?.trim() && (
-                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-                    {epcRow.transcript_summary}
-                  </p>
-                )}
-                {epcTranscript?.trim() && (
-                  <>
-                    {epcRow.transcript_summary?.trim() && <Separator />}
-                    <div>
-                      <p className="text-sm font-medium text-foreground mb-2">Transcript</p>
-                      <TranscriptTurnsList transcript={epcTranscript} />
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    {conversation?.transcript && (
+                      <>
+                        {conversation?.summary && <Separator className="my-6" />}
+                        <TranscriptSection transcript={conversation.transcript} />
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {showElevenLabsCard && epcRow && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif text-xl font-semibold">
+                      {epcRow.call_summary_title?.trim() || "Call transcript"}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {epcRow.transcript_summary?.trim() && (
+                      <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                        {epcRow.transcript_summary}
+                      </p>
+                    )}
+                    {epcTranscript?.trim() && (
+                      <>
+                        {epcRow.transcript_summary?.trim() && <Separator />}
+                        <div>
+                          <p className="text-sm font-medium text-foreground mb-2">Transcript</p>
+                          <TranscriptTurnsList transcript={epcTranscript} />
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              <SmsThreadCard messages={smsMessages} />
+            </>
           )}
         </div>
       </div>

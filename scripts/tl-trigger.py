@@ -371,7 +371,7 @@ def _normalize_sms_phone(raw: str) -> str:
 def _simpletexting_send(contact_phone: str, message: str) -> tuple[bool, str]:
     if not SIMPLETEXTING_API_KEY:
         return False, "SIMPLETEXTING_API_KEY not configured"
-    payload = {"contactPhone": contact_phone, "text": message}
+    payload = {"phoneNumber": contact_phone, "text": message}
     try:
         r = requests.post(
             SIMPLETEXTING_MESSAGES_URL,
@@ -431,6 +431,88 @@ def _parse_inbound_sms_request() -> tuple[str, str]:
     )
     text = flat.get("text") or flat.get("message") or flat.get("body") or flat.get("Message") or ""
     return str(phone or "").strip(), str(text or "").strip()
+
+
+def _fetch_load_agency_id(load_id: str) -> str | None:
+    lid = (load_id or "").strip()
+    if not lid or not SERVICE_KEY:
+        return None
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/loads",
+            headers=_supabase_headers(),
+            params={"id": f"eq.{lid}", "select": "agency_id"},
+            timeout=15,
+        )
+    except requests.RequestException:
+        return None
+    if r.status_code != 200:
+        return None
+    rows = r.json() or []
+    if not rows:
+        return None
+    aid = rows[0].get("agency_id")
+    return str(aid).strip() if aid else None
+
+
+def _caller_phone_matches_norm(caller_phone: str, phone_norm: str) -> bool:
+    if not phone_norm:
+        return False
+    cn = _normalize_sms_phone(str(caller_phone or ""))
+    return bool(cn and cn == phone_norm)
+
+
+def _find_lead_id_for_sms(agency_id: str, phone_norm: str) -> str | None:
+    if not agency_id or not phone_norm or not SERVICE_KEY:
+        return None
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/leads",
+            headers=_supabase_headers(),
+            params={
+                "agency_id": f"eq.{agency_id}",
+                "select": "id,caller_phone,created_at",
+                "order": "created_at.desc",
+                "limit": "200",
+            },
+            timeout=20,
+        )
+    except requests.RequestException:
+        return None
+    if r.status_code != 200:
+        return None
+    for row in r.json() or []:
+        if _caller_phone_matches_norm(str(row.get("caller_phone") or ""), phone_norm):
+            lid = str(row.get("id") or "").strip()
+            return lid or None
+    return None
+
+
+def _lead_sms_insert(lead_id: str, direction: str, body: str) -> None:
+    if not lead_id or direction not in ("inbound", "outbound") or not SERVICE_KEY:
+        return
+    text = (body or "")[:16000]
+    if not text.strip():
+        return
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/lead_sms_messages",
+            headers={**_supabase_headers(json_body=True), "Prefer": "return=minimal"},
+            json={"lead_id": lead_id, "direction": direction, "body": text},
+            timeout=15,
+        )
+    except requests.RequestException:
+        pass
+
+
+def _log_sms_exchange_for_lead(
+    lead_id: str | None, inbound_body: str, outbound_body: str
+) -> None:
+    if not lead_id:
+        return
+    _lead_sms_insert(lead_id, "inbound", inbound_body)
+    if (outbound_body or "").strip():
+        _lead_sms_insert(lead_id, "outbound", outbound_body)
 
 
 def _sms_context_fetch(phone_norm: str) -> dict | None:
@@ -1014,6 +1096,7 @@ def send_sms():
             "select": ",".join(
                 [
                     "id",
+                    "agency_id",
                     "load_number",
                     "pickup_city",
                     "pickup_state",
@@ -1055,6 +1138,12 @@ def send_sms():
     if pnorm:
         _sms_context_upsert(pnorm, load_id, "offered")
 
+    aid = row.get("agency_id")
+    if aid and pnorm:
+        lid = _find_lead_id_for_sms(str(aid).strip(), pnorm)
+        if lid:
+            _lead_sms_insert(lid, "outbound", sms_message)
+
     return jsonify({"ok": True})
 
 
@@ -1063,6 +1152,7 @@ def sms_inbound():
     """
     SimpleTexting inbound webhook (no TL trigger key). Parses phone + body; sends replies via API.
     """
+    print(f"[SMS-INBOUND] payload: {request.get_data(as_text=True)}", flush=True)
     if not SERVICE_KEY:
         return jsonify({"error": "Server misconfigured"}), 500
 
@@ -1084,7 +1174,14 @@ def sms_inbound():
         reply = "Got it! What is your MC# and company name?"
         if not ctx:
             reply = "We don't have an active load offer for this number. Contact dispatch for a new link."
+        lead_for_thread: str | None = None
+        if ctx:
+            lid_load = str(ctx.get("load_id") or "").strip()
+            ag = _fetch_load_agency_id(lid_load) if lid_load else None
+            if ag and phone_norm:
+                lead_for_thread = _find_lead_id_for_sms(ag, phone_norm)
         _simpletexting_send(reply_to, reply)
+        _log_sms_exchange_for_lead(lead_for_thread, text_body, reply)
         return "", 200
 
     if any(ch.isdigit() for ch in text_body) and ctx:
@@ -1105,7 +1202,12 @@ def sms_inbound():
             reply = "A dispatcher will call you shortly!"
         else:
             reply = "Thanks — we couldn't save your booking. Please call dispatch."
+        ag = _fetch_load_agency_id(lid)
+        lead_for_thread = (
+            _find_lead_id_for_sms(ag, phone_norm) if ag and phone_norm else None
+        )
         _simpletexting_send(reply_to, reply)
+        _log_sms_exchange_for_lead(lead_for_thread, text_body, reply)
         return "", 200
 
     return "", 200

@@ -214,6 +214,7 @@ log_body = {
     "imported_count": len(safe_loads),
     "raw_headers": {
         "template_type": "aljex_big500",
+        "source": "Big 500 Import",
         "new": new_count,
         "updated": updated_count,
         "dupes_dropped": dupes_dropped,

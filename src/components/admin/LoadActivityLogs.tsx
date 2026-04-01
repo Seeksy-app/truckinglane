@@ -159,12 +159,23 @@ export function LoadActivityLogs({ agencyId }: LoadActivityLogsProps) {
     // Manual DAT CSV download from Loads menu
     if (log.sender_email.toLowerCase().startsWith('dat-csv-export@')) {
       const name = typeof b.agent_name === 'string' && b.agent_name.trim() ? b.agent_name.trim() : 'Agent';
-      const count = typeof b.count === 'number' ? b.count : (log.imported_count ?? 0);
+      const count =
+        typeof b.exported === 'number'
+          ? b.exported
+          : typeof b.count === 'number'
+            ? b.count
+            : (log.imported_count ?? 0);
       return (
-        <div className="flex items-center gap-1.5 mt-1.5 text-sm text-green-700 dark:text-green-500">
-          <CheckCircle className="h-4 w-4 shrink-0" />
-          <span>
-            <span className="font-medium">{name}</span> exported {count} load{count === 1 ? '' : 's'} to DAT CSV
+        <div className="flex flex-col gap-1 mt-1.5 text-sm text-green-700 dark:text-green-500">
+          <span className="flex items-center gap-0.5 font-medium">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            {name} · DAT CSV Export
+          </span>
+          <span className="flex items-center gap-3 flex-wrap text-foreground">
+            <span className="flex items-center gap-0.5 text-green-600">
+              <ArrowUp className="h-3 w-3" />
+              {count} exported
+            </span>
           </span>
         </div>
       );

@@ -110,6 +110,17 @@ export function resolveImportActivityLabel(
   if (sender.startsWith("dat-csv-export@")) return "DAT CSV Export";
   if (sender.includes("dat-export")) return "DAT Export";
 
+  const rh = log.raw_headers;
+  if (
+    rh &&
+    typeof rh === "object" &&
+    !Array.isArray(rh) &&
+    typeof (rh as { source?: unknown }).source === "string" &&
+    (rh as { source: string }).source.trim()
+  ) {
+    return (rh as { source: string }).source.trim();
+  }
+
   const tt = resolveImportTemplateType(log, runs, loadsWindow);
   if (tt) return labelFromTemplateType(tt);
 

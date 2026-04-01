@@ -148,7 +148,14 @@ export function DatExportModal({
         subject: null,
         status: "success",
         imported_count: loads.length,
-        raw_headers: { mode: "csv", agent_name: agentName, count: loads.length, sources: groupIds },
+        raw_headers: {
+          mode: "csv",
+          source: "DAT CSV Export",
+          agent_name: agentName,
+          count: loads.length,
+          exported: loads.length,
+          sources: groupIds,
+        },
         error_message: null,
       });
       if (logError) {

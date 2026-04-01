@@ -389,6 +389,20 @@ def _fetch_existing_load_numbers(aid: str, template_type: str, load_numbers: lis
     return found
 
 
+# Display names for load_activity_logs / admin UI (raw_headers.source)
+_INSERT_LOG_SOURCE_BY_TEMPLATE: dict[str, str] = {
+    "truckertools": "Trucker Tools Sync",
+    "aljex_spot": "Aljex Spot Sync",
+    "aljex_big500": "Big 500 Import",
+    "aljex_flat": "Aljex Flat Sync",
+    "adelphia_xlsx": "Adelphia Import",
+    "vms_email": "VMS Import",
+    "oldcastle_gsheet": "Oldcastle Sync",
+    "century_xlsx": "Century Import",
+    "Century": "Century Import",
+}
+
+
 def _insert_email_import_log(
     agency_id: str,
     template_type: str,
@@ -404,6 +418,9 @@ def _insert_email_import_log(
         return
     raw_headers: dict = {
         "template_type": template_type,
+        "source": _INSERT_LOG_SOURCE_BY_TEMPLATE.get(
+            template_type, f"Extension sync ({template_type})"
+        ),
         "new": new_c,
         "updated": updated_c,
         "dupes_dropped": dupes_c,

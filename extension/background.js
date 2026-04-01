@@ -109,7 +109,13 @@ async function uploadBig500(downloadItem, aljexTab) {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'truckertools-intercepted') {
     handleTruckerToolsIntercepted(msg)
-      .then(() => sendResponse({ ok: true }))
+      .then((r) =>
+        sendResponse({
+          ok: true,
+          status: r?.vpsStatus ?? null,
+          loadsCount: r?.loadsCount ?? 0,
+        })
+      )
       .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
     return true;
   }
@@ -662,6 +668,14 @@ function ttStr(x) {
 function extractTruckerToolsLoadsArray(json) {
   if (Array.isArray(json)) return json;
   if (!json || typeof json !== 'object') return [];
+  /** API shape { meta, data: Load[] } */
+  if (
+    Array.isArray(json.data) &&
+    json.data.length > 0 &&
+    typeof json.data[0] === 'object'
+  ) {
+    return json.data;
+  }
   const keys = [
     'loads',
     'nearbyLoads',
@@ -776,7 +790,7 @@ function mapTruckerToolsResponseToLoads(json) {
 }
 
 async function pushTruckerToolsLoadsToVps(loads) {
-  if (!loads || loads.length === 0) return;
+  if (!loads || loads.length === 0) return null;
   const res = await fetch(`${VPS_URL}/insert-aljex-loads`, {
     method: 'POST',
     headers: {
@@ -787,6 +801,7 @@ async function pushTruckerToolsLoadsToVps(loads) {
   });
   const text = await res.text();
   console.log(`[truckertools] VPS insert: ${res.status} ${text.slice(0, 200)}`);
+  return res.status;
 }
 
 async function handleTruckerToolsIntercepted(msg) {
@@ -813,9 +828,11 @@ async function handleTruckerToolsIntercepted(msg) {
   }
 
   const loads = mapTruckerToolsResponseToLoads(json);
+  let vpsStatus = null;
   if (loads.length > 0) {
-    await pushTruckerToolsLoadsToVps(loads);
+    vpsStatus = await pushTruckerToolsLoadsToVps(loads);
   }
+  return { vpsStatus, loadsCount: loads.length };
 }
 
 function buildTruckerToolsNearbyPayload() {

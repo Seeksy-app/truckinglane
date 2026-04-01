@@ -42,11 +42,11 @@
       clone
         .json()
         .then((data) => {
-          /* detail.json = API body; url/authorization needed by the service worker */
+          /* API body is { meta, data: Load[] }; merge so event.detail.data is the loads array */
           document.dispatchEvent(
             new CustomEvent("tt_loads_captured", {
               bubbles: true,
-              detail: { json: data, url, authorization },
+              detail: Object.assign({}, data, { url, authorization }),
             })
           );
         })

@@ -1,7 +1,8 @@
 console.log('[TruckingLane] Trucker Tools interceptor injected');
 /**
- * Injects truckertools-page-hook.js into the page (chrome-extension:// URL — CSP-safe).
- * Relays tt_loads_captured to the service worker, which maps loads and POSTs to VPS.
+ * Injects truckertools-page-hook.js (page context). Listens for tt_loads_captured and forwards
+ * { meta, data } to the service worker. Field mapping → Supabase columns and POST to
+ * /insert-aljex-loads happen in background.js (mapTruckerToolsLoad + pushTruckerToolsLoadsToVps).
  */
 (function initTruckerToolsInterceptor() {
   const script = document.createElement("script");

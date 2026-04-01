@@ -81,30 +81,26 @@ export function formatLoadNotes(load: Load): string {
   
   // Financials section
   lines.push("");
-  if (isTruckerToolsLoad(load.template_type) && !truckerToolsHasLinehaulRate(load)) {
-    lines.push("Rate: TBD • Invoice: TBD");
-    lines.push("Target Pay: TBD • Target Comm: TBD");
-    lines.push("Max Pay: TBD • Max Comm: TBD");
-  } else {
-    const rate = formatRateDisplay(load);
-    const invoice = formatCurrency(load, load.customer_invoice_total);
-    if (rate && invoice) {
-      lines.push(`Rate: ${rate} • Invoice: ${invoice}`);
-    } else if (rate) {
-      lines.push(`Rate: ${rate}`);
-    }
+  const rate = formatRateDisplay(load);
+  const invoice = formatCurrency(load, load.customer_invoice_total);
+  if (rate && invoice) {
+    lines.push(`Rate: ${rate} • Invoice: ${invoice}`);
+  } else if (rate) {
+    lines.push(`Rate: ${rate}`);
+  } else if (invoice) {
+    lines.push(`Invoice: ${invoice}`);
+  }
 
-    const targetPay = formatCurrency(load, load.target_pay);
-    const targetComm = formatCurrency(load, load.target_commission);
-    if (targetPay && targetComm) {
-      lines.push(`Target Pay: ${targetPay} • Target Comm: ${targetComm}`);
-    }
+  const targetPay = formatCurrency(load, load.target_pay);
+  const targetComm = formatCurrency(load, load.target_commission);
+  if (targetPay && targetComm) {
+    lines.push(`Target Pay: ${targetPay} • Target Comm: ${targetComm}`);
+  }
 
-    const maxPay = formatCurrency(load, load.max_pay);
-    const maxComm = formatCurrency(load, load.max_commission);
-    if (maxPay && maxComm) {
-      lines.push(`Max Pay: ${maxPay} • Max Comm: ${maxComm}`);
-    }
+  const maxPay = formatCurrency(load, load.max_pay);
+  const maxComm = formatCurrency(load, load.max_commission);
+  if (maxPay && maxComm) {
+    lines.push(`Max Pay: ${maxPay} • Max Comm: ${maxComm}`);
   }
   
   return lines.filter(l => l !== "").join("\n");

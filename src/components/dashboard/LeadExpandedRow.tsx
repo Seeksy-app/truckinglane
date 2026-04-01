@@ -25,7 +25,8 @@ import { cn } from "@/lib/utils";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import {
   isTruckerToolsLoad,
-  truckerToolsHasLinehaulRate,
+  truckerToolsDollarDisplay,
+  truckerToolsRateFieldDisplay,
 } from "@/lib/truckerToolsLoads";
 
 const AudioPlayer = ({ url }: { url: string }) => {
@@ -352,12 +353,6 @@ export const LeadExpandedRow = ({
 
   const summaryText = conversation?.summary || lead.notes || null;
   const hasTranscript = !!conversation?.transcript;
-
-  const ttAttachedNoFin = Boolean(
-    attachedLoad &&
-      isTruckerToolsLoad(attachedLoad.template_type) &&
-      !truckerToolsHasLinehaulRate(attachedLoad),
-  );
 
   const handleCopySummary = async () => {
     const textToCopy = summaryText || lead.caller_name || '';
@@ -890,13 +885,16 @@ export const LeadExpandedRow = ({
               <div>
                 <span className="text-xs uppercase tracking-wide text-blue-600/70 block mb-0.5">Rate</span>
                 <span className="font-medium text-blue-900">
-                  {ttAttachedNoFin
-                    ? "—"
-                    : attachedLoad.rate_raw
+                  {truckerToolsRateFieldDisplay(
+                    attachedLoad.template_type,
+                    attachedLoad.rate_raw,
+                    !!attachedLoad.is_per_ton,
+                  ) ??
+                    (attachedLoad.rate_raw
                       ? attachedLoad.is_per_ton
                         ? `$${Number(attachedLoad.rate_raw).toLocaleString()}/ton`
                         : `$${Number(attachedLoad.rate_raw).toLocaleString()}`
-                      : "—"}
+                      : "—")}
                 </span>
               </div>
             </div>
@@ -939,51 +937,55 @@ export const LeadExpandedRow = ({
                   <div>
                     <span className="text-xs text-blue-600/70 block">Invoice</span>
                     <span className="font-semibold text-blue-900">
-                      {ttAttachedNoFin
-                        ? "—"
-                        : attachedLoad.customer_invoice_total
+                      {truckerToolsDollarDisplay(
+                        attachedLoad.template_type,
+                        attachedLoad.customer_invoice_total,
+                      ) ??
+                        (attachedLoad.customer_invoice_total
                           ? `$${Number(attachedLoad.customer_invoice_total).toLocaleString()}`
-                          : "—"}
+                          : "—")}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-blue-600/70 block">Target Pay</span>
                     <span className="font-semibold text-blue-900">
-                      {ttAttachedNoFin
-                        ? "—"
-                        : attachedLoad.target_pay
+                      {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.target_pay) ??
+                        (attachedLoad.target_pay
                           ? `$${Number(attachedLoad.target_pay).toLocaleString()}`
-                          : "—"}
+                          : "—")}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-blue-600/70 block">Max Pay</span>
                     <span className="font-medium text-blue-900">
-                      {ttAttachedNoFin
-                        ? "—"
-                        : attachedLoad.max_pay
+                      {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.max_pay) ??
+                        (attachedLoad.max_pay
                           ? `$${Number(attachedLoad.max_pay).toLocaleString()}`
-                          : "—"}
+                          : "—")}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-blue-600/70 block">Target Comm</span>
                     <span className="font-semibold text-emerald-700">
-                      {ttAttachedNoFin
-                        ? "—"
-                        : attachedLoad.target_commission
+                      {truckerToolsDollarDisplay(
+                        attachedLoad.template_type,
+                        attachedLoad.target_commission,
+                      ) ??
+                        (attachedLoad.target_commission
                           ? `$${Number(attachedLoad.target_commission).toLocaleString()}`
-                          : "—"}
+                          : "—")}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-blue-600/70 block">Max Comm</span>
                     <span className="font-medium text-blue-900">
-                      {ttAttachedNoFin
-                        ? "—"
-                        : attachedLoad.max_commission
+                      {truckerToolsDollarDisplay(
+                        attachedLoad.template_type,
+                        attachedLoad.max_commission,
+                      ) ??
+                        (attachedLoad.max_commission
                           ? `$${Number(attachedLoad.max_commission).toLocaleString()}`
-                          : "—"}
+                          : "—")}
                     </span>
                   </div>
                 </div>
@@ -1009,33 +1011,34 @@ export const LeadExpandedRow = ({
                 <div>
                   <span className="text-xs text-muted-foreground">Rate:</span>{" "}
                   <span className="font-medium">
-                    {ttAttachedNoFin
-                      ? "—"
-                      : attachedLoad.rate_raw
+                    {truckerToolsRateFieldDisplay(
+                      attachedLoad.template_type,
+                      attachedLoad.rate_raw,
+                      !!attachedLoad.is_per_ton,
+                    ) ??
+                      (attachedLoad.rate_raw
                         ? attachedLoad.is_per_ton
                           ? `$${Number(attachedLoad.rate_raw).toLocaleString()}/ton`
                           : `$${Number(attachedLoad.rate_raw).toLocaleString()}`
-                        : "N/A"}
+                        : "N/A")}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Target Pay:</span>{" "}
                   <span className="font-medium">
-                    {ttAttachedNoFin
-                      ? "—"
-                      : attachedLoad.target_pay
+                    {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.target_pay) ??
+                      (attachedLoad.target_pay
                         ? `$${Number(attachedLoad.target_pay).toLocaleString()}`
-                        : "N/A"}
+                        : "N/A")}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Max Pay:</span>{" "}
                   <span className="font-medium">
-                    {ttAttachedNoFin
-                      ? "—"
-                      : attachedLoad.max_pay
+                    {truckerToolsDollarDisplay(attachedLoad.template_type, attachedLoad.max_pay) ??
+                      (attachedLoad.max_pay
                         ? `$${Number(attachedLoad.max_pay).toLocaleString()}`
-                        : "N/A"}
+                        : "N/A")}
                   </span>
                 </div>
               </div>

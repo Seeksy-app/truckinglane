@@ -20,7 +20,10 @@ import {
   buildAljexDispatcherCallScript,
   isAljexCallScriptLoad,
 } from "@/lib/aljexLoadBoard";
-import { shouldShowTruckerToolsTableMoneyAsTbd } from "@/lib/truckerToolsLoads";
+import {
+  truckerToolsDollarDisplay,
+  truckerToolsInvoiceDetailLine,
+} from "@/lib/truckerToolsLoads";
 
 type Load = Tables<"loads">;
 type LoadStatus = "open" | "claimed" | "booked" | "closed";
@@ -306,10 +309,9 @@ function LoadDetailContent() {
   const status = (load.status || "open") as LoadStatus;
 
   // Format rate display
-  const ttNoLinehaul = shouldShowTruckerToolsTableMoneyAsTbd(load);
-
   const formatRate = () => {
-    if (ttNoLinehaul) return "—";
+    const ttLine = truckerToolsInvoiceDetailLine(load);
+    if (ttLine !== undefined) return ttLine;
     if (load.is_per_ton && load.rate_raw && load.rate_raw > 0) {
       return `$${load.rate_raw.toLocaleString()} / ton`;
     }
@@ -495,23 +497,22 @@ function LoadDetailContent() {
                 <div>
                   <p className="text-sm text-muted-foreground">Target Pay</p>
                   <p className="text-lg font-semibold">
-                    {ttNoLinehaul ? "—" : load.target_pay ? `$${load.target_pay.toLocaleString()}` : "TBD"}
+                    {truckerToolsDollarDisplay(load.template_type, load.target_pay) ??
+                      (load.target_pay ? `$${load.target_pay.toLocaleString()}` : "TBD")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Max Pay</p>
                   <p className="text-lg font-semibold">
-                    {ttNoLinehaul ? "—" : load.max_pay ? `$${load.max_pay.toLocaleString()}` : "—"}
+                    {truckerToolsDollarDisplay(load.template_type, load.max_pay) ??
+                      (load.max_pay ? `$${load.max_pay.toLocaleString()}` : "—")}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Target Commission</p>
                   <p className="text-lg font-semibold">
-                    {ttNoLinehaul
-                      ? "—"
-                      : load.target_commission
-                        ? `$${load.target_commission.toLocaleString()}`
-                        : "—"}
+                    {truckerToolsDollarDisplay(load.template_type, load.target_commission) ??
+                      (load.target_commission ? `$${load.target_commission.toLocaleString()}` : "—")}
                   </p>
                 </div>
               </div>

@@ -12,7 +12,7 @@ Environment:
   SUPABASE_URL          https://vjgakkomhphvdbwjjwiv.supabase.co
   SUPABASE_SERVICE_ROLE_KEY   Service role key (never expose to clients)
   DAT_BEARER_TOKEN      Optional; DAT freight API bearer (or DAT_TOKEN_FILE, default /root/.dat_bearer_token)
-  SIMPLETEXTING_API_KEY     Optional env override; defaults to in-file key for SimpleTexting /v2/api/messages
+  SIMPLETEXTING_API_KEY     Optional env override; defaults to in-file key for SimpleTexting app.simpletexting.com/api/v2/messages
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ SIMPLETEXTING_API_KEY = os.environ.get(
 ).strip()
 SIMPLETEXTING_MESSAGES_URL = os.environ.get(
     "SIMPLETEXTING_MESSAGES_URL",
-    "https://api.simpletexting.com/v2/api/messages",
+    "https://app.simpletexting.com/api/v2/messages",
 ).rstrip("/")
 
 # Full key set for /insert-aljex-loads so PostgREST upsert rows share identical columns.

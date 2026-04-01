@@ -64,6 +64,7 @@ _ALJEX_LOAD_UPSERT_TEMPLATE = {
     "rate_raw": None,
     "is_active": True,
     "trailer_type": None,
+    "trailer_footage": None,
     "source_row": None,
     "pickup_location_raw": None,
     "dest_location_raw": None,

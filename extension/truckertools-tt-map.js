@@ -96,8 +96,7 @@ function mapTruckerToolsLoad(raw, idx) {
       null
   );
   const trailer_type =
-    ttStr(raw.equipmentType) ||
-    ttStr(raw.truckType || raw.equipment || raw.trailerType || raw.trailer_type);
+    ttStr(raw.truckTypes) || ttStr(raw.equipmentType || raw.trailerType);
 
   const weight_lbs = ttPickNumber(
     raw.weight,
@@ -105,8 +104,11 @@ function mapTruckerToolsLoad(raw, idx) {
     raw.weight_lbs,
     raw.totalWeight
   );
-  const offerRate = ttPickNumber(raw.offerRate, raw.rate, raw.totalRate, raw.customerRate);
-  const miles_tt = ttPickNumber(raw.miles);
+  // Trucker Tools doesn't expose rates via API (e.g. show_rate=1 with no value).
+  const offerRate = null;
+  const miles_tt = ttPickNumber(raw.distance, raw.miles);
+  const trailer_footage = ttPickNumber(raw.length);
+  const commodity = ttStr(raw.commodityId) || null;
 
   const r = offerRate;
   const target_pay =
@@ -147,6 +149,8 @@ function mapTruckerToolsLoad(raw, idx) {
     trailer_type: trailer_type || null,
     weight_lbs,
     miles: miles_tt != null ? miles_tt : undefined,
+    commodity,
+    trailer_footage: trailer_footage != null ? trailer_footage : undefined,
     rate_raw: r,
     customer_invoice_total: r != null && Number.isFinite(r) ? r : 0,
     target_pay,

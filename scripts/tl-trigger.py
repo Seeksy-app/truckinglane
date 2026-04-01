@@ -511,12 +511,13 @@ def insert_aljex_loads():
         dc = dupes_by_pair.get((aid, tt), 0)
         log_payloads.append((aid, tt, len(grp), new_c, upd_c, dc))
 
-    url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=load_number,template_type,agency_id"
+    # Must match UNIQUE (agency_id, template_type, load_number). merge-duplicates = ON CONFLICT DO UPDATE (not ignore).
+    url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=agency_id,template_type,load_number"
     headers = {
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,missing=default",
+        "Prefer": "resolution=merge-duplicates",
     }
     r = requests.post(url, json=deduped, headers=headers, timeout=60)
     if r.status_code not in (200, 201):

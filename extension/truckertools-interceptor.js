@@ -2,7 +2,8 @@ console.log('[TruckingLane] Trucker Tools interceptor injected');
 /**
  * Injects truckertools-page-hook.js (page context). Listens for tt_loads_captured and forwards
  * { meta, data } to the service worker. Field mapping → Supabase columns and POST to
- * /insert-aljex-loads happen in background.js (mapTruckerToolsLoad + pushTruckerToolsLoadsToVps).
+ * Mapping: truckertools-tt-map.js (mapTruckerToolsResponseToLoads). [TT MAP] log here before sendMessage;
+ * VPS POST in background.js (pushTruckerToolsLoadsToVps).
  */
 (function initTruckerToolsInterceptor() {
   const script = document.createElement("script");
@@ -30,6 +31,18 @@ console.log('[TruckingLane] Trucker Tools interceptor injected');
         meta: d.meta,
         data: d.data,
       };
+
+      try {
+        const mappedLoads = mapTruckerToolsResponseToLoads(json);
+        if (mappedLoads[0] != null) {
+          console.log(
+            "[TT MAP] First mapped load:",
+            JSON.stringify(mappedLoads[0], null, 2)
+          );
+        }
+      } catch (e) {
+        console.warn("[TT MAP] map failed:", e);
+      }
 
       console.log("[TruckingLane] Posting to VPS...");
       try {

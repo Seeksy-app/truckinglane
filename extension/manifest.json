@@ -67,7 +67,7 @@
         "https://oldcastle.truckertools.com/*",
         "https://*.truckertools.com/*"
       ],
-      "js": ["truckertools-interceptor.js"],
+      "js": ["truckertools-tt-map.js", "truckertools-interceptor.js"],
       "run_at": "document_start"
     }
   ]

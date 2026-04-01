@@ -3,18 +3,26 @@ const TRIGGER_KEY = 'tl-trigger-7b747d391801b8e5f55b4542';
 const SUPABASE_URL = 'https://vjgakkomhphvdbwjjwiv.supabase.co';
 const SYNC_INTERVAL_MINUTES = 30;
 
+/** Trucker Tools → same agency as extension Aljex sync */
+const TRUCKERTOOLS_AGENCY_ID = '25127efb-6eef-412a-a5d0-3d8242988323';
+const TRUCKERTOOLS_ALARM = 'truckertools-nearby';
+const TRUCKERTOOLS_ADVANTAGE_ID = 'oc6bt2hs';
+const TRUCKERTOOLS_USERNAME = 'andrew@podlogix.co';
+
 // Supabase anon key for TruckingLanes
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZ2Fra29taHBodmRid2pqd2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTIzNjMsImV4cCI6MjA4MjA2ODM2M30.mQRJK5Bj04P-hxwIWkVxG7lXiXI4daMs59UuxU2w1Ow';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.clear('cookie-sync');
   chrome.alarms.create('auto-sync', { periodInMinutes: SYNC_INTERVAL_MINUTES });
+  chrome.alarms.create(TRUCKERTOOLS_ALARM, { periodInMinutes: 30 });
   // chrome.alarms.create('cookie-sync', { periodInMinutes: 25 });
   runFullSync();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'auto-sync') runFullSync();
+  if (alarm.name === TRUCKERTOOLS_ALARM) pollTruckerToolsNearby();
   // if (alarm.name === 'cookie-sync') syncCookiesOnly();
 });
 
@@ -99,6 +107,12 @@ async function uploadBig500(downloadItem, aljexTab) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === 'truckertools-intercepted') {
+    handleTruckerToolsIntercepted(msg)
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
+    return true;
+  }
   if (msg.action === 'sync-now') {
     runFullSync()
       .then(() => triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message)))
@@ -625,5 +639,250 @@ async function syncDatToken() {
   } catch (err) {
     console.log('DAT sync error:', err.message);
     return false;
+  }
+}
+
+// ── TRUCKER TOOLS: getNearbyLoadsV5 intercept + scheduled replay ─────────
+
+function ttPickNumber(...vals) {
+  for (const v of vals) {
+    if (v == null) continue;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    const n = parseFloat(String(v).replace(/[$,]/g, ''));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function ttStr(x) {
+  if (x == null) return '';
+  return String(x).trim();
+}
+
+function extractTruckerToolsLoadsArray(json) {
+  if (Array.isArray(json)) return json;
+  if (!json || typeof json !== 'object') return [];
+  const keys = [
+    'loads',
+    'nearbyLoads',
+    'nearby_loads',
+    'searchResults',
+    'results',
+    'matches',
+    'items',
+    'getNearbyLoadsV5',
+  ];
+  for (const k of keys) {
+    const v = json[k];
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v;
+  }
+  if (json.data && typeof json.data === 'object') {
+    for (const k of keys) {
+      const v = json.data[k];
+      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v;
+    }
+    const gql = json.data.getNearbyLoadsV5;
+    if (Array.isArray(gql) && gql.length > 0 && typeof gql[0] === 'object') return gql;
+    if (gql && typeof gql === 'object') {
+      for (const k of keys) {
+        const v = gql[k];
+        if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v;
+      }
+    }
+  }
+  for (const k of Object.keys(json)) {
+    const v = json[k];
+    if (
+      Array.isArray(v) &&
+      v.length > 0 &&
+      typeof v[0] === 'object' &&
+      (k.toLowerCase().includes('load') || k.toLowerCase().includes('nearby'))
+    ) {
+      return v;
+    }
+  }
+  return [];
+}
+
+function mapTruckerToolsLoad(raw, idx) {
+  const origins = Array.isArray(raw.origins) ? raw.origins : raw.origin ? [raw.origin] : [];
+  const o0 = origins[0] || {};
+  const pickup_city = ttStr(o0.city || o0.cityName || o0.locality || o0.name);
+  const pickup_state = ttStr(o0.state || o0.stateCode || o0.region).slice(0, 8);
+
+  const dests = Array.isArray(raw.destinations) ? raw.destinations : [];
+  const d0 = dests[0] || {};
+  const dest_city = ttStr(d0.city || d0.cityName || d0.locality || d0.name);
+  const dest_state = ttStr(d0.state || d0.stateCode || d0.region).slice(0, 8);
+
+  const ship_raw = raw.pickupDate ?? raw.pickupDateFrom ?? raw.pickup_date ?? raw.pickupFrom ?? null;
+  const ship_date = ship_raw != null ? ttStr(ship_raw) : null;
+
+  const trailer_type = ttStr(
+    raw.truckType || raw.equipment || raw.trailerType || raw.equipmentType || raw.trailer_type
+  );
+
+  const weight_lbs = ttPickNumber(raw.weight, raw.weightLbs, raw.weight_lbs, raw.totalWeight);
+  const rate = ttPickNumber(
+    raw.rate,
+    raw.totalRate,
+    raw.customerRate,
+    raw.linehaul,
+    raw.lineHaul,
+    raw.rateAmount
+  );
+
+  const id =
+    raw.id ??
+    raw.loadId ??
+    raw.shipmentId ??
+    raw.uuid ??
+    raw.referenceId ??
+    raw.referenceNumber ??
+    `gen-${idx}-${Date.now()}`;
+
+  const load_number = `TT-${String(id).replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120)}`;
+
+  return {
+    agency_id: TRUCKERTOOLS_AGENCY_ID,
+    template_type: 'truckertools',
+    load_number,
+    dispatch_status: 'open',
+    status: 'open',
+    pickup_city: pickup_city || null,
+    pickup_state: pickup_state || null,
+    pickup_location_raw: pickup_city && pickup_state ? `${pickup_city}, ${pickup_state}` : pickup_city || null,
+    dest_city: dest_city || null,
+    dest_state: dest_state || null,
+    dest_location_raw: dest_city && dest_state ? `${dest_city}, ${dest_state}` : dest_city || null,
+    ship_date,
+    trailer_type: trailer_type || null,
+    weight_lbs,
+    rate_raw: rate,
+    customer_invoice_total: rate != null ? rate : 0,
+    is_per_ton: false,
+    is_active: true,
+    source_row: JSON.stringify({
+      truckertools: true,
+      scraped_at: new Date().toISOString(),
+      raw,
+    }),
+  };
+}
+
+function mapTruckerToolsResponseToLoads(json) {
+  const rows = extractTruckerToolsLoadsArray(json);
+  return rows.map((r, i) => mapTruckerToolsLoad(r, i));
+}
+
+async function pushTruckerToolsLoadsToVps(loads) {
+  if (!loads || loads.length === 0) return;
+  const res = await fetch(`${VPS_URL}/insert-aljex-loads`, {
+    method: 'POST',
+    headers: {
+      'X-TL-Trigger-Key': TRIGGER_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ loads }),
+  });
+  const text = await res.text();
+  console.log(`[truckertools] VPS insert: ${res.status} ${text.slice(0, 200)}`);
+}
+
+async function handleTruckerToolsIntercepted(msg) {
+  const url = msg.url || '';
+  const authorization = msg.authorization || null;
+  const json = msg.json;
+
+  const toStore = {};
+  if (url) toStore.truckertools_nearby_url = url;
+  if (authorization) toStore.truckertools_token = authorization;
+  if (Object.keys(toStore).length > 0) {
+    await chrome.storage.local.set(toStore);
+  }
+
+  const { truckertools_logged_sample: alreadyLogged } = await chrome.storage.local.get([
+    'truckertools_logged_sample',
+  ]);
+  if (!alreadyLogged && json != null) {
+    console.log(
+      '[truckertools] first intercepted getNearbyLoadsV5 response (inspect field names):',
+      JSON.stringify(json, null, 2)
+    );
+    await chrome.storage.local.set({ truckertools_logged_sample: true });
+  }
+
+  const loads = mapTruckerToolsResponseToLoads(json);
+  if (loads.length > 0) {
+    await pushTruckerToolsLoadsToVps(loads);
+  }
+}
+
+function buildTruckerToolsNearbyPayload() {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    type: 'GET_NEARBY_LOADS',
+    advantageId: TRUCKERTOOLS_ADVANTAGE_ID,
+    authenticated: true,
+    brokerIds: [],
+    destinations: [],
+    origins: [{ type: 'address', country: 'United States', latitude: 37.09024 }],
+    perPage: 750,
+    pickupDateFrom: today,
+    showLTL: false,
+    truckTypes: [],
+    username: TRUCKERTOOLS_USERNAME,
+  };
+}
+
+function normalizeAuthHeader(token) {
+  const t = String(token || '').trim();
+  if (!t) return null;
+  if (/^bearer\s+/i.test(t)) return t;
+  return `Bearer ${t}`;
+}
+
+async function pollTruckerToolsNearby() {
+  const { truckertools_token, truckertools_nearby_url } = await chrome.storage.local.get([
+    'truckertools_token',
+    'truckertools_nearby_url',
+  ]);
+  if (!truckertools_token || !truckertools_nearby_url) {
+    return;
+  }
+
+  const auth = normalizeAuthHeader(truckertools_token);
+  if (!auth) return;
+
+  try {
+    const res = await fetch(truckertools_nearby_url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: auth,
+      },
+      body: JSON.stringify(buildTruckerToolsNearbyPayload()),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      return;
+    }
+    if (!res.ok) {
+      return;
+    }
+
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      return;
+    }
+
+    const loads = mapTruckerToolsResponseToLoads(json);
+    if (loads.length > 0) {
+      await pushTruckerToolsLoadsToVps(loads);
+    }
+  } catch {
+    /* skip silently until next visit or alarm */
   }
 }

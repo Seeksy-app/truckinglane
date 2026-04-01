@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TruckingLane Auto Sync",
-  "version": "2.1",
+  "version": "2.2",
   "description": "Automatically syncs Aljex session and DAT token to TruckingLane VPS every 25 minutes",
   "permissions": [
     "cookies",
@@ -17,7 +17,8 @@
     "https://*.aljex.com/*",
     "https://one.dat.com/*",
     "http://187.77.217.123:3098/*",
-    "https://axel.podlogix.io/*"
+    "https://axel.podlogix.io/*",
+    "https://oldcastle.truckertools.com/*"
   ],
   "externally_connectable": {
     "matches": [
@@ -45,11 +46,22 @@
     "48": "icon.png",
     "128": "icon.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["truckertools-page-hook.js"],
+      "matches": ["https://oldcastle.truckertools.com/*"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["https://dandl.aljex.com/*"],
       "js": ["aljex-spot-injector.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://oldcastle.truckertools.com/*"],
+      "js": ["truckertools-interceptor.js"],
+      "run_at": "document_start"
     }
   ]
 }

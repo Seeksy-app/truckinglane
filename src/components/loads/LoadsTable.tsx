@@ -631,68 +631,80 @@ export function LoadsTable({
                       />
                     </TableCell>
                   )}
-                  <TableCell className="w-8 px-0.5 text-center align-middle">
+                  <TableCell className="w-8 px-0.5 text-center align-middle text-sm sm:text-base">
                     <span className="inline-flex justify-center">
                       {expandedId === load.id ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
+                        <ChevronDown className="h-4 w-4" />
                       ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
+                        <ChevronRight className="h-4 w-4" />
                       )}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center font-medium tabular-nums">
+                  <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
                     {load.load_number || "—"}
                   </TableCell>
-                  <TableCell className="text-center align-middle">
+                  <TableCell className="text-center align-middle text-sm sm:text-base">
                     <div className="flex flex-nowrap items-center justify-center gap-0.5 min-w-0">
-                      <Badge variant="outline" className="text-[10px] font-medium h-5 px-1 shrink-0">
+                      <Badge variant="outline" className="text-xs sm:text-sm font-medium h-6 px-1.5 shrink-0">
                         {getLoadBoardClientPrimaryLabel(load.template_type)}
                       </Badge>
                       {aljexTemplateBadge ? (
                         <Badge
                           variant="secondary"
-                          className="h-5 px-1 py-0 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0"
+                          className="h-6 px-1.5 py-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground shrink-0"
                         >
                           {aljexTemplateBadge}
                         </Badge>
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="text-center tabular-nums">{load.ship_date || "—"}</TableCell>
-                  <TableCell className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate" title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}>
+                  <TableCell className="text-center tabular-nums text-sm sm:text-base">
+                    {load.ship_date || "—"}
+                  </TableCell>
+                  <TableCell
+                    className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
+                    title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}
+                  >
                     {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
                       load.pickup_location_raw ??
                       "—"}
                   </TableCell>
-                  <TableCell className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate" title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}>
+                  <TableCell
+                    className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
+                    title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}
+                  >
                     {formatLaneStateCity(load.dest_state, load.dest_city) ??
                       load.dest_location_raw ??
                       "—"}
                   </TableCell>
-                  <TableCell className="text-center font-medium tabular-nums">
+                  <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
                     {(() => {
                       const rate = formatRate(load);
                       return (
                         <>
                           {rate.display}
-                          {rate.isPerTon && <span className="text-[10px] text-muted-foreground ml-0.5">/ ton</span>}
+                          {rate.isPerTon && (
+                            <span className="text-xs sm:text-sm text-muted-foreground ml-0.5">/ ton</span>
+                          )}
                         </>
                       );
                     })()}
                   </TableCell>
-                  <TableCell className="text-center tabular-nums">
+                  <TableCell className="text-center tabular-nums text-sm sm:text-base">
                     {load.target_pay && load.target_pay > 0
                       ? `$${load.target_pay.toLocaleString()}`
                       : "TBD"}
                   </TableCell>
-                  <TableCell className="text-center align-middle">
+                  <TableCell className="text-center align-middle text-sm sm:text-base">
                     <div className="flex justify-center">
-                      <Badge className={`${statusStyles[load.status] || statusStyles.open} text-[10px] h-5 px-1.5`}>
+                      <Badge
+                        className={`${statusStyles[load.status] || statusStyles.open} text-xs sm:text-sm h-6 px-2`}
+                      >
                         {load.status === "booked" ? "Booked" : load.status === "closed" ? "Closed" : load.status === "claimed" ? "Claimed" : "Open"}
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="text-sm sm:text-base" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-0.5 justify-center">
                       {enableOpenLoadActions && (() => {
                         const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
@@ -709,7 +721,7 @@ export function LoadsTable({
                                 variant="outline"
                                 size="sm"
                                 className={cn(
-                                  "h-7 px-1.5 text-[10px] font-semibold shrink-0 cursor-pointer",
+                                  "h-8 px-2 text-xs sm:text-sm font-semibold shrink-0 cursor-pointer",
                                   isPosted
                                     ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white"
                                     : "border-amber-400/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
@@ -718,7 +730,7 @@ export function LoadsTable({
                                 onClick={(e) => handleRowPostToDat(load, e)}
                               >
                                 {datPostingId === load.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : isPosted ? (
                                   "DAT ✓"
                                 ) : (
@@ -742,9 +754,9 @@ export function LoadsTable({
                             variant="ghost"
                             size="sm"
                             onClick={(e) => handleNavigateToDetail(load.id, load, e)}
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 p-0"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>View Details</TooltipContent>

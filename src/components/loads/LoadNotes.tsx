@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -35,7 +35,7 @@ export function formatCityState(city?: string | null, state?: string | null): st
   if (s) return s.toUpperCase();
   if (c) return c;
   return null;
-};
+}
 
 // Clean copy format - omits null/empty fields
 export function formatLoadNotes(load: Load): string {
@@ -104,27 +104,38 @@ function DetailField({
       ? "—"
       : value;
   return (
-    <div className="space-y-0.5">
+    <div className="flex flex-col gap-1">
       <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <div className="text-sm font-semibold text-foreground leading-tight">
+      <div className="text-sm font-bold text-foreground leading-tight">
         {display}
       </div>
     </div>
   );
 }
 
-function DetailCard({ title, children }: { title: string; children: ReactNode }) {
+/** Omits the entire row when value is empty (equipment optional fields). */
+function OptionalDetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  if (value == null || value === "") return null;
   return (
-    <div className="rounded-md border border-border/70 bg-background/50 p-2 min-h-0">
-      <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-        {title}
-      </h4>
-      <div className="flex flex-col gap-1.5">{children}</div>
+    <div className="flex flex-col gap-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-sm font-bold text-foreground leading-tight">{value}</div>
     </div>
   );
 }
+
+const dispatchBadgeClass =
+  "w-fit text-[10px] h-5 px-1.5 font-semibold border bg-[hsl(25,95%,53%)]/15 text-[hsl(25,95%,40%)] border-[hsl(25,95%,53%)]/30 hover:bg-[hsl(25,95%,53%)]/15 shadow-none";
 
 interface LoadDetailsGridProps {
   load: Load;
@@ -159,46 +170,57 @@ export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
       ? `${load.tarps} (${load.tarp_size})`
       : String(load.tarps)
     : null;
-  const trailerTypeDisplay = [load.trailer_type, tarpsDisplay].filter(Boolean).join(" · ") || null;
+  const trailerTypeLine = [load.trailer_type, tarpsDisplay].filter(Boolean).join(" · ") || null;
 
   const commodityDisplay = getCommodityDisplay(load);
+  const footageLine =
+    load.trailer_footage != null ? `${load.trailer_footage} ft` : null;
+  const weightLine =
+    load.weight_lbs != null ? `${load.weight_lbs.toLocaleString()} lbs` : null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-      <DetailCard title="Route">
-        <DetailField label="Ship date" value={load.ship_date} />
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+      {/* Route */}
+      <div className="flex flex-col gap-4 min-w-0">
+        <DetailField label="Ship Date" value={load.ship_date} />
         <DetailField label="Pickup" value={pickup} />
         <DetailField label="Delivery" value={delivery} />
-      </DetailCard>
+      </div>
 
-      <DetailCard title="Equipment">
-        <DetailField label="Trailer type" value={trailerTypeDisplay} />
-        <DetailField
-          label="Footage"
-          value={load.trailer_footage != null ? `${load.trailer_footage} ft` : null}
-        />
-        <DetailField
-          label="Weight"
-          value={load.weight_lbs != null ? `${load.weight_lbs.toLocaleString()} lbs` : null}
-        />
-        <DetailField label="Commodity" value={commodityDisplay} />
-      </DetailCard>
+      {/* Equipment */}
+      <div className="flex flex-col gap-4 min-w-0">
+        <DetailField label="Trailer Type" value={trailerTypeLine} />
+        <OptionalDetailField label="Footage" value={footageLine} />
+        <OptionalDetailField label="Weight" value={weightLine} />
+        <OptionalDetailField label="Commodity" value={commodityDisplay} />
+      </div>
 
-      <DetailCard title="Rates">
+      {/* Financials */}
+      <div className="flex flex-col gap-4 min-w-0">
         <DetailField
           label={load.is_per_ton ? "Rate ($/ton)" : "Rate"}
           value={rate}
         />
         <DetailField label="Invoice" value={invoice} />
-        <DetailField label="Target pay" value={targetPay} />
-        <DetailField label="Max pay" value={maxPay} />
-      </DetailCard>
+        <DetailField label="Target Pay" value={targetPay} />
+        <DetailField label="Max Pay" value={maxPay} />
+      </div>
 
-      <DetailCard title="Commission">
-        <DetailField label="Target comm" value={targetComm} />
-        <DetailField label="Max comm" value={maxComm} />
-        <DetailField label="Dispatch status" value={load.dispatch_status} />
-      </DetailCard>
+      {/* Commission */}
+      <div className="flex flex-col gap-4 min-w-0">
+        <DetailField label="Target Comm" value={targetComm} />
+        <DetailField label="Max Comm" value={maxComm} />
+        {load.dispatch_status?.trim() ? (
+          <div className="flex flex-col gap-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Dispatch
+            </div>
+            <Badge variant="outline" className={dispatchBadgeClass}>
+              {load.dispatch_status}
+            </Badge>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadDetailsGrid, formatLoadNotes } from "./LoadNotes";
+import { MarketRatesSection } from "./MarketRatesSection";
 import {
   Copy,
   Check,
@@ -388,6 +389,8 @@ export function LoadExpandedRow({
         </div>
 
         <LoadDetailsGrid load={load} />
+
+        <MarketRatesSection load={load} />
 
         {dispatcherCallScript ? (
           <div className="rounded-md border border-border bg-background/50 p-2 space-y-1.5">

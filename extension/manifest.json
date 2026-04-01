@@ -47,6 +47,15 @@
     "48": "icon.png",
     "128": "icon.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["truckertools-page-hook.js"],
+      "matches": [
+        "https://oldcastle.truckertools.com/*",
+        "https://*.truckertools.com/*"
+      ]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["https://dandl.aljex.com/*"],

@@ -17,7 +17,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -442,29 +441,20 @@ def upload_big500():
     if not os.path.isfile(script):
         return jsonify({"error": f"parse script not found: {script}"}), 500
 
-    fd, path = tempfile.mkstemp(suffix=".csv", text=True)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
-            f.write(raw)
-
-        env = os.environ.copy()
-        proc = subprocess.run(
-            [sys.executable, script, path],
-            capture_output=True,
-            text=True,
-            timeout=600,
-            env=env,
-        )
-        if proc.returncode != 0:
-            err_out = (proc.stderr or proc.stdout or "").strip() or "parse-big500 failed"
-            return jsonify({"error": err_out[-8000:]}), 502
-        out = (proc.stdout or "").strip()
-        return jsonify({"success": True, "message": out[-4000:] if out else "ok"})
-    finally:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
+    env = os.environ.copy()
+    proc = subprocess.run(
+        [sys.executable, script],
+        input=raw,
+        capture_output=True,
+        text=True,
+        timeout=600,
+        env=env,
+    )
+    if proc.returncode != 0:
+        err_out = (proc.stderr or proc.stdout or "").strip() or "parse-big500 failed"
+        return jsonify({"error": err_out[-8000:]}), 502
+    out = (proc.stdout or "").strip()
+    return jsonify({"success": True, "message": out[-4000:] if out else "ok"})
 
 
 @app.post("/dat-lane-rates")

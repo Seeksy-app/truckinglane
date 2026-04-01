@@ -14,6 +14,7 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "adelphia_xlsx",
   "oldcastle_gsheet",
   "century_xlsx",
+  "Century",
 ] as const;
 
 /** UI groups for the Export to DAT modal (maps to template_type). */
@@ -23,7 +24,7 @@ export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "vms", label: "VMS", templateTypes: ["vms_email"] as const },
   { id: "adelphia", label: "Adelphia", templateTypes: ["adelphia_xlsx"] as const },
   { id: "oldcastle", label: "Oldcastle", templateTypes: ["oldcastle_gsheet"] as const },
-  { id: "century", label: "Century", templateTypes: ["century_xlsx"] as const },
+  { id: "century", label: "Century", templateTypes: ["century_xlsx", "Century"] as const },
 ] as const;
 
 export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
@@ -244,6 +245,7 @@ export function mapEquipmentCode(trailerType: string | null | undefined, templat
       templateType === "vms_email" ||
       templateType === "oldcastle_gsheet" ||
       templateType === "century_xlsx" ||
+      templateType === "Century" ||
       templateType === "aljex_big500" ||
       templateType === "aljex_spot"
     ) {
@@ -370,7 +372,17 @@ export function generateDATCsv(loads: Load[]): string {
   return [headerLine, ...dataLines].join("\n");
 }
 
-const DAT_EXPORT_TIMESTAMP_KEY = "dat_last_export_timestamp";
+/** Primary key for last DAT export time (also migrates legacy `dat_last_export_timestamp`). */
+export const LAST_DAT_EXPORT_STORAGE_KEY = "lastDatExport";
+const LEGACY_DAT_EXPORT_TIMESTAMP_KEY = "dat_last_export_timestamp";
+
+function readLastDatExportIso(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return (
+    localStorage.getItem(LAST_DAT_EXPORT_STORAGE_KEY) ??
+    localStorage.getItem(LEGACY_DAT_EXPORT_TIMESTAMP_KEY)
+  );
+}
 
 /** Dismissal time for admin DAT pending banner (ISO); banner may return after 30 min if still pending. */
 export const DAT_REMINDER_DISMISS_KEY = "dat_pending_reminder_dismissed_at";
@@ -394,7 +406,7 @@ export function isDatReminderBusinessHoursCentral(now: Date = new Date()): boole
 
 export function minutesSinceLastDatExport(): number {
   if (typeof localStorage === "undefined") return 1e6;
-  const ts = localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+  const ts = readLastDatExportIso();
   if (!ts) return 1e6;
   return (Date.now() - new Date(ts).getTime()) / 60_000;
 }
@@ -436,7 +448,7 @@ export function getNewLoadsSinceLastExport(loads: Load[]): Load[] {
     return loads.filter(load => (load as any).dat_posted_at == null);
   }
   // Column not yet populated (fresh install) — fall back to localStorage
-  const lastExport = localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+  const lastExport = readLastDatExportIso();
   if (!lastExport) return loads;
   const lastExportDate = new Date(lastExport);
   return loads.filter(load => new Date(load.created_at) > lastExportDate);
@@ -444,12 +456,19 @@ export function getNewLoadsSinceLastExport(loads: Load[]): Load[] {
 
 // Save the current timestamp as last export time
 export function markDATExportComplete(): void {
-  localStorage.setItem(DAT_EXPORT_TIMESTAMP_KEY, new Date().toISOString());
+  const now = new Date().toISOString();
+  localStorage.setItem(LAST_DAT_EXPORT_STORAGE_KEY, now);
+  try {
+    localStorage.removeItem(LEGACY_DAT_EXPORT_TIMESTAMP_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 // Get the last export timestamp for display
 export function getLastDATExportTimestamp(): string | null {
-  return localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+  if (typeof localStorage === "undefined") return null;
+  return readLastDatExportIso();
 }
 
 // Download the CSV file

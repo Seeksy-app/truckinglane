@@ -963,7 +963,10 @@ Deno.serve(async (req) => {
       console.log(`Deduplicated ${mappedLoads.length} loads to ${safeLoads.length} unique loads`);
       
       let importedCount = 0;
-      
+      let archivedNotInBatch = 0;
+      const loadNumberNotInList = (nums: string[]) =>
+        `(${nums.map((n) => `"${String(n).replace(/"/g, "")}"`).join(",")})`;
+
       if (safeLoads.length > 0) {
         const today = new Date().toISOString().split("T")[0];
         const loadsWithBoardDate = safeLoads.map(load => ({
@@ -1000,21 +1003,24 @@ Deno.serve(async (req) => {
         
         importedCount = safeLoads.length;
         
-        // Re-archive any loads that the upsert brought back from old imports
-        // The upsert sets is_active=true on ALL matching load_numbers, including
-        // loads created on previous days. We only want TODAY's parsed loads active.
-        const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
-        const { data: reactivated } = await supabase
+        // Archive loads not in this email's load numbers (never delete)
+        const currentLoadNumbers = safeLoads.map(l => String(l.load_number));
+        const { data: archivedRows } = await supabase
           .from("loads")
-          .update({ is_active: false, archived_at: new Date().toISOString() })
+          .update({
+            dispatch_status: "archived",
+            is_active: false,
+            archived_at: new Date().toISOString(),
+          })
           .eq("agency_id", agency.id)
           .eq("template_type", "vms_email")
-          .eq("is_active", true)
+          .neq("dispatch_status", "archived")
           .is("booked_at", null)
-          .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+          .not("load_number", "in", loadNumberNotInList(currentLoadNumbers))
           .select("id");
-        if (reactivated?.length) {
-          console.log(`Re-archived ${reactivated.length} stale loads not in current batch`);
+        archivedNotInBatch = archivedRows?.length ?? 0;
+        if (archivedNotInBatch) {
+          console.log(`Archived ${archivedNotInBatch} VMS loads not in current batch`);
         }
         
         // Post new loads to X
@@ -1039,7 +1045,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         imported: importedCount,
-        archived: reactivated?.length || 0,
+        archived: archivedNotInBatch,
         agency: agency.name,
         import_type: "vms_email",
       }), {
@@ -1407,16 +1413,21 @@ Deno.serve(async (req) => {
       
       importedCount = safeLoads.length;
       
-      // Archive loads NOT in the new batch
-      const currentLoadNumbers = safeLoads.map(l => l.load_number as string);
+      // Archive loads NOT in the new batch (never delete)
+      const currentLoadNumbers = safeLoads.map(l => String(l.load_number));
+      const adelNotIn = `(${currentLoadNumbers.map((n) => `"${String(n).replace(/"/g, "")}"`).join(",")})`;
       const { data: archivedData } = await supabase
         .from("loads")
-        .update({ is_active: false, archived_at: new Date().toISOString() })
+        .update({
+          dispatch_status: "archived",
+          is_active: false,
+          archived_at: new Date().toISOString(),
+        })
         .eq("agency_id", agency.id)
         .eq("template_type", "adelphia_xlsx")
-        .eq("is_active", true)
+        .neq("dispatch_status", "archived")
         .is("booked_at", null)
-        .not("load_number", "in", `(${currentLoadNumbers.join(",")})`)
+        .not("load_number", "in", adelNotIn)
         .select("id");
       
       const archivedCount = archivedData?.length || 0;

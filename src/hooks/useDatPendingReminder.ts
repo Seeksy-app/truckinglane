@@ -33,7 +33,7 @@ export function useDatPendingReminder(isAdmin: boolean, opts: Opts) {
 
   useEffect(() => {
     if (!isAdmin) return;
-    const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 5 * 60_000);
     return () => window.clearInterval(id);
   }, [isAdmin]);
 
@@ -63,8 +63,7 @@ export function useDatPendingReminder(isAdmin: boolean, opts: Opts) {
     playDatReminderDing();
     if (Notification.permission === "granted") {
       try {
-        new Notification("TruckingLanes", {
-          body: `${pending} loads pending DAT upload`,
+        new Notification(`TruckingLanes: ${pending} loads pending DAT upload`, {
           tag: "dat-pending-reminder",
         });
       } catch {

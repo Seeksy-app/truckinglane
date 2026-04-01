@@ -336,7 +336,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                           queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
                           queryClient.invalidateQueries({ queryKey: ["dat-reminder-pending"] });
                           queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-                          toast.success(`Exported ${count} pending loads to DAT format`);
+                          toast.success(`${count} loads exported to DAT`);
                         }}
                       >
                         <Download className="h-4 w-4 mr-2" />

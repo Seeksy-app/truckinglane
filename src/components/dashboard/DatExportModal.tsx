@@ -136,7 +136,7 @@ export function DatExportModal({
       queryClient.invalidateQueries({ queryKey: ["dat-pending-export"] });
       queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
       queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-      toast.success(`Exported ${loads.length} load${loads.length === 1 ? "" : "s"} to DAT CSV`);
+      toast.success(`${loads.length} loads exported to DAT`);
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
@@ -191,7 +191,7 @@ export function DatExportModal({
                     </Label>
                   </div>
                   <span className="text-sm text-muted-foreground tabular-nums shrink-0">
-                    {counts[g.id] ?? 0} pending
+                    ({counts[g.id] ?? 0} pending)
                   </span>
                 </li>
               ))}

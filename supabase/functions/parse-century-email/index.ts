@@ -35,10 +35,6 @@ function shipDateFromReceived(receivedIso: string): string {
   return d.toISOString().split("T")[0];
 }
 
-function subjectMatchesLoadsMonthDay(subject: string): boolean {
-  return /^Loads\s+[A-Za-z]+\s+\d{1,2}\s*$/i.test((subject || "").trim());
-}
-
 async function hash3(pickupSt: string, destSt: string, salt: string): Promise<string> {
   const enc = new TextEncoder().encode(`${pickupSt}|${destSt}|${salt}`);
   const buf = await crypto.subtle.digest("SHA-256", enc);
@@ -175,12 +171,7 @@ Deno.serve(async (req) => {
     }
 
     const subject = String(payload.subject || payload.data?.subject || payload.email?.subject || "");
-    if (!subjectMatchesLoadsMonthDay(subject)) {
-      return new Response(
-        JSON.stringify({ error: 'Subject must match pattern "Loads [Month] [Day]"' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    // Sender is verified as ardell@centuryent.com above — any subject is accepted (incl. "Loads …", "century", "loads").
 
     const attachments = payload.attachments || payload.data?.attachments || payload.email?.attachments || [];
     const pdfs = attachments.filter((a: { filename?: string }) =>

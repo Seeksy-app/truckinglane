@@ -567,7 +567,7 @@ function stripHtmlToText(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Subject line only — order: VMS, Oldcastle, Adelphia, Century, Allied, Semco */
+/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (century|loads) so e.g. "Semco loads" stays Semco. Sender ardell@centuryent.com forces Century before this runs. */
 function detectFromSubject(subjectLower: string): EmailImportKind | null {
   const s = subjectLower || "";
   const containsVMS = s.includes("vms") || s.includes("mvs") || s.includes("vsm");
@@ -578,16 +578,16 @@ function detectFromSubject(subjectLower: string): EmailImportKind | null {
     s.includes("adlephia") ||
     s.includes("adelphoa") ||
     s.includes("adelpha");
-  const containsCentury = s.includes("century enterprises");
+  const containsCentury = s.includes("century") || s.includes("loads");
   const containsAllied = s.includes("allied building stores") || /\babs\b/i.test(s);
   const containsSemco = s.includes("semco distributing") || s.includes("semco");
 
   if (containsVMS) return "vms";
   if (containsOldcastle) return "oldcastle";
   if (containsAdelphia) return "adelphia";
-  if (containsCentury) return "century";
   if (containsAllied) return "allied";
   if (containsSemco) return "semco";
+  if (containsCentury) return "century";
   return null;
 }
 
@@ -610,9 +610,9 @@ function detectFromBody(bodyLower: string): EmailImportKind | null {
   ) {
     return "adelphia";
   }
-  if (b.includes("century enterprises")) return "century";
   if (b.includes("allied building stores") || /\babs\b/.test(b)) return "allied";
   if (b.includes("semco distributing") || b.includes("semco")) return "semco";
+  if (b.includes("century")) return "century";
   return null;
 }
 
@@ -724,7 +724,10 @@ Deno.serve(async (req) => {
     const subjectLower = (subject || "").toLowerCase();
     const emailId = payload.data?.email_id || payload.email_id;
 
-    let importKind: EmailImportKind | null = detectFromSubject(subjectLower);
+    const senderLower = cleanEmail.toLowerCase().trim();
+    let importKind: EmailImportKind | null = senderLower === "ardell@centuryent.com"
+      ? "century"
+      : detectFromSubject(subjectLower);
     let emailBody = "";
 
     if (!importKind) {
@@ -743,13 +746,13 @@ Deno.serve(async (req) => {
         subject: subject,
         status: "rejected",
         error_message:
-          "No customer keywords in subject or body (Adelphia, VMS, Oldcastle, Century Enterprises, Allied, Semco)",
+          "No customer keywords in subject or body (Adelphia, VMS, Oldcastle, Century/loads, ardell@centuryent.com, Allied, Semco)",
         raw_headers: emailHeaders,
       });
       return new Response(
         JSON.stringify({
           error:
-            "Email must mention a supported customer in the subject or body (e.g. Adelphia, VMS, Oldcastle, Century Enterprises, Allied Building Stores, Semco)",
+            "Email must mention a supported customer in the subject or body (e.g. Adelphia, VMS, Oldcastle, century/loads, ardell@centuryent.com, Allied Building Stores, Semco)",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

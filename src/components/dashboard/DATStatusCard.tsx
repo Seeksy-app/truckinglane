@@ -127,8 +127,11 @@ export function DATStatusCard() {
                   {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                 </div>
 
-                <p className="text-sm font-medium text-foreground tabular-nums">
-                  {uploaded} uploaded · {pending} pending
+                <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums leading-tight">
+                  {pending} pending
+                </p>
+                <p className="text-xs text-muted-foreground tabular-nums mt-1">
+                  {uploaded} uploaded to DAT
                 </p>
 
                 <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -150,7 +153,7 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {uploaded} uploaded to DAT · {pending} pending (open/available, not yet uploaded)
+              {pending} pending (open/available, not yet uploaded) · {uploaded} uploaded to DAT
               {failed > 0 ? ` · ${failed} need destination fix (click card)` : ""}
             </p>
           </TooltipContent>

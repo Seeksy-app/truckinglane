@@ -20,6 +20,7 @@ import {
   buildAljexDispatcherCallScript,
   isAljexCallScriptLoad,
 } from "@/lib/aljexLoadBoard";
+import { shouldShowTruckerToolsTableMoneyAsTbd } from "@/lib/truckerToolsLoads";
 
 type Load = Tables<"loads">;
 type LoadStatus = "open" | "claimed" | "booked" | "closed";
@@ -305,7 +306,10 @@ function LoadDetailContent() {
   const status = (load.status || "open") as LoadStatus;
 
   // Format rate display
+  const ttNoLinehaul = shouldShowTruckerToolsTableMoneyAsTbd(load);
+
   const formatRate = () => {
+    if (ttNoLinehaul) return "—";
     if (load.is_per_ton && load.rate_raw && load.rate_raw > 0) {
       return `$${load.rate_raw.toLocaleString()} / ton`;
     }
@@ -491,19 +495,23 @@ function LoadDetailContent() {
                 <div>
                   <p className="text-sm text-muted-foreground">Target Pay</p>
                   <p className="text-lg font-semibold">
-                    {load.target_pay ? `$${load.target_pay.toLocaleString()}` : "TBD"}
+                    {ttNoLinehaul ? "—" : load.target_pay ? `$${load.target_pay.toLocaleString()}` : "TBD"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Max Pay</p>
                   <p className="text-lg font-semibold">
-                    {load.max_pay ? `$${load.max_pay.toLocaleString()}` : "—"}
+                    {ttNoLinehaul ? "—" : load.max_pay ? `$${load.max_pay.toLocaleString()}` : "—"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Target Commission</p>
                   <p className="text-lg font-semibold">
-                    {load.target_commission ? `$${load.target_commission.toLocaleString()}` : "—"}
+                    {ttNoLinehaul
+                      ? "—"
+                      : load.target_commission
+                        ? `$${load.target_commission.toLocaleString()}`
+                        : "—"}
                   </p>
                 </div>
               </div>

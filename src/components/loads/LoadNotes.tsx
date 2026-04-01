@@ -1,10 +1,20 @@
 import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/integrations/supabase/types";
+import {
+  truckerToolsDollarDisplay,
+  truckerToolsRateFieldDisplay,
+} from "@/lib/truckerToolsLoads";
 
 type Load = Tables<"loads">;
 
 // Format rate display
 const formatRateDisplay = (load: Load): string | null => {
+  const tt = truckerToolsRateFieldDisplay(
+    load.template_type,
+    load.rate_raw,
+    !!load.is_per_ton,
+  );
+  if (tt !== undefined) return tt;
   if (load.rate_raw == null || Number(load.rate_raw) <= 0) return null;
   if (load.is_per_ton) {
     return `$${Number(load.rate_raw).toLocaleString()}/ton`;
@@ -17,6 +27,8 @@ const formatCurrency = (load: Load, value: number | null): string | null => {
   if (load.is_per_ton && (!load.weight_lbs || load.customer_invoice_total === 0)) {
     return "TBD";
   }
+  const tt = truckerToolsDollarDisplay(load.template_type, value);
+  if (tt !== undefined) return tt;
   if (!value && value !== 0) return null;
   return `$${value.toLocaleString()}`;
 };
@@ -69,24 +81,30 @@ export function formatLoadNotes(load: Load): string {
   
   // Financials section
   lines.push("");
-  const rate = formatRateDisplay(load);
-  const invoice = formatCurrency(load, load.customer_invoice_total);
-  if (rate && invoice) {
-    lines.push(`Rate: ${rate} • Invoice: ${invoice}`);
-  } else if (rate) {
-    lines.push(`Rate: ${rate}`);
-  }
-  
-  const targetPay = formatCurrency(load, load.target_pay);
-  const targetComm = formatCurrency(load, load.target_commission);
-  if (targetPay && targetComm) {
-    lines.push(`Target Pay: ${targetPay} • Target Comm: ${targetComm}`);
-  }
-  
-  const maxPay = formatCurrency(load, load.max_pay);
-  const maxComm = formatCurrency(load, load.max_commission);
-  if (maxPay && maxComm) {
-    lines.push(`Max Pay: ${maxPay} • Max Comm: ${maxComm}`);
+  if (isTruckerToolsLoad(load.template_type) && !truckerToolsHasLinehaulRate(load)) {
+    lines.push("Rate: TBD • Invoice: TBD");
+    lines.push("Target Pay: TBD • Target Comm: TBD");
+    lines.push("Max Pay: TBD • Max Comm: TBD");
+  } else {
+    const rate = formatRateDisplay(load);
+    const invoice = formatCurrency(load, load.customer_invoice_total);
+    if (rate && invoice) {
+      lines.push(`Rate: ${rate} • Invoice: ${invoice}`);
+    } else if (rate) {
+      lines.push(`Rate: ${rate}`);
+    }
+
+    const targetPay = formatCurrency(load, load.target_pay);
+    const targetComm = formatCurrency(load, load.target_commission);
+    if (targetPay && targetComm) {
+      lines.push(`Target Pay: ${targetPay} • Target Comm: ${targetComm}`);
+    }
+
+    const maxPay = formatCurrency(load, load.max_pay);
+    const maxComm = formatCurrency(load, load.max_commission);
+    if (maxPay && maxComm) {
+      lines.push(`Max Pay: ${maxPay} • Max Comm: ${maxComm}`);
+    }
   }
   
   return lines.filter(l => l !== "").join("\n");

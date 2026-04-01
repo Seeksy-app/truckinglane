@@ -40,7 +40,7 @@ import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadDATExport, isExportableLoad } from "@/lib/datExport";
-import { shouldShowTruckerToolsTableMoneyAsTbd } from "@/lib/truckerToolsLoads";
+import { truckerToolsInvoiceColumnDisplay } from "@/lib/truckerToolsLoads";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -391,6 +391,8 @@ export function LoadsTable({
 
   // Helper to format rate display
   const formatRate = (load: Load): { display: string; isPerTon: boolean } => {
+    const ttInv = truckerToolsInvoiceColumnDisplay(load);
+    if (ttInv) return ttInv;
     // For per-ton loads - show "$X / ton" when rate exists
     if (load.is_per_ton) {
       if (load.rate_raw && load.rate_raw > 0) {

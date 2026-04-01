@@ -24,6 +24,7 @@ import {
   LOADS_TABLE_DENSE_CLASS,
   LOADS_TABLE_TOOLBAR_CLASS,
 } from "@/lib/loadTableDisplay";
+import { truckerToolsInvoiceColumnDisplay } from "@/lib/truckerToolsLoads";
 
 type Load = Tables<"loads">;
 
@@ -153,6 +154,8 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
   }
 
   const formatRate = (load: Load): { display: string; isPerTon: boolean } => {
+    const ttInv = truckerToolsInvoiceColumnDisplay(load);
+    if (ttInv) return ttInv;
     if (load.is_per_ton) {
       if (load.rate_raw && load.rate_raw > 0) return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: true };
       return { display: "TBD", isPerTon: false };
@@ -371,7 +374,9 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                   })()}
                 </TableCell>
                 <TableCell className="text-center tabular-nums text-sm sm:text-base">
-                  {load.target_pay && load.target_pay > 0 ? `$${load.target_pay.toLocaleString()}` : "TBD"}
+                  {load.target_pay && load.target_pay > 0
+                    ? `$${load.target_pay.toLocaleString()}`
+                    : "TBD"}
                 </TableCell>
                 <TableCell className="text-center align-middle text-sm sm:text-base">
                   <div className="flex justify-center">

@@ -439,7 +439,7 @@ def _sms_context_fetch(phone_norm: str) -> dict | None:
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
         headers=_supabase_headers(),
-        params={"phone_normalized": f"eq.{phone_norm}", "select": "phone_normalized,load_id,stage,updated_at"},
+        params={"phone_norm": f"eq.{phone_norm}", "select": "phone_norm,load_id,stage,updated_at"},
         timeout=15,
     )
     if r.status_code != 200:
@@ -452,12 +452,10 @@ def _sms_context_fetch(phone_norm: str) -> dict | None:
 
 
 def _sms_context_upsert(phone_norm: str, load_id: str, stage: str) -> bool:
-    now_iso = datetime.now(timezone.utc).isoformat()
     body = {
-        "phone_normalized": phone_norm,
+        "phone_norm": phone_norm,
         "load_id": load_id,
         "stage": stage,
-        "updated_at": now_iso,
     }
     r = requests.post(
         f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
@@ -475,7 +473,7 @@ def _sms_context_patch_stage(phone_norm: str, stage: str) -> bool:
     r = requests.patch(
         f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
         headers={**_supabase_headers(json_body=True), "Prefer": "return=minimal"},
-        params={"phone_normalized": f"eq.{phone_norm}"},
+        params={"phone_norm": f"eq.{phone_norm}"},
         json={"stage": stage, "updated_at": datetime.now(timezone.utc).isoformat()},
         timeout=15,
     )
@@ -486,7 +484,7 @@ def _sms_context_delete(phone_norm: str) -> None:
     requests.delete(
         f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
         headers={**_supabase_headers(), "Prefer": "return=minimal"},
-        params={"phone_normalized": f"eq.{phone_norm}"},
+        params={"phone_norm": f"eq.{phone_norm}"},
         timeout=15,
     )
 

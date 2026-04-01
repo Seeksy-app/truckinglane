@@ -5,7 +5,7 @@ ALTER TABLE public.loads
   ADD COLUMN IF NOT EXISTS booked_by_mc text;
 
 CREATE TABLE IF NOT EXISTS public.tl_sms_booking_context (
-  phone_normalized text PRIMARY KEY,
+  phone_norm text PRIMARY KEY,
   load_id uuid NOT NULL REFERENCES public.loads (id) ON DELETE CASCADE,
   stage text NOT NULL DEFAULT 'offered' CHECK (stage IN ('offered', 'awaiting_mc')),
   updated_at timestamptz NOT NULL DEFAULT now()

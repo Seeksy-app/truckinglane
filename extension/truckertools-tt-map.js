@@ -69,6 +69,13 @@ function extractTruckerToolsLoadsArray(json) {
 }
 
 function mapTruckerToolsLoad(raw, idx) {
+  const numericFields = Object.entries(raw).filter(
+    ([k, v]) =>
+      (typeof v === 'number' && v > 100) ||
+      (typeof v === 'string' && parseFloat(v) > 100 && !isNaN(parseFloat(v))),
+  );
+  console.log('[TT RATE FIELDS]', numericFields.map(([k, v]) => k + ':' + v).join(', '));
+
   const origins = Array.isArray(raw.origins) ? raw.origins : raw.origin ? [raw.origin] : [];
   const o0 = origins[0] || {};
   const dests = Array.isArray(raw.destinations) ? raw.destinations : [];
@@ -105,8 +112,18 @@ function mapTruckerToolsLoad(raw, idx) {
     raw.weight_lbs,
     raw.totalWeight
   );
-  // Trucker Tools doesn't expose rates via API (e.g. show_rate=1 with no value).
-  const offerRate = null;
+  const offerRate = ttPickNumber(
+    raw.offerRate,
+    raw.rate,
+    raw.totalRate,
+    raw.customerRate,
+    raw.price,
+    raw.loadRate,
+    raw.carrierRate,
+    raw.offerAmount,
+    raw.bookItNowRate,
+    raw.binRate,
+  );
   const miles_tt = ttPickNumber(raw.distance, raw.miles);
   const trailer_footage = ttPickNumber(raw.length);
   const commodity = ttStr(raw.commodityId) || null;

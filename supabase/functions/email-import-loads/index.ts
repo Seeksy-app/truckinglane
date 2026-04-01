@@ -83,14 +83,10 @@ async function recordSuccessfulInboundDedupe(
   await supabase.from("email_import_attachment_dedupe").delete().lt("created_at", pruneBefore);
 }
 
-/** Subject substrings (case-insensitive) that route to Century / PDF parser eligibility. */
-const CENTURY_EMAIL_SUBJECT_KEYWORDS = ["century", "loads"] as const;
-
-function subjectMatchesCenturySubjectWhitelist(subject: string): boolean {
-  const s = String(subject ?? "")
-    .normalize("NFKC")
-    .toLowerCase();
-  return CENTURY_EMAIL_SUBJECT_KEYWORDS.some((kw) => s.includes(kw));
+/** Century PDF import: subject/body must contain "century" (case-insensitive). Not "loads" alone — avoids mis-routing. */
+function subjectMatchesCenturyKeyword(subject: string): boolean {
+  const s = String(subject ?? "").normalize("NFKC").toLowerCase();
+  return s.includes("century");
 }
 
 function resolveInboundEmailSubject(
@@ -338,15 +334,6 @@ function centuryPickupDateFromEmailReceived(receivedIso: string): string {
   const d = new Date(receivedIso);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().split("T")[0];
-}
-
-function resolveCenturyPickupDateYmd(
-  fromDoc: string | null | undefined,
-  receivedIso: string,
-): string {
-  const t = String(fromDoc ?? "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  return centuryPickupDateFromEmailReceived(receivedIso);
 }
 
 async function centuryHash3(pickupSt: string, destSt: string, salt: string): Promise<string> {
@@ -915,7 +902,7 @@ function stripHtmlToText(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (CENTURY_EMAIL_SUBJECT_KEYWORDS). Sender ardell@centuryent.com forces Century before this runs. */
+/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century ("century"). Sender ardell@centuryent.com forces Century before this runs. */
 function detectFromSubject(subjectLower: string): EmailImportKind | null {
   const s = subjectLower || "";
   const containsVMS = s.includes("vms") || s.includes("mvs") || s.includes("vsm");
@@ -926,7 +913,7 @@ function detectFromSubject(subjectLower: string): EmailImportKind | null {
     s.includes("adlephia") ||
     s.includes("adelphoa") ||
     s.includes("adelpha");
-  const containsCentury = subjectMatchesCenturySubjectWhitelist(s);
+  const containsCentury = subjectMatchesCenturyKeyword(s);
   const containsAllied = s.includes("allied building stores") || /\babs\b/i.test(s);
   const containsSemco = s.includes("semco distributing") || s.includes("semco");
 
@@ -960,7 +947,7 @@ function detectFromBody(bodyLower: string): EmailImportKind | null {
   }
   if (b.includes("allied building stores") || /\babs\b/.test(b)) return "allied";
   if (b.includes("semco distributing") || b.includes("semco")) return "semco";
-  if (subjectMatchesCenturySubjectWhitelist(b)) return "century";
+  if (subjectMatchesCenturyKeyword(b)) return "century";
   return null;
 }
 
@@ -1095,13 +1082,13 @@ Deno.serve(async (req) => {
         subject: subject,
         status: "rejected",
         error_message:
-          "No customer keywords in subject or body (Adelphia, VMS, Oldcastle, Century/loads, ardell@centuryent.com, Allied, Semco)",
+          "No customer keywords in subject or body (Adelphia, VMS, Oldcastle, Century, ardell@centuryent.com, Allied, Semco)",
         raw_headers: emailHeaders,
       });
       return new Response(
         JSON.stringify({
           error:
-            "Email must mention a supported customer in the subject or body (e.g. Adelphia, VMS, Oldcastle, century/loads, ardell@centuryent.com, Allied Building Stores, Semco)",
+            "Email must mention a supported customer in the subject or body (e.g. Adelphia, VMS, Oldcastle, Century, ardell@centuryent.com, Allied Building Stores, Semco)",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1373,7 +1360,8 @@ Deno.serve(async (req) => {
             loadNum = `CENT-${ext.pickup_state}-${ext.dest_state}-${h}`;
           }
 
-          const pickupDateYmd = resolveCenturyPickupDateYmd(ext.pickup_date, receivedIso);
+          // ship_date: next calendar day from email receipt (never PDF date) — product spec
+          const shipDateYmd = centuryPickupDateFromEmailReceived(receivedIso);
           const weightLbs = Math.round(tons * 2000);
           const customerInvoiceTotal = Math.round(ratePerTon * tons);
           const targetPay = Math.round(customerInvoiceTotal * 0.8);
@@ -1399,7 +1387,7 @@ Deno.serve(async (req) => {
             dest_city: ext.dest_city || null,
             dest_state: ext.dest_state || null,
             dest_location_raw: destRaw,
-            ship_date: pickupDateYmd,
+            ship_date: shipDateYmd,
             board_date: today,
             delivery_date: null,
             trailer_type: "Flatbed",
@@ -1420,7 +1408,11 @@ Deno.serve(async (req) => {
             dat_posted_at: null,
             archived_at: null,
             tarp_required: false,
-            source_row: { century_pdf: att.filename ?? "load.pdf", index: idx },
+            source_row: {
+              century_pdf: att.filename ?? "load.pdf",
+              index: idx,
+              document_pickup_date: ext.pickup_date,
+            },
             load_call_script:
               `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +
               `${tons} tons @ $${ratePerTon}/ton (invoice ~$${customerInvoiceTotal}).`,

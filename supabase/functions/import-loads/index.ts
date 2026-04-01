@@ -363,7 +363,7 @@ function mapAljexFlatRow(row: Record<string, string>, agencyId: string): Record<
     ship_date: parseDate(row["Ship Date"]),
     delivery_date: parseDate(row["Ship Date"]),
     trailer_type: row["Type of Shipment"] || null,
-    dispatch_status: row["Dispatch Status"] || null,
+    dispatch_status: (row["Dispatch Status"] || "").trim() || "open",
     trailer_footage: parseNumber(row["Footage"]),
     tarps: row["Tarps"] || null,
     tarp_size: row["Tarp Size"] || null,

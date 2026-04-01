@@ -76,7 +76,7 @@ for row in reader:
         "agency_id": AGENCY_ID,
         "template_type": "aljex_big500",
         "load_number": pro_num,
-        "dispatch_status": "available" if is_open else ("archived" if is_archived_by_status else "available"),
+        "dispatch_status": "open" if is_open else ("archived" if is_archived_by_status else "open"),
         "status": "open",
         "ship_date": row[15].strip() or None,
         "pickup_city": row[31].strip(),
@@ -126,10 +126,10 @@ except urllib.error.HTTPError as e:
     print(f"ERROR: {e.code} {e.read().decode()[:300]}")
     sys.exit(1)
 
-# Sweep previously available rows not present in this CSV batch -> archived/inactive
+# Sweep previously open rows not present in this CSV batch -> archived/inactive
 swept_count = 0
 available_req = urllib.request.Request(
-    f"{SUPABASE_URL}/rest/v1/loads?agency_id=eq.{AGENCY_ID}&template_type=eq.aljex_big500&dispatch_status=eq.available&select=id,load_number",
+    f"{SUPABASE_URL}/rest/v1/loads?agency_id=eq.{AGENCY_ID}&template_type=eq.aljex_big500&dispatch_status=eq.open&select=id,load_number",
     headers={
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",

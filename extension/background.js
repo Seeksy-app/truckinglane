@@ -336,7 +336,7 @@ function scrapeAljexLoads() {
       const load = {
         template_type: 'aljex_big500',
         load_number: proNum,
-        dispatch_status: status.toLowerCase() === 'open' ? 'available' : status.toLowerCase(),
+        dispatch_status: status.toLowerCase() === 'open' ? 'open' : status.toLowerCase(),
         pickup_city: originCity,
         pickup_state: originState,
         pickup_location_raw: cells[3]?.textContent?.trim() || '',
@@ -390,7 +390,7 @@ function scrapeAljexLoads() {
       loads.push({
         template_type: 'aljex_spot',
         load_number: spotNum,
-        dispatch_status: 'available',
+        dispatch_status: 'open',
         status: 'open',
         customer_invoice_total: rateNum,
         target_pay: carrierNum,

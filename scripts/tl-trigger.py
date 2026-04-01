@@ -40,7 +40,7 @@ _ALJEX_LOAD_UPSERT_TEMPLATE = {
     "agency_id": None,
     "template_type": None,
     "load_number": None,
-    "dispatch_status": None,
+    "dispatch_status": "open",
     "status": None,
     "pickup_city": None,
     "pickup_state": None,
@@ -71,6 +71,10 @@ def _normalize_aljex_load_row(load: dict) -> dict:
     for k, v in load.items():
         if k in out:
             out[k] = v
+    # Default new inserts to open; legacy clients may still send "available".
+    ds = out.get("dispatch_status")
+    if ds in (None, "", "available"):
+        out["dispatch_status"] = "open"
     return out
 
 DAT_SEARCH_URL = "https://freight.api.dat.com/search/v2/loads"

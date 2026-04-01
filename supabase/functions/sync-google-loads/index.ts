@@ -272,6 +272,7 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
     miles: null,
     tarp_required: false,
     status: "open",
+    dispatch_status: "open",
     source_row: { sheet: parsed.sheet_name, equipment: parsed.equipment, notes: parsed.notes },
   };
 

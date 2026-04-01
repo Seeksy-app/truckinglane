@@ -3,8 +3,30 @@ import { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
 
-/** Loads that can be exported to DAT (matches DATStatusCard / board rules). */
-export const DAT_ELIGIBLE_TEMPLATE_TYPES = ["oldcastle_gsheet", "adelphia_xlsx", "vms_email"] as const;
+/**
+ * DAT board + CSV export eligibility (template_type).
+ * Century is stored as century_xlsx in the database.
+ */
+export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
+  "aljex_big500",
+  "aljex_spot",
+  "vms_email",
+  "adelphia_xlsx",
+  "oldcastle_gsheet",
+  "century_xlsx",
+] as const;
+
+/** UI groups for the Export to DAT modal (maps to template_type). */
+export const DAT_EXPORT_SOURCE_GROUPS = [
+  { id: "big500", label: "Big 500", templateTypes: ["aljex_big500"] as const },
+  { id: "spot", label: "Spot Loads", templateTypes: ["aljex_spot"] as const },
+  { id: "vms", label: "VMS", templateTypes: ["vms_email"] as const },
+  { id: "adelphia", label: "Adelphia", templateTypes: ["adelphia_xlsx"] as const },
+  { id: "oldcastle", label: "Oldcastle", templateTypes: ["oldcastle_gsheet"] as const },
+  { id: "century", label: "Century", templateTypes: ["century_xlsx"] as const },
+] as const;
+
+export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
 
 export function filterDatEligibleLoads(loads: Load[]): Load[] {
   return loads.filter((l) =>
@@ -18,6 +40,75 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
  * Server-side pending list for "Export Pending to DAT": does not filter by is_active.
  * Open dispatch + not yet posted to DAT + DAT-eligible template + exportable row shape.
  */
+/** Pending count per export source group (dat_posted_at IS NULL, not archived). */
+export async function fetchDatPendingCountsBySource(
+  supabase: SupabaseClient,
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<Record<DatExportSourceGroupId, number>> {
+  let q = supabase
+    .from("loads")
+    .select("id, template_type")
+    .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
+    .is("dat_posted_at", null)
+    .neq("dispatch_status", "archived");
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = data || [];
+  const init: Record<DatExportSourceGroupId, number> = {
+    big500: 0,
+    spot: 0,
+    vms: 0,
+    adelphia: 0,
+    oldcastle: 0,
+    century: 0,
+  };
+  for (const row of rows) {
+    const tt = row.template_type as string;
+    for (const g of DAT_EXPORT_SOURCE_GROUPS) {
+      if ((g.templateTypes as readonly string[]).includes(tt)) {
+        init[g.id] += 1;
+      }
+    }
+  }
+  return init;
+}
+
+/** Pending loads for selected source groups (exportable rows only). */
+export async function fetchDatPendingLoadsForSourceGroups(
+  supabase: SupabaseClient,
+  groupIds: DatExportSourceGroupId[],
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<Load[]> {
+  const templateSet = new Set<string>();
+  for (const id of groupIds) {
+    const g = DAT_EXPORT_SOURCE_GROUPS.find((x) => x.id === id);
+    if (g) for (const tt of g.templateTypes) templateSet.add(tt);
+  }
+  const types = [...templateSet];
+  if (types.length === 0) return [];
+
+  let q = supabase
+    .from("loads")
+    .select("*")
+    .in("template_type", types)
+    .is("dat_posted_at", null)
+    .neq("dispatch_status", "archived")
+    .order("ship_date", { ascending: true });
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []).filter(isExportableLoad);
+}
+
 export async function fetchDatPendingLoadsForExport(
   supabase: SupabaseClient,
   opts: { role: string | null; impersonatedAgencyId: string | null },
@@ -27,7 +118,7 @@ export async function fetchDatPendingLoadsForExport(
     .select("*")
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .eq("dispatch_status", "open")
+    .neq("dispatch_status", "archived")
     .order("ship_date", { ascending: true });
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -50,7 +141,7 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
       return false;
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
-    if (load.dispatch_status !== "open") return false;
+    if (load.dispatch_status === "archived") return false;
     return isExportableLoad(load);
   });
 }
@@ -148,7 +239,14 @@ function normalizeDatEquipmentCode(raw: string | null | undefined): string {
 export function mapEquipmentCode(trailerType: string | null | undefined, templateType?: string | null): string {
   let raw = "";
   if (!trailerType?.trim()) {
-    if (templateType === "adelphia_xlsx" || templateType === "vms_email" || templateType === "oldcastle_gsheet") {
+    if (
+      templateType === "adelphia_xlsx" ||
+      templateType === "vms_email" ||
+      templateType === "oldcastle_gsheet" ||
+      templateType === "century_xlsx" ||
+      templateType === "aljex_big500" ||
+      templateType === "aljex_spot"
+    ) {
       raw = "F";
     }
   } else {
@@ -273,6 +371,60 @@ export function generateDATCsv(loads: Load[]): string {
 }
 
 const DAT_EXPORT_TIMESTAMP_KEY = "dat_last_export_timestamp";
+
+/** Dismissal time for admin DAT pending banner (ISO); banner may return after 30 min if still pending. */
+export const DAT_REMINDER_DISMISS_KEY = "dat_pending_reminder_dismissed_at";
+
+/** Last time we played sound + desktop notification for DAT reminder (ISO). */
+export const DAT_REMINDER_NUDGE_KEY = "dat_reminder_last_nudge_at";
+
+/** True when current time in America/Chicago is 7:55–17:00 inclusive. */
+export function isDatReminderBusinessHoursCentral(now: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const mins = hour * 60 + minute;
+  return mins >= 7 * 60 + 55 && mins <= 17 * 60;
+}
+
+export function minutesSinceLastDatExport(): number {
+  if (typeof localStorage === "undefined") return 1e6;
+  const ts = localStorage.getItem(DAT_EXPORT_TIMESTAMP_KEY);
+  if (!ts) return 1e6;
+  return (Date.now() - new Date(ts).getTime()) / 60_000;
+}
+
+export function datReminderDismissedWithinMinutes(minutes: number): boolean {
+  if (typeof localStorage === "undefined") return false;
+  const d = localStorage.getItem(DAT_REMINDER_DISMISS_KEY);
+  if (!d) return false;
+  return Date.now() - new Date(d).getTime() < minutes * 60_000;
+}
+
+export async function fetchDatPendingTotalForReminder(
+  supabase: SupabaseClient,
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<number> {
+  let q = supabase
+    .from("loads")
+    .select("id", { count: "exact", head: true })
+    .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
+    .is("dat_posted_at", null)
+    .neq("dispatch_status", "archived");
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
 
 // Get loads that have NOT yet been posted to DAT (dat_posted_at is null)
 export function getNewLoadsSinceLastExport(loads: Load[]): Load[] {

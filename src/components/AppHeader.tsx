@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp, Send } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -23,16 +23,8 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  downloadDATExport,
-  getNewLoadsSinceLastExport,
-  markDATExportComplete,
-  getLastDATExportTimestamp,
-  filterDatEligibleLoads,
-  fetchDatPendingLoadsForExport,
-} from '@/lib/datExport';
-import { useLoads } from '@/hooks/useLoads';
-import { sendPushToAljexToExtension } from '@/lib/chromeExtension';
+import { downloadDATExport, markDATExportComplete, fetchDatPendingLoadsForExport } from '@/lib/datExport';
+import { DatExportModal } from '@/components/dashboard/DatExportModal';
 type ImportState = "idle" | "loading" | "success" | "error";
 
 interface ImportResult {
@@ -55,8 +47,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { loads } = useLoads();
-  const datEligibleLoads = filterDatEligibleLoads(loads);
   const { data: datPendingLoads = [] } = useQuery({
     queryKey: ["dat-pending-export", role, impersonatedAgencyId],
     queryFn: () =>
@@ -66,10 +56,10 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       }),
     enabled: !!user,
   });
-  const newLoadsForExport = getNewLoadsSinceLastExport(datEligibleLoads);
   const hasNewExport = datPendingLoads.length > 0;
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
+  const [datExportModalOpen, setDatExportModalOpen] = useState(false);
   const [templateType, setTemplateType] = useState<string>("aljex_flat");
   const [file, setFile] = useState<File | null>(null);
   const [importState, setImportState] = useState<ImportState>("idle");
@@ -277,7 +267,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     <span className="hidden sm:inline">Analytics</span>
                   </Button>
                   
-                  {/* Loads Dropdown - Import, Export, Converter */}
+                  {/* Import Loads dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -286,7 +276,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                         className="gap-2 relative"
                       >
                         <FileSpreadsheet className="h-4 w-4" />
-                        <span className="hidden sm:inline">Loads</span>
+                        <span className="hidden sm:inline">Import Loads</span>
                         <ChevronDown className="h-3 w-3" />
                         {hasNewExport && (
                           <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
@@ -297,32 +287,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       <DropdownMenuItem onClick={() => setImportOpen(true)}>
                         <Upload className="h-4 w-4 mr-2" />
                         Import Loads
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => {
-                          if (datEligibleLoads.length === 0) {
-                            toast.error("No DAT-eligible loads to export");
-                            return;
-                          }
-                          const newLoads = getNewLoadsSinceLastExport(datEligibleLoads);
-                          if (newLoads.length === 0) {
-                            const lastTs = getLastDATExportTimestamp();
-                            const since = lastTs ? new Date(lastTs).toLocaleString() : "unknown";
-                            toast.warning(`No new loads since last export (${since})`, { duration: 5000 });
-                            return;
-                          }
-                          downloadDATExport(newLoads);
-                          markDATExportComplete();
-                          toast.success(`Exported ${newLoads.length} new loads to DAT format`);
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export to DAT
-                        {hasNewExport && (
-                          <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
-                            {datPendingLoads.length}
-                          </Badge>
-                         )}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
@@ -369,42 +333,14 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                           queryClient.invalidateQueries({ queryKey: ["loads"] });
                           queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
                           queryClient.invalidateQueries({ queryKey: ["dat-pending-export"] });
+                          queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
+                          queryClient.invalidateQueries({ queryKey: ["dat-reminder-pending"] });
                           queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
                           toast.success(`Exported ${count} pending loads to DAT format`);
                         }}
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Export Pending to DAT
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          toast.info(
-                            "Pushing loads to Aljex — switch to your Aljex tab to monitor progress"
-                          );
-                          const sent = sendPushToAljexToExtension();
-                          if (!sent) {
-                            toast.warning(
-                              "Could not reach the TruckingLane extension. Use Chrome with the extension installed and set VITE_TRUCKINGLANE_EXTENSION_ID."
-                            );
-                          }
-                        }}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Push to Aljex
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (loads.length === 0) {
-                            toast.error("No active loads to export");
-                            return;
-                          }
-                          downloadDATExport(loads);
-                          markDATExportComplete();
-                          toast.success(`Exported ALL ${loads.length} loads to DAT format (one-time)`);
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export All to DAT (one-time)
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate('/csv-converter')}>
@@ -598,6 +534,24 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
               <span className="hidden sm:inline">Help</span>
             </Button>
             <NotificationCenter />
+            {showAgencyNav && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 shrink-0"
+                    aria-label="Export to DAT"
+                    onClick={() => setDatExportModalOpen(true)}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Export to DAT</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Export pending loads to DAT CSV by source</TooltipContent>
+              </Tooltip>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
@@ -679,6 +633,18 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
           </div>
         </div>
       </header>
+      {showAgencyNav && user && (
+        <DatExportModal
+          open={datExportModalOpen}
+          onOpenChange={setDatExportModalOpen}
+          role={role}
+          impersonatedAgencyId={isImpersonating ? impersonatedAgencyId : null}
+          effectiveAgencyId={effectiveAgencyId}
+          agentName={
+            profile?.full_name?.trim() || user?.email?.split("@")[0] || "Agent"
+          }
+        />
+      )}
     </>
   );
 }

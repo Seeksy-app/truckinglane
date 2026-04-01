@@ -48,6 +48,8 @@ import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/l
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
+import { DatPendingReminderBanner } from "@/components/dashboard/DatPendingReminderBanner";
+import { useDatPendingReminder } from "@/hooks/useDatPendingReminder";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -86,6 +88,10 @@ const Dashboard = () => {
 
   const { timezone } = useUserTimezone();
   const isAdmin = role === "agency_admin" || role === "super_admin";
+  const datReminder = useDatPendingReminder(isAdmin, {
+    role,
+    impersonatedAgencyId: isImpersonating ? impersonatedAgencyId ?? null : null,
+  });
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<DashboardMode>("pending");
   const [searchQuery, setSearchQuery] = useState("");
@@ -874,7 +880,14 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader leadSoundMuted={leadSoundMuted} onLeadSoundMutedChange={setLeadSoundMuted} />
-      
+
+      {datReminder.showBanner && (
+        <DatPendingReminderBanner
+          pendingCount={datReminder.pendingCount}
+          onDismiss={datReminder.dismissBanner}
+        />
+      )}
+
       {/* System Reset Banner - Admin only, dismissible */}
       {showResetBanner && (
         <div className="bg-emerald-500/10 border-b border-emerald-500/20">

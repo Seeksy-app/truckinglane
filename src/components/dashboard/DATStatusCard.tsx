@@ -9,6 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { DAT_ELIGIBLE_TEMPLATE_TYPES, isExportableLoad } from "@/lib/datExport";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Load = Tables<"loads">;
+
 interface FailedLoad {
   id: string;
   load_number: string;
@@ -48,22 +53,27 @@ export function DATStatusCard() {
       const resp = await fetch(datPostedUrl.toString(), {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` },
       });
-      const datStatus: any[] = await resp.json();
-      const datMap = new Map(datStatus.map((l: any) => [l.id, l.dat_posted_at]));
+      const datStatus: { id: string; dat_posted_at: string | null }[] = await resp.json();
+      const datMap = new Map(datStatus.map((l) => [l.id, l.dat_posted_at]));
 
-      // Only Oldcastle + Adelphia + VMS are DAT-eligible (not Aljex or Spot)
-      const DAT_ELIGIBLE = ["oldcastle_gsheet", "adelphia_xlsx", "vms_email"];
-      const allLoads: any[] = (data || []).map(l => ({ ...l, dat_posted_at: datMap.get(l.id) ?? null }));
-      const loads = allLoads.filter(l => DAT_ELIGIBLE.includes(l.template_type));
-      const posted = loads.filter(l => l.dat_posted_at);
-      const failed = loads.filter(l => !l.dat_posted_at && (!l.pickup_city || !l.dest_city));
-      const pending = loads.filter(l => !l.dat_posted_at && l.pickup_city && l.dest_city);
+      const eligibleTypes: readonly string[] = DAT_ELIGIBLE_TEMPLATE_TYPES;
+      const allLoads: (Load & { dat_posted_at: string | null })[] = (data || []).map((l) => ({
+        ...l,
+        dat_posted_at: datMap.get(l.id) ?? null,
+      }));
+      const loads = allLoads.filter((l) => eligibleTypes.includes(String(l.template_type || "")));
+
+      const uploaded = loads.filter((l) => l.dat_posted_at != null).length;
+      const pendingLoads = loads.filter((l) => l.dat_posted_at == null);
+      const pending = pendingLoads.length;
+      const failedLoads = pendingLoads.filter((l) => !isExportableLoad(l));
+
       return {
         total: loads.length,
-        posted: posted.length,
-        failed: failed.length,
-        pending: pending.length,
-        failedLoads: failed as FailedLoad[],
+        uploaded,
+        pending,
+        failed: failedLoads.length,
+        failedLoads: failedLoads as FailedLoad[],
       };
     },
     refetchInterval: 60000,
@@ -90,10 +100,9 @@ export function DATStatusCard() {
     }
   };
 
-  const total   = stats?.total   ?? 0;
-  const posted  = stats?.posted  ?? 0;
-  const failed  = stats?.failed  ?? 0;
+  const uploaded = stats?.uploaded ?? 0;
   const pending = stats?.pending ?? 0;
+  const failed = stats?.failed ?? 0;
 
   return (
     <TooltipProvider>
@@ -105,39 +114,41 @@ export function DATStatusCard() {
               onClick={() => failed > 0 && setShowFailed(true)}
             >
               <CardContent className="pt-4 pb-3 px-4">
-                {/* Header row */}
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <Upload className="h-4 w-4 text-blue-500" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">DAT Board</span>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      DAT Board
+                    </span>
                   </div>
                   {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                 </div>
 
-                {/* Live on DAT — big number */}
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-2xl font-bold text-foreground">{posted}</span>
-                  <span className="text-xs text-muted-foreground">of {total} live</span>
+                <div className="flex items-baseline gap-2 flex-wrap mb-1">
+                  <span className="text-2xl font-bold text-foreground">{uploaded}</span>
+                  <span className="text-xs text-muted-foreground">uploaded</span>
+                  <span className="text-muted-foreground/50 mx-0.5">·</span>
+                  <span className="text-xl font-semibold text-foreground">{pending}</span>
+                  <span className="text-xs text-muted-foreground">pending</span>
                 </div>
 
-                {/* Status pills */}
                 <div className="flex items-center gap-2 flex-wrap mt-1">
-                  {pending > 0 && (
+                  {pending > 0 && uploaded + pending > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-blue-400">
                       <Clock className="h-3 w-3" />
-                      {pending} pending
+                      eligible templates only
                     </span>
                   )}
                   {failed > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-amber-500 font-medium">
                       <XCircle className="h-3 w-3" />
-                      {failed} failed
+                      {failed} need destination
                     </span>
                   )}
-                  {failed === 0 && pending === 0 && posted > 0 && (
+                  {failed === 0 && pending === 0 && uploaded > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-green-500">
                       <CheckCircle2 className="h-3 w-3" />
-                      all synced
+                      none waiting
                     </span>
                   )}
                 </div>
@@ -146,14 +157,12 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {posted} of {total} loads posted to DAT
-              {pending > 0 ? ` • ${pending} ready to post` : ""}
-              {failed > 0 ? ` • ${failed} need destination fix (click to fix)` : ""}
+              {uploaded} uploaded to DAT · {pending} pending (not yet uploaded)
+              {failed > 0 ? ` · ${failed} need destination fix (click card)` : ""}
             </p>
           </TooltipContent>
         </Tooltip>
 
-        {/* Failed Loads Modal */}
         <Dialog open={showFailed} onOpenChange={setShowFailed}>
           <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
@@ -163,19 +172,27 @@ export function DATStatusCard() {
               </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground mb-4">
-              These loads couldn't post to DAT — usually a missing or unrecognized destination. Click a load to fix it.
+              These loads couldn&apos;t post to DAT — usually a missing or unrecognized destination. Click a load to fix
+              it.
             </p>
             <div className="space-y-2">
-              {stats?.failedLoads.map(load => (
-                <div key={load.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border">
+              {stats?.failedLoads.map((load) => (
+                <div
+                  key={load.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border"
+                >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{load.load_number}</div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <MapPin className="h-3 w-3" />
                       {load.pickup_city || "?"}, {load.pickup_state || "?"} →{" "}
-                      {load.dest_city
-                        ? <>{load.dest_city}, {load.dest_state}</>
-                        : <span className="text-amber-500 font-medium">Missing destination</span>}
+                      {load.dest_city ? (
+                        <>
+                          {load.dest_city}, {load.dest_state}
+                        </>
+                      ) : (
+                        <span className="text-amber-500 font-medium">Missing destination</span>
+                      )}
                     </div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => handleEditLoad(load)} className="ml-3 shrink-0">
@@ -187,7 +204,6 @@ export function DATStatusCard() {
           </DialogContent>
         </Dialog>
 
-        {/* Edit Load Modal */}
         <Dialog open={!!editLoad} onOpenChange={() => setEditLoad(null)}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -201,15 +217,22 @@ export function DATStatusCard() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>Destination City</Label>
-                  <Input value={editCity} onChange={e => setEditCity(e.target.value)} placeholder="e.g. Chicago" />
+                  <Input value={editCity} onChange={(e) => setEditCity(e.target.value)} placeholder="e.g. Chicago" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Destination State (2-letter)</Label>
-                  <Input value={editState} onChange={e => setEditState(e.target.value.toUpperCase().slice(0, 2))} placeholder="e.g. IL" maxLength={2} />
+                  <Input
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value.toUpperCase().slice(0, 2))}
+                    placeholder="e.g. IL"
+                    maxLength={2}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setEditLoad(null)}>Cancel</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setEditLoad(null)}>
+                  Cancel
+                </Button>
                 <Button className="flex-1" disabled={!editCity || !editState || posting === editLoad?.id} onClick={handleSave}>
                   <Upload className="h-4 w-4 mr-2" />
                   Save & Queue for DAT

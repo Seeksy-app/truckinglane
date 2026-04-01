@@ -1,0 +1,15 @@
+# Paste inside the existing `server { ... }` block that listens on 443 (SSL)
+# for the same host that already proxies TruckingLane / tl-trigger routes.
+#
+# Repo references use: https://axel.podlogix.io/tl/...
+# After editing: sudo nginx -t && sudo nginx -s reload
+#
+# SimpleTexting webhook URL:
+#   https://axel.podlogix.io/sms-inbound
+# (Confirm server_name on the VPS with: grep -R server_name /etc/nginx/sites-enabled/)
+
+location /sms-inbound {
+    proxy_pass http://127.0.0.1:3098/sms-inbound;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}

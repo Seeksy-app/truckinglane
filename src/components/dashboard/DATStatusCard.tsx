@@ -69,14 +69,22 @@ export function DATStatusCard() {
           isPendingDispatch(l.dispatch_status),
       );
       const pending = pendingLoads.length;
-      const failedLoads = pendingLoads.filter((l) => !isExportableLoad(l));
+      const notExportable = pendingLoads.filter((l) => !isExportableLoad(l));
+      /** Real destination / row issues — not Trucker Tools (those need extension field mapping). */
+      const failedLoads = notExportable.filter(
+        (l) => String(l.template_type || "") !== "truckertools",
+      ) as FailedLoad[];
+      const truckertoolsMapping = notExportable.filter(
+        (l) => String(l.template_type || "") === "truckertools",
+      );
 
       return {
         total: loads.length,
         uploaded,
         pending,
         failed: failedLoads.length,
-        failedLoads: failedLoads as FailedLoad[],
+        failedLoads,
+        truckertoolsMappingCount: truckertoolsMapping.length,
       };
     },
     refetchInterval: 60000,
@@ -106,6 +114,7 @@ export function DATStatusCard() {
   const uploaded = stats?.uploaded ?? 0;
   const pending = stats?.pending ?? 0;
   const failed = stats?.failed ?? 0;
+  const ttMapping = stats?.truckertoolsMappingCount ?? 0;
 
   return (
     <TooltipProvider>
@@ -113,7 +122,7 @@ export function DATStatusCard() {
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <Card
-              className="cursor-pointer transition-all duration-200 border-2 bg-card border-border hover:border-blue-500/50 hover:bg-blue-500/5"
+              className={`transition-all duration-200 border-2 bg-card border-border hover:border-blue-500/50 hover:bg-blue-500/5 ${failed > 0 ? "cursor-pointer" : ""}`}
               onClick={() => failed > 0 && setShowFailed(true)}
             >
               <CardContent className="pt-4 pb-3 px-4">
@@ -124,7 +133,9 @@ export function DATStatusCard() {
                       DAT Board
                     </span>
                   </div>
-                  {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                  {(failed > 0 || ttMapping > 0) && (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  )}
                 </div>
 
                 <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums leading-tight">
@@ -134,14 +145,19 @@ export function DATStatusCard() {
                   {uploaded} uploaded to DAT
                 </p>
 
-                <div className="flex items-center gap-2 flex-wrap mt-2">
+                <div className="flex flex-col gap-1 mt-2">
                   {failed > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-amber-500 font-medium">
                       <XCircle className="h-3 w-3" />
                       {failed} need destination
                     </span>
                   )}
-                  {failed === 0 && pending === 0 && uploaded > 0 && (
+                  {ttMapping > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {ttMapping} Trucker Tools need field mapping
+                    </span>
+                  )}
+                  {failed === 0 && ttMapping === 0 && pending === 0 && uploaded > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-green-500">
                       <CheckCircle2 className="h-3 w-3" />
                       none waiting
@@ -155,6 +171,9 @@ export function DATStatusCard() {
             <p>
               {pending} pending (open/available, not yet uploaded) · {uploaded} uploaded to DAT
               {failed > 0 ? ` · ${failed} need destination fix (click card)` : ""}
+              {ttMapping > 0
+                ? `${failed > 0 ? " ·" : " ·"} ${ttMapping} Trucker Tools need field mapping (data quality — update extension mapper)`
+                : ""}
             </p>
           </TooltipContent>
         </Tooltip>

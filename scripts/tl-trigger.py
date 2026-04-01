@@ -278,6 +278,15 @@ def insert_aljex_loads():
     if len(loads) == 0:
         return jsonify({"success": True, "count": 0, "updated": datetime.now(timezone.utc).isoformat()})
 
+    # Trucker Tools: raw extension row before column whitelist (journalctl -u tl-trigger -f)
+    tt_rows = [
+        r
+        for r in loads
+        if isinstance(r, dict) and str(r.get("template_type") or "") == "truckertools"
+    ]
+    if tt_rows:
+        print("[TT DEBUG] First load:", json.dumps(tt_rows[0], indent=2))
+
     normalized: list[dict] = []
     for row in loads:
         if not isinstance(row, dict):

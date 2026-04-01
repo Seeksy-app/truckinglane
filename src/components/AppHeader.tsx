@@ -23,7 +23,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { downloadDATExport, markDATExportComplete, fetchDatPendingLoadsForExport } from '@/lib/datExport';
+import { fetchDatPendingTotalForReminder } from '@/lib/datExport';
 import { DatExportModal } from '@/components/dashboard/DatExportModal';
 type ImportState = "idle" | "loading" | "success" | "error";
 
@@ -47,16 +47,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { data: datPendingLoads = [] } = useQuery({
-    queryKey: ["dat-pending-export", role, impersonatedAgencyId],
-    queryFn: () =>
-      fetchDatPendingLoadsForExport(supabase, {
-        role,
-        impersonatedAgencyId: impersonatedAgencyId ?? null,
-      }),
-    enabled: !!user,
-  });
-  const hasNewExport = datPendingLoads.length > 0;
   // Import Loads state
   const [importOpen, setImportOpen] = useState(false);
   const [datExportModalOpen, setDatExportModalOpen] = useState(false);
@@ -94,6 +84,17 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
 
   // Show agency-level nav when impersonating or when user is not super admin
   const showAgencyNav = !isSuperAdmin || isImpersonating;
+
+  const { data: datPendingNavCount = 0 } = useQuery({
+    queryKey: ["dat-pending-nav-badge", role, impersonatedAgencyId],
+    queryFn: () =>
+      fetchDatPendingTotalForReminder(supabase, {
+        role,
+        impersonatedAgencyId: impersonatedAgencyId ?? null,
+      }),
+    enabled: !!user && showAgencyNav,
+    refetchInterval: 60_000,
+  });
 
   const handleExitImpersonation = () => {
     clearImpersonation();
@@ -167,6 +168,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       setImportState("success");
       setImportResult({ imported: result.imported, archived: result.archived });
       queryClient.invalidateQueries({ queryKey: ["loads"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
     } catch (error) {
       console.error("Import error:", error);
       setImportState("error");
@@ -273,13 +275,28 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="gap-2 relative"
+                        className="gap-2 relative sm:pr-1"
                       >
-                        <FileSpreadsheet className="h-4 w-4" />
-                        <span className="hidden sm:inline">Loads</span>
-                        <ChevronDown className="h-3 w-3" />
-                        {hasNewExport && (
-                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
+                        <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline relative inline-block">
+                          Loads
+                          {datPendingNavCount > 0 && (
+                            <Badge
+                              className="absolute -top-1.5 -right-1 h-5 min-w-[20px] translate-x-1/2 border-0 px-1 text-[10px] font-semibold tabular-nums bg-destructive text-destructive-foreground pointer-events-none"
+                              aria-hidden
+                            >
+                              {datPendingNavCount > 99 ? "99+" : datPendingNavCount}
+                            </Badge>
+                          )}
+                        </span>
+                        <ChevronDown className="h-3 w-3 shrink-0" />
+                        {datPendingNavCount > 0 && (
+                          <Badge
+                            className="sm:hidden absolute -top-1 -right-1 h-5 min-w-[20px] border-0 px-1 text-[10px] font-semibold tabular-nums bg-destructive text-destructive-foreground"
+                            aria-label={`${datPendingNavCount} loads pending DAT`}
+                          >
+                            {datPendingNavCount > 99 ? "99+" : datPendingNavCount}
+                          </Badge>
                         )}
                       </Button>
                     </DropdownMenuTrigger>
@@ -287,60 +304,6 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       <DropdownMenuItem onClick={() => setImportOpen(true)}>
                         <Upload className="h-4 w-4 mr-2" />
                         Import Loads
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={async () => {
-                          if (datPendingLoads.length === 0) {
-                            toast.error("No pending DAT loads to export");
-                            return;
-                          }
-                          if (!effectiveAgencyId) {
-                            toast.error("No agency — cannot export");
-                            return;
-                          }
-                          const pending = [...datPendingLoads];
-                          const ids = pending.map((l) => l.id);
-                          const count = pending.length;
-                          const postedAt = new Date().toISOString();
-                          const { error } = await supabase
-                            .from("loads")
-                            .update({ dat_posted_at: postedAt })
-                            .in("id", ids);
-                          if (error) {
-                            toast.error(`Failed to mark loads as posted: ${error.message}`);
-                            return;
-                          }
-                          const filename = `DAT_Export_Pending_${new Date().toISOString().split("T")[0]}.csv`;
-                          downloadDATExport(pending, filename);
-                          const agentName =
-                            profile?.full_name?.trim() ||
-                            user?.email?.split("@")[0] ||
-                            "Agent";
-                          const { error: logError } = await supabase.from("email_import_logs").insert({
-                            agency_id: effectiveAgencyId,
-                            sender_email: "dat-csv-export@truckinglane.com",
-                            subject: null,
-                            status: "success",
-                            imported_count: count,
-                            raw_headers: { mode: "csv", agent_name: agentName, count },
-                            error_message: null,
-                          });
-                          if (logError) {
-                            console.error("DAT CSV activity log:", logError);
-                            toast.warning("Exported CSV, but activity log could not be saved.");
-                          }
-                          markDATExportComplete();
-                          queryClient.invalidateQueries({ queryKey: ["loads"] });
-                          queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
-                          queryClient.invalidateQueries({ queryKey: ["dat-pending-export"] });
-                          queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
-                          queryClient.invalidateQueries({ queryKey: ["dat-reminder-pending"] });
-                          queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-                          toast.success(`${count} loads exported to DAT`);
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export Pending to DAT
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setDatExportModalOpen(true)}>
                         <Download className="h-4 w-4 mr-2" />

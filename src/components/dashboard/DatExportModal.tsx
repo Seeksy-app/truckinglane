@@ -133,7 +133,7 @@ export function DatExportModal({
       markDATExportComplete();
       queryClient.invalidateQueries({ queryKey: ["loads"] });
       queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["dat-pending-export"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
       queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
       queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
       toast.success(`${loads.length} loads exported to DAT`);

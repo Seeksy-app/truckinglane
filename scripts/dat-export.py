@@ -59,11 +59,30 @@ def destination_resolved_for_dat(load: dict[str, Any]) -> tuple[str, str]:
     return c, clean_state(s)
 
 
+_TEMPLATE_TYPES_REQUIRE_ORIGIN_DEST = frozenset(
+    {
+        "adelphia_xlsx",
+        "oldcastle_gsheet",
+        "aljex_big500",
+        "vms_email",
+        "aljex_spot",
+    }
+)
+
+
+def template_type_requires_origin_dest_for_dat_export(template_type: Any) -> bool:
+    """Match datExport.ts templateTypeRequiresOriginDestForDatExport."""
+    t = "" if template_type is None else str(template_type)
+    return t in _TEMPLATE_TYPES_REQUIRE_ORIGIN_DEST
+
+
 def is_exportable_load(load: dict[str, Any]) -> bool:
     """Match datExport.ts isExportableLoad."""
     pc = (load.get("pickup_city") or "").upper().strip()
     if pc.startswith("PICK UP") or pc.startswith("NOTE") or pc.startswith("***"):
         return False
+    if not template_type_requires_origin_dest_for_dat_export(load.get("template_type")):
+        return True
     if not (load.get("pickup_city") or "").strip() and not (load.get("dest_city") or "").strip():
         return False
     dc, ds = destination_resolved_for_dat(load)

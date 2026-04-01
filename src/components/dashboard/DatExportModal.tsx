@@ -57,7 +57,15 @@ export function DatExportModal({
     enabled: open,
     staleTime: 0,
     gcTime: 0,
+    refetchOnMount: "always",
   });
+
+  useEffect(() => {
+    if (!open) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["dat-pending-counts-by-source", role, impersonatedAgencyId],
+    });
+  }, [open, queryClient, role, impersonatedAgencyId]);
 
   const idsWithPending = useMemo(() => {
     if (!counts) return [] as DatExportSourceGroupId[];
@@ -172,9 +180,9 @@ export function DatExportModal({
           </DialogTitle>
           <DialogDescription>
             Choose sources. Counts are active loads (<code className="text-xs">is_active</code>) with no DAT upload yet (
-            <code className="text-xs">dat_posted_at</code> empty), grouped by source. Adelphia, Oldcastle, Big 500, VMS,
-            and spot rows need origin and destination in the CSV; Trucker Tools and Century can export with partial
-            locations.
+            <code className="text-xs">dat_posted_at</code> empty), grouped by source. Only Adelphia, Oldcastle, Big 500,
+            VMS, and Spot Loads require complete origin and destination for export; other sources (including Trucker Tools
+            and Century) can export with partial locations.
           </DialogDescription>
         </DialogHeader>
 

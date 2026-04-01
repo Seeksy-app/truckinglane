@@ -69,6 +69,7 @@ export function DATStatusCard() {
         failedLoads,
       };
     },
+    staleTime: 0,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });

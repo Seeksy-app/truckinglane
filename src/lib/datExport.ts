@@ -34,14 +34,22 @@ export const DAT_EXPORT_SOURCE_GROUPS = [
 
 export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
 
+/** Only these sources require complete origin/destination before DAT export. */
+const DAT_EXPORT_REQUIRES_ORIGIN_DEST_TEMPLATE_TYPES = new Set<string>([
+  "adelphia_xlsx",
+  "oldcastle_gsheet",
+  "aljex_big500",
+  "vms_email",
+  "aljex_spot",
+]);
+
 /**
- * DAT CSV rows normally need origin+destination. Trucker Tools and Century may have sparse
- * location fields in the API — still include them in export; CSV uses whatever is present.
+ * Trucker Tools and Century are excluded — export even with sparse O/D. All other DAT-eligible
+ * types not in this set are also treated as not requiring O/D (defensive).
  */
 export function templateTypeRequiresOriginDestForDatExport(templateType: string | null | undefined): boolean {
   const t = templateType || "";
-  if (t === "truckertools" || t === "century_xlsx" || t === "Century") return false;
-  return true;
+  return DAT_EXPORT_REQUIRES_ORIGIN_DEST_TEMPLATE_TYPES.has(t);
 }
 
 export function filterDatEligibleLoads(loads: Load[]): Load[] {

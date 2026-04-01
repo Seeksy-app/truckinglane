@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
-import { cn } from "@/lib/utils";
 import { DASHBOARD_TABLE_CENTERED_DENSE_CLASS } from "@/lib/loadTableDisplay";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Json } from "@/integrations/supabase/types";

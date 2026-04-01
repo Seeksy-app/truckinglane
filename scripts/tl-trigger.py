@@ -355,9 +355,18 @@ def _supabase_headers(*, json_body: bool = False) -> dict:
     return h
 
 
-def _normalize_sms_phone(raw: str) -> str:
-    """E.164-style key for matching (digits + leading +)."""
-    s = (raw or "").strip()
+def _normalize_sms_phone(raw: str | int | float | None) -> str:
+    """E.164-style key for matching (digits + leading +). US 10-digit -> +1XXXXXXXXXX."""
+    if raw is None:
+        return ""
+    if isinstance(raw, float):
+        if not raw.is_integer():
+            return ""
+        raw = int(raw)
+    if isinstance(raw, int):
+        s = str(raw)
+    else:
+        s = str(raw).strip()
     digits = re.sub(r"\D", "", s)
     if not digits:
         return ""
@@ -365,13 +374,17 @@ def _normalize_sms_phone(raw: str) -> str:
         return "+1" + digits
     if len(digits) == 11 and digits.startswith("1"):
         return "+" + digits
-    return "+" + digits if not s.startswith("+") else "+" + digits
+    return "+" + digits
 
 
-def _simpletexting_send(contact_phone: str, message: str) -> tuple[bool, str]:
+def _simpletexting_send(contact_phone: str | int | float | None, message: str) -> tuple[bool, str]:
     if not SIMPLETEXTING_API_KEY:
         return False, "SIMPLETEXTING_API_KEY not configured"
-    payload = {"phoneNumber": contact_phone, "text": message}
+    phone = _normalize_sms_phone(contact_phone)
+    if not phone:
+        return False, "invalid or empty phone for SMS"
+    print(f"[SMS-SEND] phone={phone}", flush=True)
+    payload = {"contactPhone": phone, "text": message}
     try:
         r = requests.post(
             SIMPLETEXTING_MESSAGES_URL,

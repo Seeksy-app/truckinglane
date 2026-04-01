@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,8 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { PhoneDisplay } from "@/components/ui/phone-display";
-import { TranscriptTurnsList } from "@/lib/callTranscript";
-import { DASHBOARD_TABLE_CENTERED_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { TranscriptTwoColumnList } from "@/lib/callTranscript";
+import { CALLS_TABLE_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { CallAISummaryBullets } from "@/components/calls/CallAISummaryBullets";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -124,10 +125,18 @@ const getHighIntentReasons = (call: AICallSummary): string[] => {
 
 const INITIAL_DISPLAY_COUNT = 25;
 
+const CALL_ROW_CELL_CLASS =
+  "text-left align-middle text-sm sm:text-base tabular-nums";
+
 export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+
+  useEffect(() => {
+    setTranscriptOpen(false);
+  }, [expandedId]);
 
   const statusStyles: Record<string, string> = {
     done: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
@@ -206,16 +215,28 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
         <CardContent className="p-0">
           <div className="rounded-lg border border-border overflow-hidden">
             <div className="w-full min-w-0 overflow-x-auto">
-            <Table className={DASHBOARD_TABLE_CENTERED_DENSE_CLASS}>
+            <Table className={CALLS_TABLE_DENSE_CLASS}>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-8 px-0.5" />
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Time</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Phone</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Duration</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Call Status</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Lead Status</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Title</TableHead>
+                  <TableHead className="w-8 px-0.5 text-left align-middle" />
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Time
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Phone
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Duration
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Call Status
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Lead Status
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
+                    Title
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,55 +265,48 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${highIntent ? "bg-amber-500/5" : ""}`}
                         onClick={() => toggleExpand(call.id)}
                       >
-                        <TableCell className="w-8 px-0.5 text-center align-middle">
-                          <span className="inline-flex justify-center">
-                          {expandedId === call.id ? (
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
+                        <TableCell className="w-8 px-0.5 text-left align-middle text-sm sm:text-base">
+                          <span className="inline-flex justify-start">
+                            {expandedId === call.id ? (
+                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
                           </span>
                         </TableCell>
-                        <TableCell className="text-sm text-center tabular-nums">
+                        <TableCell className={CALL_ROW_CELL_CLASS}>
                           {format(parseISO(call.created_at), "MMM d, h:mm a")}
                         </TableCell>
-                        <TableCell className="text-sm text-center">
-                          <div className="flex justify-center">
-                            <PhoneDisplay
-                              phone={phoneNumber}
-                              className="font-semibold text-[0.95rem]"
-                            />
-                          </div>
+                        <TableCell className={`${CALL_ROW_CELL_CLASS} font-medium`}>
+                          <PhoneDisplay phone={phoneNumber} className="font-semibold" />
                         </TableCell>
-                        <TableCell className="text-sm text-center tabular-nums">
+                        <TableCell className={CALL_ROW_CELL_CLASS}>
                           {call.duration_secs ? `${call.duration_secs}s` : "—"}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                          <Badge className={outcomeStyles[call.call_outcome || 'unknown'] || outcomeStyles.unknown}>
+                        <TableCell className="text-left align-middle text-sm sm:text-base">
+                          <Badge
+                            className={
+                              outcomeStyles[call.call_outcome || "unknown"] || outcomeStyles.unknown
+                            }
+                          >
                             {call.call_outcome || "unknown"}
                           </Badge>
-                          </div>
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
+                        <TableCell className="text-left align-middle text-sm sm:text-base">
                           {(() => {
-                            const status = call.lead_status || 'none';
+                            const status = call.lead_status || "none";
                             const config = leadStatusConfig[status] || leadStatusConfig.none;
-                            return (
-                              <Badge className={config.className}>
-                                {config.label}
-                              </Badge>
-                            );
+                            return <Badge className={config.className}>{config.label}</Badge>;
                           })()}
-                          </div>
                         </TableCell>
-                        <TableCell className="max-w-[200px] text-sm text-center">
-                          <div className="flex items-center justify-center gap-2 min-w-0 flex-wrap">
-                            {highIntent && <Flame className="h-4 w-4 text-amber-500 flex-shrink-0" />}
+                        <TableCell className="max-w-[min(14rem,40vw)] text-left align-middle text-sm sm:text-base min-w-0">
+                          <div className="flex items-center justify-start gap-2 min-w-0">
+                            {highIntent && (
+                              <Flame className="h-4 w-4 text-amber-500 shrink-0" />
+                            )}
                             <Link
                               to={`/calls/${call.id}`}
-                              className="truncate hover:underline text-primary"
+                              className="truncate hover:underline text-primary min-w-0"
                               title="Open call detail"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -300,7 +314,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                             </Link>
                             <Link
                               to={`/calls/${call.id}`}
-                              className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                              className="shrink-0 text-muted-foreground hover:text-foreground"
                               aria-label="Open call detail"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -313,26 +327,37 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                       {expandedId === call.id && (
                         <TableRow key={`${call.id}-expanded`}>
                           <TableCell colSpan={7} className="p-0 bg-muted/30">
-                            <div className="p-5 border-t border-border/50 space-y-4">
-                              {/* Top row: Title + badges */}
-                              <div className="flex items-start justify-between gap-4">
-                              <div className="space-y-1">
-                                  <h4 className="font-semibold text-foreground">
-                                    {displayTitle || call.summary_title || "Call Summary"}
-                                  </h4>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge className={outcomeStyles[outcome] || outcomeStyles.unknown}>
-                                      {outcome}
-                                    </Badge>
-                                    {highIntent && (
-                                      <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 gap-1">
-                                        <Flame className="h-3 w-3" />
-                                        High Intent
+                            <div className="p-5 border-t border-border/50 space-y-4 text-left">
+                              {/* Top row: Call status | Lead status | Title | Copy Summary */}
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 w-full min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                  <Badge
+                                    className={
+                                      outcomeStyles[outcome] || outcomeStyles.unknown
+                                    }
+                                  >
+                                    {outcome}
+                                  </Badge>
+                                  {(() => {
+                                    const status = call.lead_status || "none";
+                                    const config =
+                                      leadStatusConfig[status] || leadStatusConfig.none;
+                                    return (
+                                      <Badge className={config.className}>
+                                        {config.label}
                                       </Badge>
-                                    )}
-                                  </div>
+                                    );
+                                  })()}
+                                  {highIntent && (
+                                    <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 gap-1">
+                                      <Flame className="h-3 w-3" />
+                                      High Intent
+                                    </Badge>
+                                  )}
                                 </div>
-                                
+                                <h4 className="font-semibold text-foreground min-w-0 flex-1 truncate text-left">
+                                  {displayTitle || call.summary_title || "Call Summary"}
+                                </h4>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -340,7 +365,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                                     e.stopPropagation();
                                     handleCopySummary(call);
                                   }}
-                                  className="gap-1.5 text-xs"
+                                  className="gap-1.5 text-xs shrink-0 self-end sm:self-center sm:ml-auto"
                                 >
                                   {copiedId === call.id ? (
                                     <Check className="h-3 w-3" />
@@ -350,29 +375,68 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                                   Copy Summary
                                 </Button>
                               </div>
-                              
-                              {/* AI summary + transcript */}
+
                               {aiSummaryBlock && (
-                                <div className="space-y-1">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                <div className="space-y-2">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground text-left">
                                     AI summary
                                   </p>
-                                  <div className="bg-card border border-border rounded-md p-4">
-                                    <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                                      {aiSummaryBlock}
-                                    </p>
+                                  <div className="border border-border rounded-md p-4 bg-card text-left">
+                                    <CallAISummaryBullets
+                                      callId={call.id}
+                                      summary={aiSummaryBlock}
+                                      enabled={expandedId === call.id}
+                                    />
                                   </div>
                                 </div>
                               )}
 
                               {transcriptToShow && (
-                                <div className="space-y-2">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    Transcript
-                                  </p>
-                                  <div className="rounded-md border border-border bg-background p-3 max-h-[min(480px,50vh)] overflow-y-auto">
-                                    <TranscriptTurnsList transcript={transcriptToShow} />
+                                <div className="space-y-2 text-left">
+                                  <div className="flex flex-wrap items-center gap-2 justify-between">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                      Transcript
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 text-xs text-muted-foreground"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toast({
+                                            title: "Prompt improvement",
+                                            description:
+                                              "TODO: add to agent review queue (coming soon).",
+                                          });
+                                        }}
+                                      >
+                                        🤖 Prompt Improvement
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2 text-xs font-normal text-primary"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTranscriptOpen((o) => !o);
+                                        }}
+                                      >
+                                        {transcriptOpen
+                                          ? "Hide transcript ▲"
+                                          : "View Full Transcript ▼"}
+                                      </Button>
+                                    </div>
                                   </div>
+                                  {transcriptOpen && (
+                                    <div className="rounded-md border border-border bg-background p-3 max-h-[min(480px,50vh)] overflow-y-auto text-left">
+                                      <TranscriptTwoColumnList
+                                        transcript={transcriptToShow}
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               

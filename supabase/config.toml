@@ -114,6 +114,9 @@ verify_jwt = false
 [functions.parse-century-email]
 verify_jwt = false
 
+[functions.summarize-call-bullets]
+verify_jwt = true
+
 [functions.archive-daily-loads]
 verify_jwt = false
 

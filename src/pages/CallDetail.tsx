@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,11 +9,34 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Phone } from "lucide-react";
+import { ArrowLeft, Copy, Check, Phone } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { PhoneDisplay } from "@/components/ui/phone-display";
-import { TranscriptTurnsList } from "@/lib/callTranscript";
+import { TranscriptTwoColumnList } from "@/lib/callTranscript";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
+import { CallAISummaryBullets } from "@/components/calls/CallAISummaryBullets";
+import { toast } from "@/hooks/use-toast";
+
+const leadStatusDetailConfig: Record<
+  string,
+  { label: string; className: string }
+> = {
+  pending: { label: "Lead", className: "bg-blue-500/15 text-blue-700" },
+  claimed: { label: "Claimed", className: "bg-amber-500/15 text-amber-700" },
+  closed: { label: "Closed", className: "bg-muted text-muted-foreground" },
+  booked: { label: "Booked", className: "bg-emerald-500/15 text-emerald-700" },
+  none: { label: "No Lead", className: "bg-muted/50 text-muted-foreground" },
+};
+
+const outcomeDetailStyles: Record<string, string> = {
+  completed: "bg-emerald-500/15 text-emerald-700",
+  confirmed: "bg-emerald-500/15 text-emerald-700",
+  booked: "bg-emerald-500/15 text-emerald-700",
+  declined: "bg-red-500/15 text-red-700",
+  callback_requested: "bg-amber-500/15 text-amber-700",
+  no_action: "bg-muted text-muted-foreground",
+  unknown: "bg-muted text-muted-foreground",
+};
 
 export default function CallDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +45,8 @@ export default function CallDetail() {
   const { agencyId: userAgencyId } = useUserRole();
   const { impersonatedAgencyId, isImpersonating } = useImpersonation();
   const effectiveAgencyId = isImpersonating ? impersonatedAgencyId : userAgencyId;
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   const { data: call, isLoading, error, isError } = useQuery({
     queryKey: ["ai_call_detail", id, effectiveAgencyId],
@@ -54,6 +80,28 @@ export default function CallDetail() {
       return data;
     },
     enabled: !!user && !!effectiveAgencyId && !!call?.conversation_id,
+  });
+
+  const { data: leadMatch } = useQuery({
+    queryKey: ["lead_for_call_detail", effectiveAgencyId, call?.external_number],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("status")
+        .eq("agency_id", effectiveAgencyId!)
+        .eq("caller_phone", call!.external_number!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled:
+      !!user &&
+      !!call &&
+      !!effectiveAgencyId &&
+      !!call.external_number &&
+      call.external_number !== "unknown",
   });
 
   const handleBack = () => {
@@ -115,6 +163,34 @@ export default function CallDetail() {
     null;
   const transcriptToShow = epcTranscript?.trim() || call.transcript?.trim() || null;
 
+  const leadStatusKey = leadMatch?.status ?? "none";
+  const leadCfg =
+    leadStatusDetailConfig[leadStatusKey] ?? leadStatusDetailConfig.none;
+  const outcomeKey = call.call_outcome || "unknown";
+  const outcomeCls =
+    outcomeDetailStyles[outcomeKey] ?? outcomeDetailStyles.unknown;
+
+  const handleCopySummary = async () => {
+    const text =
+      epcRow?.transcript_summary?.trim() ||
+      call.summary?.trim() ||
+      call.summary_short?.trim() ||
+      call.summary_title?.trim() ||
+      "";
+    if (!text) {
+      toast({ title: "No summary to copy", variant: "destructive" });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSummary(true);
+      toast({ title: "Summary copied" });
+      setTimeout(() => setCopiedSummary(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto tl-page-gutter py-8">
@@ -123,25 +199,35 @@ export default function CallDetail() {
           Back
         </Button>
 
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-serif font-semibold text-foreground">
-                {displayTitle}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                <Phone className="h-4 w-4 shrink-0" />
-                <PhoneDisplay phone={call.external_number} className="text-muted-foreground" />
-                <span> · {format(parseISO(call.created_at), "MMM d, yyyy h:mm a")}</span>
-                {call.duration_secs != null && ` · ${call.duration_secs}s`}
-              </p>
+        <div className="space-y-6 text-left">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 w-full min-w-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Badge className={outcomeCls}>{outcomeKey}</Badge>
+              <Badge className={leadCfg.className}>{leadCfg.label}</Badge>
             </div>
-            {call.call_outcome && (
-              <Badge variant="outline" className="shrink-0">
-                {call.call_outcome}
-              </Badge>
-            )}
+            <h1 className="text-2xl font-serif font-semibold text-foreground min-w-0 flex-1 truncate">
+              {displayTitle}
+            </h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopySummary}
+              className="gap-1.5 text-xs shrink-0 self-end sm:self-center sm:ml-auto"
+            >
+              {copiedSummary ? (
+                <Check className="h-3 w-3" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
+              Copy Summary
+            </Button>
           </div>
+          <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <Phone className="h-4 w-4 shrink-0" />
+            <PhoneDisplay phone={call.external_number} className="text-muted-foreground" />
+            <span> · {format(parseISO(call.created_at), "MMM d, yyyy h:mm a")}</span>
+            {call.duration_secs != null && ` · ${call.duration_secs}s`}
+          </p>
 
           <Card>
             <CardHeader>
@@ -172,24 +258,62 @@ export default function CallDetail() {
 
           {aiSummary && (
             <Card>
-              <CardHeader>
+              <CardHeader className="text-left">
                 <CardTitle className="text-base">AI summary</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+              <CardContent className="text-left">
+                <CallAISummaryBullets callId={call.id} summary={aiSummary} />
               </CardContent>
             </Card>
           )}
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Transcript</CardTitle>
+            <CardHeader className="text-left space-y-0 pb-2">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <CardTitle className="text-base">Transcript</CardTitle>
+                {transcriptToShow ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground"
+                      onClick={() =>
+                        toast({
+                          title: "Prompt improvement",
+                          description:
+                            "TODO: add to agent review queue (coming soon).",
+                        })
+                      }
+                    >
+                      🤖 Prompt Improvement
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs font-normal text-primary"
+                      onClick={() => setTranscriptOpen((o) => !o)}
+                    >
+                      {transcriptOpen
+                        ? "Hide transcript ▲"
+                        : "View Full Transcript ▼"}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="text-left">
               {transcriptToShow ? (
-                <TranscriptTurnsList transcript={transcriptToShow} />
+                transcriptOpen ? (
+                  <div className="max-h-[min(480px,55vh)] overflow-y-auto pr-1">
+                    <TranscriptTwoColumnList transcript={transcriptToShow} />
+                  </div>
+                ) : null
               ) : (
-                <p className="text-sm text-muted-foreground">No transcript available.</p>
+                <p className="text-sm text-muted-foreground">
+                  No transcript available.
+                </p>
               )}
             </CardContent>
           </Card>

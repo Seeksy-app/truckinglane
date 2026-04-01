@@ -84,3 +84,37 @@ export function TranscriptTurnsList({ transcript }: { transcript: string }) {
     </div>
   );
 }
+
+/** Two-column transcript: speaker (small gray) | message — left-aligned, no bubbles. */
+export function TranscriptTwoColumnList({ transcript }: { transcript: string }) {
+  const turns = useMemo(() => parseTranscriptToTurns(transcript), [transcript]);
+  if (!transcript?.trim()) {
+    return (
+      <p className="text-sm text-muted-foreground text-left">No transcript available.</p>
+    );
+  }
+  if (turns && turns.length > 0) {
+    return (
+      <div className="space-y-2.5 text-left">
+        {turns.map((turn, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-[minmax(3.5rem,5rem)_1fr] gap-x-3 gap-y-0.5 items-start"
+          >
+            <span className="text-xs text-muted-foreground font-medium pt-0.5">
+              {turn.speaker}
+            </span>
+            <span className="text-sm font-normal text-foreground leading-relaxed">
+              {turn.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <pre className="text-sm text-foreground whitespace-pre-wrap leading-relaxed text-left font-sans">
+      {transcript}
+    </pre>
+  );
+}

@@ -94,6 +94,8 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       }),
     enabled: !!user && showAgencyNav,
     refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   const handleExitImpersonation = () => {

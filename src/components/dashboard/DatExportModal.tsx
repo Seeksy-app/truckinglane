@@ -55,6 +55,8 @@ export function DatExportModal({
         impersonatedAgencyId,
       }),
     enabled: open,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const idsWithPending = useMemo(() => {
@@ -120,7 +122,7 @@ export function DatExportModal({
         impersonatedAgencyId,
       });
       if (loads.length === 0) {
-        toast.error("No exportable pending loads for the selected sources (check destinations)");
+        toast.error("No exportable pending loads for the selected sources (check row filters or missing data)");
         return;
       }
       const ids = loads.map((l) => l.id);
@@ -169,8 +171,10 @@ export function DatExportModal({
             Export to DAT
           </DialogTitle>
           <DialogDescription>
-            Choose sources. Counts are loads with no DAT upload yet (<code className="text-xs">dat_posted_at</code>{" "}
-            empty). Only rows with complete origin/destination export.
+            Choose sources. Counts are active loads (<code className="text-xs">is_active</code>) with no DAT upload yet (
+            <code className="text-xs">dat_posted_at</code> empty), grouped by source. Adelphia, Oldcastle, Big 500, VMS,
+            and spot rows need origin and destination in the CSV; Trucker Tools and Century can export with partial
+            locations.
           </DialogDescription>
         </DialogHeader>
 

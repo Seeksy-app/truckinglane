@@ -9,11 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, XCircle } from "lucide-react";
-import {
-  DAT_ELIGIBLE_TEMPLATE_TYPES,
-  DAT_PENDING_DISPATCH_STATUSES,
-  isExportableLoad,
-} from "@/lib/datExport";
+import { DAT_ELIGIBLE_TEMPLATE_TYPES, isExportableLoad } from "@/lib/datExport";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -26,10 +22,6 @@ interface FailedLoad {
   dest_city: string | null;
   dest_state: string | null;
   template_type: string | null;
-}
-
-function isPendingDispatch(ds: string | null | undefined): boolean {
-  return DAT_PENDING_DISPATCH_STATUSES.includes(ds as "open" | "available");
 }
 
 export function DATStatusCard() {
@@ -63,20 +55,11 @@ export function DATStatusCard() {
 
       const uploaded = loads.filter((l) => l.dat_posted_at != null).length;
 
-      const pendingLoads = loads.filter(
-        (l) =>
-          l.dat_posted_at == null &&
-          isPendingDispatch(l.dispatch_status),
-      );
+      // Pending = eligible, active, not yet posted (matches modal / nav: dat_posted_at IS NULL)
+      const pendingLoads = loads.filter((l) => l.dat_posted_at == null);
       const pending = pendingLoads.length;
       const notExportable = pendingLoads.filter((l) => !isExportableLoad(l));
-      /** Real destination / row issues — not Trucker Tools (those need extension field mapping). */
-      const failedLoads = notExportable.filter(
-        (l) => String(l.template_type || "") !== "truckertools",
-      ) as FailedLoad[];
-      const truckertoolsMapping = notExportable.filter(
-        (l) => String(l.template_type || "") === "truckertools",
-      );
+      const failedLoads = notExportable as FailedLoad[];
 
       return {
         total: loads.length,
@@ -84,10 +67,10 @@ export function DATStatusCard() {
         pending,
         failed: failedLoads.length,
         failedLoads,
-        truckertoolsMappingCount: truckertoolsMapping.length,
       };
     },
-    refetchInterval: 60000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const handleEditLoad = (load: FailedLoad) => {
@@ -133,9 +116,7 @@ export function DATStatusCard() {
                       DAT Board
                     </span>
                   </div>
-                  {(failed > 0 || ttMapping > 0) && (
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                  )}
+                  {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                 </div>
 
                 <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums leading-tight">
@@ -152,12 +133,7 @@ export function DATStatusCard() {
                       {failed} need destination
                     </span>
                   )}
-                  {ttMapping > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {ttMapping} Trucker Tools need field mapping
-                    </span>
-                  )}
-                  {failed === 0 && ttMapping === 0 && pending === 0 && uploaded > 0 && (
+                  {failed === 0 && pending === 0 && uploaded > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-green-500">
                       <CheckCircle2 className="h-3 w-3" />
                       none waiting
@@ -169,11 +145,9 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {pending} pending (open/available, not yet uploaded) · {uploaded} uploaded to DAT
-              {failed > 0 ? ` · ${failed} need destination fix (click card)` : ""}
-              {ttMapping > 0
-                ? `${failed > 0 ? " ·" : " ·"} ${ttMapping} Trucker Tools need field mapping (data quality — update extension mapper)`
-                : ""}
+              {pending} pending (not yet uploaded, <code className="text-xs">dat_posted_at</code> empty) · {uploaded}{" "}
+              uploaded to DAT
+              {failed > 0 ? ` · ${failed} need destination or row fix (click card)` : ""}
             </p>
           </TooltipContent>
         </Tooltip>

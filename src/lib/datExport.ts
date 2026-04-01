@@ -34,6 +34,16 @@ export const DAT_EXPORT_SOURCE_GROUPS = [
 
 export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
 
+/**
+ * DAT CSV rows normally need origin+destination. Trucker Tools and Century may have sparse
+ * location fields in the API — still include them in export; CSV uses whatever is present.
+ */
+export function templateTypeRequiresOriginDestForDatExport(templateType: string | null | undefined): boolean {
+  const t = templateType || "";
+  if (t === "truckertools" || t === "century_xlsx" || t === "Century") return false;
+  return true;
+}
+
 export function filterDatEligibleLoads(loads: Load[]): Load[] {
   return loads.filter((l) =>
     DAT_ELIGIBLE_TEMPLATE_TYPES.includes(
@@ -43,10 +53,9 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
 }
 
 /**
- * Server-side pending list for "Export Pending to DAT": does not filter by is_active.
- * Open dispatch + not yet posted to DAT + DAT-eligible template + exportable row shape.
+ * Modal pending counts: active rows not yet posted to DAT, grouped client-side by source.
+ * Matches COUNT(*) WHERE dat_posted_at IS NULL AND is_active = true (per template_type group).
  */
-/** Pending count per export source group (dat_posted_at IS NULL, not archived). */
 export async function fetchDatPendingCountsBySource(
   supabase: SupabaseClient,
   opts: { role: string | null; impersonatedAgencyId: string | null },
@@ -56,7 +65,7 @@ export async function fetchDatPendingCountsBySource(
     .select("id, template_type")
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
+    .eq("is_active", true);
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);
@@ -104,6 +113,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
     .select("*")
     .in("template_type", types)
     .is("dat_posted_at", null)
+    .eq("is_active", true)
     .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
     .order("ship_date", { ascending: true });
 
@@ -125,6 +135,7 @@ export async function fetchDatPendingLoadsForExport(
     .select("*")
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
+    .eq("is_active", true)
     .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
     .order("ship_date", { ascending: true });
 
@@ -148,14 +159,8 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
       return false;
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
+    if (load.is_active === false) return false;
     if (load.dispatch_status === "archived") return false;
-    if (
-      !DAT_PENDING_DISPATCH_STATUSES.includes(
-        load.dispatch_status as (typeof DAT_PENDING_DISPATCH_STATUSES)[number],
-      )
-    ) {
-      return false;
-    }
     return isExportableLoad(load);
   });
 }
@@ -317,6 +322,9 @@ function datExportDestinationResolved(load: Load): { city: string; state: string
 export function isExportableLoad(load: Load): boolean {
   const city = (load.pickup_city || "").toUpperCase();
   if (city.startsWith("PICK UP") || city.startsWith("NOTE") || city.startsWith("***")) return false;
+  if (!templateTypeRequiresOriginDestForDatExport(load.template_type)) {
+    return true;
+  }
   if (!load.pickup_city && !load.dest_city) return false;
   const dest = datExportDestinationResolved(load);
   if (!dest.city.trim() || !dest.state.trim()) return false;
@@ -441,7 +449,7 @@ export async function fetchDatPendingTotalForReminder(
     .select("id", { count: "exact", head: true })
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
+    .eq("is_active", true);
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);

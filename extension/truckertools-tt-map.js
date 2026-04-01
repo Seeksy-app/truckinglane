@@ -95,8 +95,8 @@ function mapTruckerToolsLoad(raw, idx) {
       raw.pickupFrom ??
       null
   );
-  const trailer_type =
-    ttStr(raw.truckTypes) || ttStr(raw.equipmentType || raw.trailerType);
+  // API exposes truckTypes (not equipmentType); keep equipmentType as optional fallback.
+  const trailer_type = ttStr(raw.truckTypes) || ttStr(raw.equipmentType);
 
   const weight_lbs = ttPickNumber(
     raw.weight,

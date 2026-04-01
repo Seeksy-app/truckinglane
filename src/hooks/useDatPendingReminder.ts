@@ -29,6 +29,8 @@ export function useDatPendingReminder(isAdmin: boolean, opts: Opts) {
       }),
     enabled: isAdmin,
     refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   useEffect(() => {

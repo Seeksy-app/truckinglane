@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import {
   markDATExportComplete,
 } from "@/lib/datExport";
 import type { UserRole } from "@/hooks/useUserRole";
+import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -42,10 +43,9 @@ export function DatExportModal({
   agentName,
 }: Props) {
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<Set<DatExportSourceGroupId>>(
-    () => new Set(DAT_EXPORT_SOURCE_GROUPS.map((g) => g.id)),
-  );
+  const [selected, setSelected] = useState<Set<DatExportSourceGroupId>>(() => new Set());
   const [exporting, setExporting] = useState(false);
+  const initSelectionForOpenRef = useRef(false);
 
   const { data: counts = null, isLoading } = useQuery({
     queryKey: ["dat-pending-counts-by-source", role, impersonatedAgencyId],
@@ -57,17 +57,32 @@ export function DatExportModal({
     enabled: open,
   });
 
-  useEffect(() => {
-    if (open) {
-      setSelected(new Set(DAT_EXPORT_SOURCE_GROUPS.map((g) => g.id)));
-    }
-  }, [open]);
+  const idsWithPending = useMemo(() => {
+    if (!counts) return [] as DatExportSourceGroupId[];
+    return DAT_EXPORT_SOURCE_GROUPS.filter((g) => (counts[g.id] ?? 0) > 0).map((g) => g.id);
+  }, [counts]);
 
-  const allIds = useMemo(() => DAT_EXPORT_SOURCE_GROUPS.map((g) => g.id), []);
-  const allSelected = allIds.every((id) => selected.has(id));
+  useEffect(() => {
+    if (!open) {
+      initSelectionForOpenRef.current = false;
+      return;
+    }
+    if (counts != null && !initSelectionForOpenRef.current) {
+      initSelectionForOpenRef.current = true;
+      setSelected(new Set(idsWithPending));
+    }
+  }, [open, counts, idsWithPending]);
+
+  const allSelected = idsWithPending.length > 0 && idsWithPending.every((id) => selected.has(id));
+  const somePendingSelected = idsWithPending.some((id) => selected.has(id));
+  const selectAllChecked: boolean | "indeterminate" = allSelected
+    ? true
+    : somePendingSelected
+      ? "indeterminate"
+      : false;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    setSelected(checked ? new Set(idsWithPending) : new Set());
   };
 
   const toggleOne = (id: DatExportSourceGroupId, checked: boolean) => {
@@ -178,23 +193,33 @@ export function DatExportModal({
             </div>
           ) : (
             <ul className="space-y-3">
-              {DAT_EXPORT_SOURCE_GROUPS.map((g) => (
-                <li key={g.id} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <Checkbox
-                      id={`dat-src-${g.id}`}
-                      checked={selected.has(g.id)}
-                      onCheckedChange={(v) => toggleOne(g.id, v === true)}
-                    />
-                    <Label htmlFor={`dat-src-${g.id}`} className="cursor-pointer truncate">
-                      {g.label}
-                    </Label>
-                  </div>
-                  <span className="text-sm text-muted-foreground tabular-nums shrink-0">
-                    ({counts[g.id] ?? 0} pending)
-                  </span>
-                </li>
-              ))}
+              {DAT_EXPORT_SOURCE_GROUPS.map((g) => {
+                const n = counts[g.id] ?? 0;
+                const noPending = n === 0;
+                return (
+                  <li
+                    key={g.id}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-md transition-colors",
+                      noPending && "opacity-60 text-muted-foreground",
+                    )}
+                  >
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <Checkbox
+                        id={`dat-src-${g.id}`}
+                        checked={selected.has(g.id)}
+                        onCheckedChange={(v) => toggleOne(g.id, v === true)}
+                      />
+                      <Label htmlFor={`dat-src-${g.id}`} className="cursor-pointer truncate">
+                        {g.label}
+                      </Label>
+                    </div>
+                    <span className="text-sm tabular-nums shrink-0 text-muted-foreground">
+                      ({n} pending)
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

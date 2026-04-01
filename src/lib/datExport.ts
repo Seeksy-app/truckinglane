@@ -17,6 +17,9 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "Century",
 ] as const;
 
+/** Dispatch states that count as “pending DAT” (not yet posted, still on the board). */
+export const DAT_PENDING_DISPATCH_STATUSES = ["open", "available"] as const;
+
 /** UI groups for the Export to DAT modal (maps to template_type). */
 export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "big500", label: "Big 500", templateTypes: ["aljex_big500"] as const },
@@ -51,7 +54,7 @@ export async function fetchDatPendingCountsBySource(
     .select("id, template_type")
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .neq("dispatch_status", "archived");
+    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);
@@ -98,7 +101,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
     .select("*")
     .in("template_type", types)
     .is("dat_posted_at", null)
-    .neq("dispatch_status", "archived")
+    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
     .order("ship_date", { ascending: true });
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -119,7 +122,7 @@ export async function fetchDatPendingLoadsForExport(
     .select("*")
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .neq("dispatch_status", "archived")
+    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
     .order("ship_date", { ascending: true });
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -143,6 +146,13 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
     if (load.dispatch_status === "archived") return false;
+    if (
+      !DAT_PENDING_DISPATCH_STATUSES.includes(
+        load.dispatch_status as (typeof DAT_PENDING_DISPATCH_STATUSES)[number],
+      )
+    ) {
+      return false;
+    }
     return isExportableLoad(load);
   });
 }
@@ -427,7 +437,7 @@ export async function fetchDatPendingTotalForReminder(
     .select("id", { count: "exact", head: true })
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .neq("dispatch_status", "archived");
+    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);

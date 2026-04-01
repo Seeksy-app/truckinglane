@@ -8,8 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Upload, AlertTriangle, MapPin, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { DAT_ELIGIBLE_TEMPLATE_TYPES, isExportableLoad } from "@/lib/datExport";
+import { Upload, AlertTriangle, MapPin, CheckCircle2, XCircle } from "lucide-react";
+import {
+  DAT_ELIGIBLE_TEMPLATE_TYPES,
+  DAT_PENDING_DISPATCH_STATUSES,
+  isExportableLoad,
+} from "@/lib/datExport";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -24,6 +28,10 @@ interface FailedLoad {
   template_type: string | null;
 }
 
+function isPendingDispatch(ds: string | null | undefined): boolean {
+  return DAT_PENDING_DISPATCH_STATUSES.includes(ds as "open" | "available");
+}
+
 export function DATStatusCard() {
   const queryClient = useQueryClient();
   const [showFailed, setShowFailed] = useState(false);
@@ -35,36 +43,31 @@ export function DATStatusCard() {
   const { data: stats } = useQuery({
     queryKey: ["dat-stats"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("loads")
-        .select("id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type")
+        .select(
+          "id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type, dat_posted_at, dispatch_status",
+        )
         .eq("is_active", true)
         .neq("dispatch_status", "archived");
 
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const datPostedUrl = new URL(`${supabaseUrl}/rest/v1/loads`);
-      datPostedUrl.searchParams.set("is_active", "eq.true");
-      datPostedUrl.searchParams.set("dispatch_status", "neq.archived");
-      datPostedUrl.searchParams.set("select", "id,dat_posted_at");
-      const resp = await fetch(datPostedUrl.toString(), {
-        headers: { apikey: supabaseKey, Authorization: `Bearer ${token || supabaseKey}` },
-      });
-      const datStatus: { id: string; dat_posted_at: string | null }[] = await resp.json();
-      const datMap = new Map(datStatus.map((l) => [l.id, l.dat_posted_at]));
+      if (error) throw error;
 
       const eligibleTypes: readonly string[] = DAT_ELIGIBLE_TEMPLATE_TYPES;
-      const allLoads: (Load & { dat_posted_at: string | null })[] = (data || []).map((l) => ({
-        ...l,
-        dat_posted_at: datMap.get(l.id) ?? null,
-      }));
-      const loads = allLoads.filter((l) => eligibleTypes.includes(String(l.template_type || "")));
+      const loads = (data || []).filter((l) =>
+        eligibleTypes.includes(String(l.template_type || "")),
+      ) as (Load & {
+        dat_posted_at: string | null;
+        dispatch_status: string | null;
+      })[];
 
       const uploaded = loads.filter((l) => l.dat_posted_at != null).length;
-      const pendingLoads = loads.filter((l) => l.dat_posted_at == null);
+
+      const pendingLoads = loads.filter(
+        (l) =>
+          l.dat_posted_at == null &&
+          isPendingDispatch(l.dispatch_status),
+      );
       const pending = pendingLoads.length;
       const failedLoads = pendingLoads.filter((l) => !isExportableLoad(l));
 
@@ -124,21 +127,11 @@ export function DATStatusCard() {
                   {failed > 0 && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
                 </div>
 
-                <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                  <span className="text-2xl font-bold text-foreground">{uploaded}</span>
-                  <span className="text-xs text-muted-foreground">uploaded</span>
-                  <span className="text-muted-foreground/50 mx-0.5">·</span>
-                  <span className="text-xl font-semibold text-foreground">{pending}</span>
-                  <span className="text-xs text-muted-foreground">pending</span>
-                </div>
+                <p className="text-sm font-medium text-foreground tabular-nums">
+                  {uploaded} uploaded · {pending} pending
+                </p>
 
-                <div className="flex items-center gap-2 flex-wrap mt-1">
-                  {pending > 0 && uploaded + pending > 0 && (
-                    <span className="flex items-center gap-0.5 text-xs text-blue-400">
-                      <Clock className="h-3 w-3" />
-                      eligible templates only
-                    </span>
-                  )}
+                <div className="flex items-center gap-2 flex-wrap mt-2">
                   {failed > 0 && (
                     <span className="flex items-center gap-0.5 text-xs text-amber-500 font-medium">
                       <XCircle className="h-3 w-3" />
@@ -157,7 +150,7 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {uploaded} uploaded to DAT · {pending} pending (not yet uploaded)
+              {uploaded} uploaded to DAT · {pending} pending (open/available, not yet uploaded)
               {failed > 0 ? ` · ${failed} need destination fix (click card)` : ""}
             </p>
           </TooltipContent>

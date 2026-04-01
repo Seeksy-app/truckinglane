@@ -427,7 +427,7 @@ def _parse_inbound_sms_request() -> tuple[str, str]:
     if request.form:
         flat.update(request.form.to_dict())
 
-    for nk in ("data", "payload", "message", "event", "body"):
+    for nk in ("data", "payload", "message", "event", "body", "values"):
         sub = flat.get(nk)
         if isinstance(sub, dict):
             for k, v in sub.items():
@@ -1165,6 +1165,10 @@ def sms_inbound():
     """
     SimpleTexting inbound webhook (no TL trigger key). Parses phone + body; sends replies via API.
     """
+    j = request.get_json(silent=True) or {}
+    if j.get("type") == "OUTGOING_MESSAGE":
+        return jsonify({"ok": True, "skipped": "outgoing"}), 200
+
     print(f"[SMS-INBOUND] payload: {request.get_data(as_text=True)}", flush=True)
     if not SERVICE_KEY:
         return jsonify({"error": "Server misconfigured"}), 500

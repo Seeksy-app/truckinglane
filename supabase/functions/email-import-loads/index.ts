@@ -10,8 +10,9 @@ const corsHeaders = {
 
 /** Lowercased full addresses allowed to import when agency domain whitelist would otherwise reject. */
 const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>([
-  "stephen@dltransport.com",
   "appletonab@gmail.com",
+  "darya@valleymetalservices.com",
+  "stephen@dltransport.com",
 ]);
 
 const INBOUND_DEDUPE_WINDOW_MS = 60 * 60 * 1000;

@@ -8,6 +8,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Lowercased full addresses allowed to import when agency domain whitelist would otherwise reject. */
+const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>(["stephen@dltransport.com"]);
+
 // ============= XLSX PARSING (copied from import-loads) =============
 function parseXLSX(buffer: ArrayBuffer, sheetName: string, headerRow: number): Record<string, string>[] {
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -845,9 +848,10 @@ Deno.serve(async (req) => {
     
     console.log("Found agency:", agency.name, agency.id);
     
-    // Validate sender domain against whitelist
+    // Validate sender domain against whitelist (full-address exceptions in EDGE_EXTRA_ALLOWED_SENDER_EMAILS)
     const allowedDomains = (agency.allowed_sender_domains || []).map((d: string) => d.toLowerCase());
-    if (allowedDomains.length > 0 && !allowedDomains.includes(senderDomain)) {
+    const senderAllowedByAddress = EDGE_EXTRA_ALLOWED_SENDER_EMAILS.has(senderLower);
+    if (allowedDomains.length > 0 && !allowedDomains.includes(senderDomain) && !senderAllowedByAddress) {
       console.error("Sender domain not whitelisted:", senderDomain);
       
       await supabase.from("email_import_logs").insert({

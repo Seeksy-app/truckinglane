@@ -11,6 +11,11 @@ const corsHeaders = {
 /** Lowercased full addresses allowed to import when agency domain whitelist would otherwise reject. */
 const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>(["stephen@dltransport.com"]);
 
+function subjectHasCenturyKeywords(subjectLower: string): boolean {
+  const s = subjectLower || "";
+  return s.includes("century") || s.includes("loads");
+}
+
 // ============= XLSX PARSING (copied from import-loads) =============
 function parseXLSX(buffer: ArrayBuffer, sheetName: string, headerRow: number): Record<string, string>[] {
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -570,7 +575,7 @@ function stripHtmlToText(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (century|loads) so e.g. "Semco loads" stays Semco. Sender ardell@centuryent.com forces Century before this runs. */
+/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (case-insensitive century|loads). Sender ardell@centuryent.com forces Century before this runs. */
 function detectFromSubject(subjectLower: string): EmailImportKind | null {
   const s = subjectLower || "";
   const containsVMS = s.includes("vms") || s.includes("mvs") || s.includes("vsm");
@@ -581,7 +586,7 @@ function detectFromSubject(subjectLower: string): EmailImportKind | null {
     s.includes("adlephia") ||
     s.includes("adelphoa") ||
     s.includes("adelpha");
-  const containsCentury = s.includes("century") || s.includes("loads");
+  const containsCentury = subjectHasCenturyKeywords(s);
   const containsAllied = s.includes("allied building stores") || /\babs\b/i.test(s);
   const containsSemco = s.includes("semco distributing") || s.includes("semco");
 
@@ -615,7 +620,7 @@ function detectFromBody(bodyLower: string): EmailImportKind | null {
   }
   if (b.includes("allied building stores") || /\babs\b/.test(b)) return "allied";
   if (b.includes("semco distributing") || b.includes("semco")) return "semco";
-  if (b.includes("century")) return "century";
+  if (subjectHasCenturyKeywords(b)) return "century";
   return null;
 }
 

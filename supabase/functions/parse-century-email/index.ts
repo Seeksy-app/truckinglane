@@ -7,8 +7,17 @@ const corsHeaders = {
 };
 
 const CENTURY_AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323";
-const EXPECTED_SENDER = "ardell@centuryent.com";
+/** Senders allowed to hit this Century PDF parser. */
+const PARSE_CENTURY_ALLOWED_SENDERS = new Set<string>([
+  "ardell@centuryent.com",
+  "stephen@dltransport.com",
+]);
 const MODEL = "claude-sonnet-4-20250514";
+
+function subjectHasCenturyKeywords(subject: string): boolean {
+  const s = subject.toLowerCase();
+  return s.includes("century") || s.includes("loads");
+}
 
 type Extracted = {
   pickup_city: string;
@@ -163,15 +172,27 @@ Deno.serve(async (req) => {
     const m = senderEmail && String(senderEmail).match(/<([^>]+)>/);
     if (m) senderEmail = m[1];
     const clean = String(senderEmail || "").toLowerCase().trim();
-    if (clean !== EXPECTED_SENDER) {
-      return new Response(JSON.stringify({ error: "Sender must be ardell@centuryent.com" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!PARSE_CENTURY_ALLOWED_SENDERS.has(clean)) {
+      return new Response(
+        JSON.stringify({ error: "Sender not allowed for Century PDF import" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const subject = String(payload.subject || payload.data?.subject || payload.email?.subject || "");
-    // Sender is verified as ardell@centuryent.com above — any subject is accepted (incl. "Loads …", "century", "loads").
+    // Case-insensitive "century" or "loads" in subject; ardell@centuryent.com may use any subject.
+    const subjectOk = subjectHasCenturyKeywords(subject) || clean === "ardell@centuryent.com";
+    if (!subjectOk) {
+      return new Response(
+        JSON.stringify({
+          error: 'Subject must contain "century" or "loads" (case insensitive) unless from ardell@centuryent.com',
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const attachments = payload.attachments || payload.data?.attachments || payload.email?.attachments || [];
     const pdfs = attachments.filter((a: { filename?: string }) =>

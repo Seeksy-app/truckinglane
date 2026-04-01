@@ -9,7 +9,79 @@ const corsHeaders = {
 };
 
 /** Lowercased full addresses allowed to import when agency domain whitelist would otherwise reject. */
-const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>(["stephen@dltransport.com"]);
+const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>([
+  "stephen@dltransport.com",
+  "appletonab@gmail.com",
+]);
+
+const INBOUND_DEDUPE_WINDOW_MS = 60 * 60 * 1000;
+
+/** Dedupe store key: same sender + same attachment filename(s) within the window → skip. */
+function inboundDedupeSenderFilenameKey(senderLower: string, filenamePart: string): string {
+  const fn = String(filenamePart ?? "").trim().toLowerCase().slice(0, 800);
+  return `fn:${senderLower}|${fn}`;
+}
+
+function centuryPdfDedupeFilenamePart(
+  pdfs: { filename?: string; id?: string }[],
+): string {
+  const parts = pdfs.map((a, i) => {
+    const f = String(a.filename ?? "").trim().toLowerCase();
+    if (f) return f;
+    return `id:${String(a.id ?? `idx${i}`)}`;
+  });
+  parts.sort();
+  return `pdfs:${parts.join("\x1f")}`;
+}
+
+async function responseIfDuplicateSenderFilenameWithinHour(
+  supabase: ReturnType<typeof createClient>,
+  payloadHash: string,
+  logCtx: {
+    agency_id: string;
+    sender_email: string;
+    subject: string;
+    raw_headers: unknown;
+  },
+): Promise<Response | null> {
+  const cutoff = new Date(Date.now() - INBOUND_DEDUPE_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from("email_import_attachment_dedupe")
+    .select("id")
+    .eq("payload_hash", payloadHash)
+    .gte("created_at", cutoff)
+    .limit(1);
+  if (error) {
+    console.error("Inbound dedupe lookup error:", error);
+    return null;
+  }
+  if (data && data.length > 0) {
+    await supabase.from("email_import_logs").insert({
+      agency_id: logCtx.agency_id,
+      sender_email: logCtx.sender_email,
+      subject: logCtx.subject,
+      status: "received",
+      imported_count: 0,
+      error_message: "duplicate skipped",
+      raw_headers: logCtx.raw_headers,
+    });
+    return new Response(JSON.stringify({ ok: true, skipped: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
+async function recordSuccessfulInboundDedupe(
+  supabase: ReturnType<typeof createClient>,
+  fullKey: string,
+): Promise<void> {
+  const { error } = await supabase.from("email_import_attachment_dedupe").insert({ payload_hash: fullKey });
+  if (error) console.error("Inbound dedupe insert error:", error);
+  const pruneBefore = new Date(Date.now() - 2 * INBOUND_DEDUPE_WINDOW_MS).toISOString();
+  await supabase.from("email_import_attachment_dedupe").delete().lt("created_at", pruneBefore);
+}
 
 /** Subject substrings (case-insensitive) that route to Century / PDF parser eligibility. */
 const CENTURY_EMAIL_SUBJECT_KEYWORDS = ["century", "loads"] as const;
@@ -135,6 +207,25 @@ async function countNewUpdatedForImport(
   return { new: newC, updated: loadNumbers.length - newC };
 }
 
+/** Active loads after import — for load_activity_logs / email_import_logs.raw_headers.total_count */
+async function countActiveLoadsForTemplate(
+  supabase: ReturnType<typeof createClient>,
+  agencyId: string,
+  templateType: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("loads")
+    .select("*", { count: "exact", head: true })
+    .eq("agency_id", agencyId)
+    .eq("template_type", templateType)
+    .eq("is_active", true);
+  if (error) {
+    console.error("countActiveLoadsForTemplate:", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 function mergeImportActivityHeaders(
   emailHeaders: unknown,
   breakdown: {
@@ -144,6 +235,14 @@ function mergeImportActivityHeaders(
     dupes_dropped: number;
     removed?: number;
     supports_removal: boolean;
+    /** Canonical label for load_activity_logs.meta (trigger merges raw_headers) */
+    source?: string;
+    /** Explicit counts for load_activity_logs consumers (mirror new/updated/removed) */
+    new_count?: number;
+    updated_count?: number;
+    removed_count?: number;
+    /** Total active loads for this template after import */
+    total_count?: number;
   },
 ): Record<string, unknown> {
   const base =
@@ -160,6 +259,13 @@ function mergeImportActivityHeaders(
     base.removed = breakdown.removed;
     base.archived = breakdown.removed;
   }
+  if (typeof breakdown.source === "string" && breakdown.source.trim()) {
+    base.source = breakdown.source.trim();
+  }
+  if (typeof breakdown.new_count === "number") base.new_count = breakdown.new_count;
+  if (typeof breakdown.updated_count === "number") base.updated_count = breakdown.updated_count;
+  if (typeof breakdown.removed_count === "number") base.removed_count = breakdown.removed_count;
+  if (typeof breakdown.total_count === "number") base.total_count = breakdown.total_count;
   return base;
 }
 
@@ -213,6 +319,166 @@ function calculateRateFields(rateRaw: number | null, weightLbs: number | null, i
     commission_target_pct: 0.20,
     commission_max_pct: 0.15,
   };
+}
+
+// ============= CENTURY PDF (Claude) =============
+const CENTURY_CLAUDE_MODEL = "claude-sonnet-4-20250514";
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+/** Century: email received day → pickup is next calendar day (UTC). */
+function centuryPickupDateFromEmailReceived(receivedIso: string): string {
+  const d = new Date(receivedIso);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
+function resolveCenturyPickupDateYmd(
+  fromDoc: string | null | undefined,
+  receivedIso: string,
+): string {
+  const t = String(fromDoc ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  return centuryPickupDateFromEmailReceived(receivedIso);
+}
+
+async function centuryHash3(pickupSt: string, destSt: string, salt: string): Promise<string> {
+  const enc = new TextEncoder().encode(`${pickupSt}|${destSt}|${salt}`);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  const hex = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hex.slice(0, 3).toUpperCase();
+}
+
+async function fetchInboundPdfAttachmentBuffer(
+  emailId: string | undefined,
+  attachment: { id?: string; content?: string; filename?: string },
+  resendApiKey: string | undefined,
+): Promise<ArrayBuffer> {
+  if (attachment.content) {
+    const fileContent = decodeBase64(attachment.content);
+    return new Uint8Array(fileContent).buffer as ArrayBuffer;
+  }
+  if (!attachment.id || !resendApiKey || !emailId) {
+    throw new Error("PDF attachment needs content or Resend fetch (id + email_id + API key)");
+  }
+  const listResponse = await fetch(
+    `https://api.resend.com/emails/receiving/${emailId}/attachments`,
+    { headers: { Authorization: `Bearer ${resendApiKey}` } },
+  );
+  if (!listResponse.ok) throw new Error(`Resend attachments list: ${listResponse.status}`);
+  const attachmentsList = await listResponse.json();
+  const attachmentData = attachmentsList.data?.find((a: { id: string }) => a.id === attachment.id);
+  if (!attachmentData?.download_url) throw new Error("Attachment download_url not found");
+  const fileResponse = await fetch(attachmentData.download_url);
+  if (!fileResponse.ok) throw new Error(`Download PDF: ${fileResponse.status}`);
+  return await fileResponse.arrayBuffer();
+}
+
+type CenturyPdfClaudeExtract = {
+  load_number: string;
+  reference_number: string;
+  pickup_city: string;
+  pickup_state: string;
+  dest_city: string;
+  dest_state: string;
+  weight_tons: number;
+  rate_per_ton: number;
+  pickup_date: string | null;
+  destination_company: string;
+  contains_bales: boolean;
+};
+
+async function extractCenturyPdfWithClaude(
+  pdfBase64: string,
+  anthropicKey: string,
+): Promise<CenturyPdfClaudeExtract> {
+  const body = {
+    model: CENTURY_CLAUDE_MODEL,
+    max_tokens: 1800,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data: pdfBase64,
+            },
+          },
+          {
+            type: "text",
+            text: `You are parsing a freight load PDF (Century / scrap metal). Return ONLY valid JSON (no markdown) with these keys:
+{"load_number":"","reference_number":"","pickup_city":"","pickup_state":"2-letter US state","dest_city":"","dest_state":"2-letter US state","weight_tons":0,"rate_per_ton":0,"pickup_date":null,"destination_company":"","contains_bales":false}
+
+load_number / reference_number: shipment or reference ID as printed (prefer the clearest primary load ID). Use empty string if not found.
+weight_tons: shipment weight in US tons (2000 lb tons), numeric only.
+rate_per_ton: dollars per ton from patterns like $85/NT or $85 / NT (number only).
+pickup_date: string "YYYY-MM-DD" if a pickup or ship date is clearly shown on the document, otherwise null.
+destination_company: consignee / mill / recycler at destination.
+contains_bales: true if the word BALES appears anywhere (any case), else false.`,
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Anthropic ${res.status}: ${t.slice(0, 500)}`);
+  }
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+  };
+  const text = data.content?.find((c) => c.type === "text")?.text ?? "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Claude did not return JSON");
+  const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+  const tons = Number(parsed.weight_tons);
+  const rpt = Number(parsed.rate_per_ton);
+  const pickupDateRaw = parsed.pickup_date;
+  const pickupDate =
+    pickupDateRaw === null || pickupDateRaw === undefined
+      ? null
+      : String(pickupDateRaw).trim() || null;
+  return {
+    load_number: String(parsed.load_number ?? "").trim(),
+    reference_number: String(parsed.reference_number ?? "").trim(),
+    pickup_city: String(parsed.pickup_city ?? "").trim(),
+    pickup_state: String(parsed.pickup_state ?? "").trim().toUpperCase().slice(0, 2),
+    dest_city: String(parsed.dest_city ?? "").trim(),
+    dest_state: String(parsed.dest_state ?? "").trim().toUpperCase().slice(0, 2),
+    weight_tons: Number.isFinite(tons) ? tons : 0,
+    rate_per_ton: Number.isFinite(rpt) ? rpt : 0,
+    pickup_date: pickupDate,
+    destination_company: String(parsed.destination_company ?? "").trim(),
+    contains_bales: Boolean(parsed.contains_bales),
+  };
+}
+
+function sanitizeCenturyLoadNumberFromPdf(loadNum: string, refNum: string): string {
+  const primary = String(loadNum ?? "").trim();
+  const secondary = String(refNum ?? "").trim();
+  const raw = primary || secondary;
+  if (!raw) return "";
+  return raw.replace(/\s+/g, " ").replace(/[\r\n\t]/g, "").slice(0, 120);
 }
 
 // ============= POST LOADS TO X HELPER =============
@@ -751,7 +1017,8 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+
   const supabase = createClient(supabaseUrl, supabaseKey);
   const resend = resendApiKey ? new Resend(resendApiKey) : null;
   
@@ -887,7 +1154,11 @@ Deno.serve(async (req) => {
     if (agencyError || !agency) {
       if (importType === "century" || importType === "allied" || importType === "semco") {
         const templateType =
-          importType === "century" ? "century_xlsx" : importType === "allied" ? "allied_xlsx" : "semco_xlsx";
+          importType === "century"
+            ? "century_pdf"
+            : importType === "allied"
+            ? "allied_xlsx"
+            : "semco_xlsx";
         console.warn(`${templateType}: agency not found — logging email as received anyway`);
         await supabase.from("email_import_logs").insert({
           agency_id: null,
@@ -961,10 +1232,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ============= CENTURY / ALLIED / SEMCO (parser pending — log only) =============
-    if (importType === "century" || importType === "allied" || importType === "semco") {
-      const templateType =
-        importType === "century" ? "century_xlsx" : importType === "allied" ? "allied_xlsx" : "semco_xlsx";
+    // ============= ALLIED / SEMCO (parser pending — log only) =============
+    if (importType === "allied" || importType === "semco") {
+      const templateType = importType === "allied" ? "allied_xlsx" : "semco_xlsx";
       console.log(`[${templateType}] Email accepted — full XLSX parser not implemented yet; logging as received`);
       await supabase.from("email_import_logs").insert({
         agency_id: agency.id,
@@ -982,6 +1252,304 @@ Deno.serve(async (req) => {
           template_type: templateType,
           agency: agency.name,
           message: "Email logged; import parser not yet implemented for this customer",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ============= CENTURY: PDF auto-import (subject contains "century", or ardell@centuryent.com) =============
+    const centuryPdfSubjectOk =
+      subjectLower.includes("century") || senderLower === "ardell@centuryent.com";
+    if (importType === "century" && !centuryPdfSubjectOk) {
+      console.log("[century] Subject has no 'century' keyword — logging; PDF auto-import not triggered");
+      await supabase.from("email_import_logs").insert({
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject: subject,
+        status: "received",
+        imported_count: 0,
+        error_message:
+          'Century PDF auto-import requires "century" in the subject (or send from ardell@centuryent.com)',
+        raw_headers: emailHeaders,
+      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          received: true,
+          template_type: "century_pdf",
+          agency: agency.name,
+          message: "Email logged; add \"century\" to the subject to run PDF import",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (importType === "century" && centuryPdfSubjectOk) {
+      const CENTURY_TEMPLATE = "century_pdf";
+      const pdfs = (attachments as { filename?: string; content?: string; id?: string }[]).filter((a) =>
+        a.filename?.toLowerCase().endsWith(".pdf")
+      );
+
+      if (pdfs.length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "Century PDF import: no PDF attachments found",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "No PDF attachments found for Century import" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!anthropicKey) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "ANTHROPIC_API_KEY not configured",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const centuryDedupeKey = inboundDedupeSenderFilenameKey(
+        senderLower,
+        centuryPdfDedupeFilenamePart(pdfs),
+      );
+      const centuryDupResp = await responseIfDuplicateSenderFilenameWithinHour(
+        supabase,
+        centuryDedupeKey,
+        {
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject,
+          raw_headers: emailHeaders,
+        },
+      );
+      if (centuryDupResp) return centuryDupResp;
+
+      const pCentury = payload as Record<string, unknown>;
+      const dataCentury = pCentury.data as Record<string, unknown> | undefined;
+      const c1 = dataCentury?.created_at;
+      const c2 = pCentury.created_at;
+      const receivedRaw =
+        (typeof c1 === "string" && c1) ||
+        (typeof c2 === "string" && c2) ||
+        new Date().toISOString();
+      const receivedIso = new Date(receivedRaw).toISOString();
+
+      const parseErrors: string[] = [];
+      const finalRows: Record<string, unknown>[] = [];
+      let idx = 0;
+      for (const att of pdfs) {
+        idx += 1;
+        try {
+          const buf = await fetchInboundPdfAttachmentBuffer(emailId, att, resendApiKey);
+          const pdfBase64 = uint8ToBase64(new Uint8Array(buf));
+          const ext = await extractCenturyPdfWithClaude(pdfBase64, anthropicKey);
+
+          const tons = ext.weight_tons;
+          const ratePerTon = ext.rate_per_ton;
+          if (!(tons > 0) || !(ratePerTon > 0)) {
+            parseErrors.push(`${att.filename ?? `pdf_${idx}`}: missing weight_tons or rate_per_ton`);
+            continue;
+          }
+
+          let loadNum = sanitizeCenturyLoadNumberFromPdf(ext.load_number, ext.reference_number);
+          if (!loadNum) {
+            const h = await centuryHash3(
+              ext.pickup_state,
+              ext.dest_state,
+              `${idx}-${ext.pickup_city}-${ext.dest_city}-${tons}-${ratePerTon}`,
+            );
+            loadNum = `CENT-${ext.pickup_state}-${ext.dest_state}-${h}`;
+          }
+
+          const pickupDateYmd = resolveCenturyPickupDateYmd(ext.pickup_date, receivedIso);
+          const weightLbs = Math.round(tons * 2000);
+          const customerInvoiceTotal = Math.round(ratePerTon * tons);
+          const targetPay = Math.round(customerInvoiceTotal * 0.8);
+          const maxPay = Math.round(customerInvoiceTotal * 0.85);
+          const targetCommission = Math.round(customerInvoiceTotal * 0.2);
+          const maxCommission = Math.round(customerInvoiceTotal * 0.15);
+
+          const commodity = ext.contains_bales ? "baled aluminum" : "crushed cars";
+          const pickupRaw = ext.pickup_city && ext.pickup_state
+            ? `${ext.pickup_city}, ${ext.pickup_state}`
+            : null;
+          const destRaw = ext.dest_city && ext.dest_state ? `${ext.dest_city}, ${ext.dest_state}` : null;
+          const today = new Date().toISOString().split("T")[0];
+
+          finalRows.push({
+            agency_id: agency.id,
+            template_type: CENTURY_TEMPLATE,
+            load_number: loadNum,
+            customer_name: ext.destination_company || null,
+            pickup_city: ext.pickup_city || null,
+            pickup_state: ext.pickup_state || null,
+            pickup_location_raw: pickupRaw,
+            dest_city: ext.dest_city || null,
+            dest_state: ext.dest_state || null,
+            dest_location_raw: destRaw,
+            ship_date: pickupDateYmd,
+            board_date: today,
+            delivery_date: null,
+            trailer_type: "Flatbed",
+            weight_lbs: weightLbs,
+            is_per_ton: true,
+            rate_raw: ratePerTon,
+            customer_invoice_total: customerInvoiceTotal,
+            target_pay: targetPay,
+            max_pay: maxPay,
+            target_commission: targetCommission,
+            max_commission: maxCommission,
+            commission_target_pct: 0.2,
+            commission_max_pct: 0.15,
+            commodity,
+            dispatch_status: "open",
+            status: "open",
+            is_active: true,
+            dat_posted_at: null,
+            archived_at: null,
+            tarp_required: false,
+            source_row: { century_pdf: att.filename ?? "load.pdf", index: idx },
+            load_call_script:
+              `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +
+              `${tons} tons @ $${ratePerTon}/ton (invoice ~$${customerInvoiceTotal}).`,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          parseErrors.push(`${att.filename ?? `pdf_${idx}`}: ${msg}`);
+        }
+      }
+
+      if (finalRows.length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: `Century PDF: no loads parsed. ${parseErrors.join(" | ")}`,
+          raw_headers: emailHeaders,
+        });
+        return new Response(
+          JSON.stringify({ error: "Could not parse any Century PDFs", details: parseErrors }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const byNum = new Map<string, Record<string, unknown>>();
+      for (const row of finalRows) {
+        byNum.set(String(row.load_number), row);
+      }
+      const safeLoads = Array.from(byNum.values());
+      const dupesDroppedCentury = finalRows.length - safeLoads.length;
+
+      const currentLoadNumbers = safeLoads.map((l) => String(l.load_number));
+      const nu = await countNewUpdatedForImport(supabase, agency.id, CENTURY_TEMPLATE, currentLoadNumbers);
+      const newCountCentury = nu.new;
+      const updatedCountCentury = nu.updated;
+
+      await supabase.from("load_import_runs").insert({
+        agency_id: agency.id,
+        template_type: CENTURY_TEMPLATE,
+        file_name: `email-${pdfs.length}-pdf`,
+        row_count: safeLoads.length,
+        replaced_count: 0,
+      });
+
+      const loadsForUpsert = safeLoads.map((load) => ({
+        ...load,
+        archived_at: null,
+      }));
+
+      const { error: insertError } = await supabase.from("loads").upsert(loadsForUpsert, {
+        onConflict: "agency_id,template_type,load_number",
+        ignoreDuplicates: false,
+      });
+
+      if (insertError) {
+        console.error("Century PDF upsert error:", insertError);
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: insertError.message,
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: insertError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const notInList = `(${currentLoadNumbers.map((n) => `"${String(n).replace(/"/g, "")}"`).join(",")})`;
+      const { data: archivedData } = await supabase
+        .from("loads")
+        .update({
+          dispatch_status: "archived",
+          is_active: false,
+          archived_at: new Date().toISOString(),
+        })
+        .eq("agency_id", agency.id)
+        .eq("template_type", CENTURY_TEMPLATE)
+        .neq("dispatch_status", "archived")
+        .is("booked_at", null)
+        .not("load_number", "in", notInList)
+        .select("id");
+
+      const archivedCountCentury = archivedData?.length ?? 0;
+      if (archivedCountCentury) {
+        console.log(`Archived ${archivedCountCentury} Century PDF loads not in current batch`);
+      }
+
+      await postLoadsToX(safeLoads);
+
+      const totalActiveCentury = await countActiveLoadsForTemplate(supabase, agency.id, CENTURY_TEMPLATE);
+
+      await supabase.from("email_import_logs").insert({
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject: subject,
+        status: "success",
+        imported_count: safeLoads.length,
+        raw_headers: mergeImportActivityHeaders(emailHeaders, {
+          template_type: CENTURY_TEMPLATE,
+          source: "Century PDF",
+          new: newCountCentury,
+          updated: updatedCountCentury,
+          dupes_dropped: dupesDroppedCentury,
+          removed: archivedCountCentury,
+          supports_removal: true,
+          new_count: newCountCentury,
+          updated_count: updatedCountCentury,
+          removed_count: archivedCountCentury,
+          total_count: totalActiveCentury,
+        }),
+      });
+
+      await recordSuccessfulInboundDedupe(supabase, centuryDedupeKey);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          imported: safeLoads.length,
+          new: newCountCentury,
+          updated: updatedCountCentury,
+          removed: archivedCountCentury,
+          dupes_dropped: dupesDroppedCentury,
+          parse_warnings: parseErrors.length ? parseErrors : undefined,
+          agency: agency.name,
+          import_type: CENTURY_TEMPLATE,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1180,6 +1748,22 @@ Deno.serve(async (req) => {
       }
       
       console.log("Processing Oldcastle attachment:", ocAttachment.filename);
+
+      const ocDedupePart =
+        String(ocAttachment.filename ?? "").trim().toLowerCase() ||
+        `id:${String(ocAttachment.id ?? "unknown")}`;
+      const oldcastleDedupeKey = inboundDedupeSenderFilenameKey(senderLower, ocDedupePart);
+      const oldcastleDupResp = await responseIfDuplicateSenderFilenameWithinHour(
+        supabase,
+        oldcastleDedupeKey,
+        {
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject,
+          raw_headers: emailHeaders,
+        },
+      );
+      if (oldcastleDupResp) return oldcastleDupResp;
       
       // Fetch attachment content
       let ocBuffer: ArrayBuffer;
@@ -1324,6 +1908,8 @@ Deno.serve(async (req) => {
           supports_removal: true,
         }),
       });
+
+      await recordSuccessfulInboundDedupe(supabase, oldcastleDedupeKey);
       
       return new Response(JSON.stringify({
         success: true,
@@ -1361,6 +1947,22 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const adelDedupePart =
+      String(xlsxAttachment.filename ?? "").trim().toLowerCase() ||
+      `id:${String(xlsxAttachment.id ?? "unknown")}`;
+    const adelphiaDedupeKey = inboundDedupeSenderFilenameKey(senderLower, adelDedupePart);
+    const adelphiaDupResp = await responseIfDuplicateSenderFilenameWithinHour(
+      supabase,
+      adelphiaDedupeKey,
+      {
+        agency_id: agency.id,
+        sender_email: senderEmail,
+        subject,
+        raw_headers: emailHeaders,
+      },
+    );
+    if (adelphiaDupResp) return adelphiaDupResp;
     
     console.log("Processing attachment:", xlsxAttachment.filename);
     
@@ -1569,8 +2171,10 @@ Deno.serve(async (req) => {
     }
     
     console.log(`Imported ${importedCount} loads`);
-    
-    // Log successful import
+
+    const totalActiveAdelphia = await countActiveLoadsForTemplate(supabase, agency.id, "adelphia_xlsx");
+
+    // Log successful import (raw_headers merged into load_activity_logs.meta by DB trigger)
     await supabase.from("email_import_logs").insert({
       agency_id: agency.id,
       sender_email: senderEmail,
@@ -1579,13 +2183,20 @@ Deno.serve(async (req) => {
       imported_count: importedCount,
       raw_headers: mergeImportActivityHeaders(emailHeaders, {
         template_type: "adelphia_xlsx",
+        source: "Adelphia Import",
         new: newCountAdel,
         updated: updatedCountAdel,
         dupes_dropped: dupesDroppedAdel,
         removed: archivedCountAdel,
         supports_removal: true,
+        new_count: newCountAdel,
+        updated_count: updatedCountAdel,
+        removed_count: archivedCountAdel,
+        total_count: totalActiveAdelphia,
       }),
     });
+
+    await recordSuccessfulInboundDedupe(supabase, adelphiaDedupeKey);
     
     // Note: No confirmation emails to external senders - import logs are visible in admin dashboard
     

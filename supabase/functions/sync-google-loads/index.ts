@@ -291,7 +291,7 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
   const parsedLoads = parseAllSheets(buffer);
   console.log(`[${source}] Parsed ${parsedLoads.length} total loads`);
 
-  const senderLabel = source === "openclaw-upload" ? "openclaw@oldcastle-sync" : "google-sheets@oldcastle-sync";
+  const senderLabel = "google-sheets@oldcastle-sync";
   const subjectLabel = `Oldcastle Sync (${source})`;
 
   if (parsedLoads.length === 0) {
@@ -373,16 +373,6 @@ async function syncLoads(buffer: ArrayBuffer, source: string) {
   const archivedCount = archivedData?.length || 0;
   console.log(`[${source}] ${newCount} new, ${updatedCount} updated, ${archivedCount} archived, ${dedupedCount} sheet dupes removed`);
 
-  // Also save the uploaded file to storage for audit
-  if (source === "openclaw-upload") {
-    await supabase.storage
-      .from("load-imports")
-      .upload(`oldcastle-latest.xlsx`, new Blob([buffer]), {
-        upsert: true,
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-  }
-
   // Log with full breakdown in raw_headers
   const sheetsProcessed = new Set(parsedLoads.map(l => l.sheet_name)).size;
   const breakdown = {
@@ -434,31 +424,24 @@ Deno.serve(async (req) => {
   try {
     console.log("=== SYNC-GOOGLE-LOADS START ===");
 
+    // OpenClaw .xlsx uploads were removed — Oldcastle only syncs from the Google Sheet (fetch below).
     const openclawKey = req.headers.get("x-openclaw-key");
-    const expectedKey = Deno.env.get("OPENCLAW_UPLOAD_KEY");
-    const contentType = req.headers.get("content-type") || "";
-
-    // ── MODE 1: OpenClaw uploads .xlsx via POST ──
-    if (openclawKey && expectedKey && openclawKey === expectedKey) {
-      console.log("Mode: OpenClaw upload");
-
-      const buffer = await req.arrayBuffer();
-      if (buffer.byteLength < 100) {
-        return new Response(JSON.stringify({ error: "Empty or invalid file" }), {
-          status: 400,
+    if (openclawKey != null && String(openclawKey).trim().length > 0) {
+      console.warn("Rejected OpenClaw upload attempt (disabled); use Google Sheet sync only.");
+      return new Response(
+        JSON.stringify({
+          error:
+            "OpenClaw Oldcastle upload is disabled. Oldcastle loads import only via Google Sheet sync (this function’s fetch mode).",
+          disabled: true,
+        }),
+        {
+          status: 410,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      console.log(`Received ${buffer.byteLength} bytes from OpenClaw`);
-      const result = await syncLoads(buffer, "openclaw-upload");
-
-      return new Response(JSON.stringify(result), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        },
+      );
     }
 
-    // ── MODE 2: Legacy Google Sheets fetch (cron / manual) ──
+    // Google Sheets export fetch (cron / manual) — sole Oldcastle import path
     console.log("Mode: Google Sheets fetch");
     const SPREADSHEET_ID = "154T6F7tIMfaG0-8Bw1aKtGAnwpQJvXuLNDbz6Lx1LA8";
     const exportUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=xlsx`;

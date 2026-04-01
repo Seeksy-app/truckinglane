@@ -62,6 +62,16 @@ export function pickTemplateFromLoads(logCreatedAt: string, loads: LoadTsRow[]):
   return best;
 }
 
+/** Display-only labels for raw_headers.source (stored values unchanged). */
+const LOAD_ACTIVITY_SOURCE_DISPLAY: Record<string, string> = {
+  "openclaw-upload": "Oldcastle Sync",
+};
+
+function displayLoadActivitySource(source: string): string {
+  const key = source.trim();
+  return LOAD_ACTIVITY_SOURCE_DISPLAY[key] ?? key;
+}
+
 function readTemplateFromRawHeaders(raw: unknown): string | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const tt = (raw as { template_type?: unknown }).template_type;
@@ -118,7 +128,7 @@ export function resolveImportActivityLabel(
     typeof (rh as { source?: unknown }).source === "string" &&
     (rh as { source: string }).source.trim()
   ) {
-    return (rh as { source: string }).source.trim();
+    return displayLoadActivitySource((rh as { source: string }).source);
   }
 
   const tt = resolveImportTemplateType(log, runs, loadsWindow);

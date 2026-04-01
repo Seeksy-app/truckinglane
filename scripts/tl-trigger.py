@@ -3,11 +3,16 @@
 TruckingLanes trigger service — add this route to the copy deployed at /root/scripts/tl-trigger.py
 or run standalone (see bottom).
 
+Oldcastle loads: NOT handled here. There is no openclaw-upload route on this service — Oldcastle
+imports only via Supabase Edge Function sync-google-loads (Google Sheet xlsx fetch). OpenClaw
+upload to that function is disabled in-repo.
+
 Environment:
   TL_TRIGGER_KEY        Shared secret (must match extension header)
   SUPABASE_URL          https://vjgakkomhphvdbwjjwiv.supabase.co
   SUPABASE_SERVICE_ROLE_KEY   Service role key (never expose to clients)
   DAT_BEARER_TOKEN      Optional; DAT freight API bearer (or DAT_TOKEN_FILE, default /root/.dat_bearer_token)
+  SIMPLETEXTING_API_KEY     Optional env override; defaults to in-file key for SimpleTexting /v2/api/messages
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -35,6 +41,14 @@ app = Flask(__name__)
 TL_TRIGGER_KEY = os.environ.get("TL_TRIGGER_KEY", "tl-trigger-7b747d391801b8e5f55b4542")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vjgakkomhphvdbwjjwiv.supabase.co").rstrip("/")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SIMPLETEXTING_API_KEY = os.environ.get(
+    "SIMPLETEXTING_API_KEY",
+    "a1637fca1a5131f4c85e499221ff47d1",
+).strip()
+SIMPLETEXTING_MESSAGES_URL = os.environ.get(
+    "SIMPLETEXTING_MESSAGES_URL",
+    "https://api.simpletexting.com/v2/api/messages",
+).rstrip("/")
 
 # Full key set for /insert-aljex-loads so PostgREST upsert rows share identical columns.
 _ALJEX_LOAD_UPSERT_TEMPLATE = {
@@ -328,6 +342,153 @@ def require_trigger_key() -> tuple[bool, tuple]:
     if not SERVICE_KEY:
         return False, (jsonify({"error": "Server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY"}), 500)
     return True, ()
+
+
+def _supabase_headers(*, json_body: bool = False) -> dict:
+    h = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Accept": "application/json",
+    }
+    if json_body:
+        h["Content-Type"] = "application/json"
+    return h
+
+
+def _normalize_sms_phone(raw: str) -> str:
+    """E.164-style key for matching (digits + leading +)."""
+    s = (raw or "").strip()
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return ""
+    if len(digits) == 10:
+        return "+1" + digits
+    if len(digits) == 11 and digits.startswith("1"):
+        return "+" + digits
+    return "+" + digits if not s.startswith("+") else "+" + digits
+
+
+def _simpletexting_send(contact_phone: str, message: str) -> tuple[bool, str]:
+    if not SIMPLETEXTING_API_KEY:
+        return False, "SIMPLETEXTING_API_KEY not configured"
+    payload = {"contactPhone": contact_phone, "message": message}
+    try:
+        r = requests.post(
+            SIMPLETEXTING_MESSAGES_URL,
+            headers={
+                "Authorization": f"Bearer {SIMPLETEXTING_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=30,
+        )
+    except requests.RequestException as e:
+        return False, str(e)
+    if r.status_code not in (200, 201, 202):
+        return False, (r.text or r.reason or str(r.status_code))[:500]
+    return True, ""
+
+
+def _sms_fmt_field(val, fallback: str = "—") -> str:
+    if val is None:
+        return fallback
+    if isinstance(val, bool):
+        return str(val)
+    if isinstance(val, (int, float)):
+        if isinstance(val, float) and val == int(val):
+            return str(int(val))
+        return str(val)
+    t = str(val).strip()
+    return t if t else fallback
+
+
+def _parse_inbound_sms_request() -> tuple[str, str]:
+    """Best-effort phone + body from JSON, form, or nested webhook payloads."""
+    flat: dict = {}
+
+    if request.is_json:
+        j = request.get_json(silent=True)
+        if isinstance(j, dict):
+            flat.update(j)
+
+    if request.form:
+        flat.update(request.form.to_dict())
+
+    for nk in ("data", "payload", "message", "event", "body"):
+        sub = flat.get(nk)
+        if isinstance(sub, dict):
+            for k, v in sub.items():
+                flat.setdefault(k, v)
+
+    phone = (
+        flat.get("contactPhone")
+        or flat.get("phone")
+        or flat.get("from")
+        or flat.get("From")
+        or flat.get("mobile")
+        or flat.get("msisdn")
+        or flat.get("sender")
+    )
+    text = flat.get("text") or flat.get("message") or flat.get("body") or flat.get("Message") or ""
+    return str(phone or "").strip(), str(text or "").strip()
+
+
+def _sms_context_fetch(phone_norm: str) -> dict | None:
+    if not phone_norm or not SERVICE_KEY:
+        return None
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
+        headers=_supabase_headers(),
+        params={"phone_normalized": f"eq.{phone_norm}", "select": "phone_normalized,load_id,stage,updated_at"},
+        timeout=15,
+    )
+    if r.status_code != 200:
+        return None
+    rows = r.json()
+    if not rows:
+        return None
+    row = rows[0]
+    return row if isinstance(row, dict) else None
+
+
+def _sms_context_upsert(phone_norm: str, load_id: str, stage: str) -> bool:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    body = {
+        "phone_normalized": phone_norm,
+        "load_id": load_id,
+        "stage": stage,
+        "updated_at": now_iso,
+    }
+    r = requests.post(
+        f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
+        headers={
+            **_supabase_headers(json_body=True),
+            "Prefer": "resolution=merge-duplicates,return=minimal",
+        },
+        json=body,
+        timeout=15,
+    )
+    return r.status_code in (200, 201, 204)
+
+
+def _sms_context_patch_stage(phone_norm: str, stage: str) -> bool:
+    r = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
+        headers={**_supabase_headers(json_body=True), "Prefer": "return=minimal"},
+        params={"phone_normalized": f"eq.{phone_norm}"},
+        json={"stage": stage, "updated_at": datetime.now(timezone.utc).isoformat()},
+        timeout=15,
+    )
+    return r.status_code in (200, 204)
+
+
+def _sms_context_delete(phone_norm: str) -> None:
+    requests.delete(
+        f"{SUPABASE_URL}/rest/v1/tl_sms_booking_context",
+        headers={**_supabase_headers(), "Prefer": "return=minimal"},
+        params={"phone_normalized": f"eq.{phone_norm}"},
+        timeout=15,
+    )
 
 
 def _set_env_var_in_file(path: str, key: str, value: str) -> None:
@@ -830,6 +991,126 @@ def dat_lane_rates():
     with _DAT_LANE_CACHE_LOCK:
         _DAT_LANE_CACHE[cache_key] = (now + _DAT_LANE_CACHE_TTL_SEC, dict(out))
     return jsonify(out)
+
+
+@app.post("/send-sms")
+def send_sms():
+    """Send load offer SMS (SimpleTexting). Body JSON: { "phone", "load_id" }. Requires X-TL-Trigger-Key."""
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+    if not SIMPLETEXTING_API_KEY:
+        return jsonify({"error": "SIMPLETEXTING_API_KEY not configured"}), 500
+
+    body = request.get_json(silent=True) or {}
+    phone = str(body.get("phone") or "").strip()
+    load_id = str(body.get("load_id") or "").strip()
+    if not phone or not load_id:
+        return jsonify({"error": "phone and load_id required"}), 400
+
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/loads",
+        headers=_supabase_headers(),
+        params={
+            "id": f"eq.{load_id}",
+            "select": ",".join(
+                [
+                    "id",
+                    "load_number",
+                    "pickup_city",
+                    "pickup_state",
+                    "dest_city",
+                    "dest_state",
+                    "trailer_type",
+                    "weight_lbs",
+                    "ship_date",
+                    "target_pay",
+                ]
+            ),
+        },
+        timeout=30,
+    )
+    if r.status_code != 200:
+        return jsonify({"error": r.text or "load fetch failed", "status": r.status_code}), 502
+    rows = r.json() or []
+    if not rows:
+        return jsonify({"error": "load not found"}), 404
+    row = rows[0]
+
+    ln = _sms_fmt_field(row.get("load_number"))
+    sms_message = (
+        "D&L Transport\n"
+        f"Load #{ln}\n"
+        f"{_sms_fmt_field(row.get('pickup_city'))}, {_sms_fmt_field(row.get('pickup_state'))} → "
+        f"{_sms_fmt_field(row.get('dest_city'))}, {_sms_fmt_field(row.get('dest_state'))}\n"
+        f"{_sms_fmt_field(row.get('trailer_type'))} | {_sms_fmt_field(row.get('weight_lbs'))} lbs\n"
+        f"Ship: {_sms_fmt_field(row.get('ship_date'))}\n"
+        f"Rate: ${_sms_fmt_field(row.get('target_pay'))}\n"
+        "Reply BOOK to claim."
+    )
+
+    ok_send, send_err = _simpletexting_send(phone, sms_message)
+    if not ok_send:
+        return jsonify({"error": send_err}), 502
+
+    pnorm = _normalize_sms_phone(phone)
+    if pnorm:
+        _sms_context_upsert(pnorm, load_id, "offered")
+
+    return jsonify({"ok": True})
+
+
+@app.post("/sms-inbound")
+def sms_inbound():
+    """
+    SimpleTexting inbound webhook (no TL trigger key). Parses phone + body; sends replies via API.
+    """
+    if not SERVICE_KEY:
+        return jsonify({"error": "Server misconfigured"}), 500
+
+    phone_raw, text_body = _parse_inbound_sms_request()
+    phone_norm = _normalize_sms_phone(phone_raw)
+    reply_to = phone_raw.strip() if phone_raw.strip() else phone_norm
+
+    if not text_body.strip():
+        return "", 200
+    if not reply_to or not re.sub(r"\D", "", reply_to):
+        return "", 200
+
+    ctx = _sms_context_fetch(phone_norm) if phone_norm else None
+    upper_msg = text_body.upper()
+
+    if "BOOK" in upper_msg:
+        if ctx and str(ctx.get("stage")) == "offered":
+            _sms_context_patch_stage(phone_norm, "awaiting_mc")
+        reply = "Got it! What is your MC# and company name?"
+        if not ctx:
+            reply = "We don't have an active load offer for this number. Contact dispatch for a new link."
+        _simpletexting_send(reply_to, reply)
+        return "", 200
+
+    if any(ch.isdigit() for ch in text_body) and ctx:
+        lid = str(ctx.get("load_id") or "").strip()
+        patch = {
+            "sms_book_status": "pending_review",
+            "booked_by_phone": phone_norm,
+        }
+        pr = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/loads",
+            headers={**_supabase_headers(json_body=True), "Prefer": "return=minimal"},
+            params={"id": f"eq.{lid}"},
+            json=patch,
+            timeout=30,
+        )
+        if pr.status_code in (200, 204):
+            _sms_context_delete(phone_norm)
+            reply = "A dispatcher will call you shortly!"
+        else:
+            reply = "Thanks — we couldn't save your booking. Please call dispatch."
+        _simpletexting_send(reply_to, reply)
+        return "", 200
+
+    return "", 200
 
 
 def main():

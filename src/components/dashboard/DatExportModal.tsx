@@ -133,15 +133,39 @@ export function DatExportModal({
         toast.error("No exportable pending loads for the selected sources (check row filters or missing data)");
         return;
       }
-      const ids = loads.map((l) => l.id);
-      const postedAt = new Date().toISOString();
-      const { error } = await supabase.from("loads").update({ dat_posted_at: postedAt }).in("id", ids);
-      if (error) {
-        toast.error(`Failed to mark loads as posted: ${error.message}`);
-        return;
-      }
       const filename = `DAT_Export_${new Date().toISOString().split("T")[0]}.csv`;
       downloadDATExport(loads, filename);
+
+      const postedAt = new Date().toISOString();
+      const loadNumbers = [
+        ...new Set(loads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0)),
+      ];
+      const chunkSize = 120;
+      if (loadNumbers.length > 0) {
+        for (let i = 0; i < loadNumbers.length; i += chunkSize) {
+          const chunk = loadNumbers.slice(i, i + chunkSize);
+          const { error } = await supabase
+            .from("loads")
+            .update({ dat_posted_at: postedAt })
+            .eq("agency_id", effectiveAgencyId)
+            .in("load_number", chunk);
+          if (error) {
+            toast.error(`Failed to mark loads as posted: ${error.message}`);
+            return;
+          }
+        }
+      } else {
+        const ids = [...new Set(loads.map((l) => l.id))];
+        const { error } = await supabase
+          .from("loads")
+          .update({ dat_posted_at: postedAt })
+          .eq("agency_id", effectiveAgencyId)
+          .in("id", ids);
+        if (error) {
+          toast.error(`Failed to mark loads as posted: ${error.message}`);
+          return;
+        }
+      }
       const { error: logError } = await supabase.from("email_import_logs").insert({
         agency_id: effectiveAgencyId,
         sender_email: "dat-csv-export@truckinglane.com",

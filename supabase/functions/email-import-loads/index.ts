@@ -11,9 +11,36 @@ const corsHeaders = {
 /** Lowercased full addresses allowed to import when agency domain whitelist would otherwise reject. */
 const EDGE_EXTRA_ALLOWED_SENDER_EMAILS = new Set<string>(["stephen@dltransport.com"]);
 
-function subjectHasCenturyKeywords(subjectLower: string): boolean {
-  const s = subjectLower || "";
-  return s.includes("century") || s.includes("loads");
+/** Subject substrings (case-insensitive) that route to Century / PDF parser eligibility. */
+const CENTURY_EMAIL_SUBJECT_KEYWORDS = ["century", "loads"] as const;
+
+function subjectMatchesCenturySubjectWhitelist(subject: string): boolean {
+  const s = String(subject ?? "")
+    .normalize("NFKC")
+    .toLowerCase();
+  return CENTURY_EMAIL_SUBJECT_KEYWORDS.some((kw) => s.includes(kw));
+}
+
+function resolveInboundEmailSubject(
+  payload: Record<string, unknown>,
+  emailHeaders: Record<string, unknown>,
+): string {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const email = payload.email as Record<string, unknown> | undefined;
+  const dataHeaders = data?.headers as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    payload.subject,
+    data?.subject,
+    email?.subject,
+    emailHeaders?.subject,
+    emailHeaders?.Subject,
+    dataHeaders?.subject,
+    dataHeaders?.Subject,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return "";
 }
 
 // ============= XLSX PARSING (copied from import-loads) =============
@@ -622,7 +649,7 @@ function stripHtmlToText(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (case-insensitive century|loads). Sender ardell@centuryent.com forces Century before this runs. */
+/** Subject line only — order: VMS, Oldcastle, Adelphia, Allied, Semco, then Century (CENTURY_EMAIL_SUBJECT_KEYWORDS). Sender ardell@centuryent.com forces Century before this runs. */
 function detectFromSubject(subjectLower: string): EmailImportKind | null {
   const s = subjectLower || "";
   const containsVMS = s.includes("vms") || s.includes("mvs") || s.includes("vsm");
@@ -633,7 +660,7 @@ function detectFromSubject(subjectLower: string): EmailImportKind | null {
     s.includes("adlephia") ||
     s.includes("adelphoa") ||
     s.includes("adelpha");
-  const containsCentury = subjectHasCenturyKeywords(s);
+  const containsCentury = subjectMatchesCenturySubjectWhitelist(s);
   const containsAllied = s.includes("allied building stores") || /\babs\b/i.test(s);
   const containsSemco = s.includes("semco distributing") || s.includes("semco");
 
@@ -667,7 +694,7 @@ function detectFromBody(bodyLower: string): EmailImportKind | null {
   }
   if (b.includes("allied building stores") || /\babs\b/.test(b)) return "allied";
   if (b.includes("semco distributing") || b.includes("semco")) return "semco";
-  if (subjectHasCenturyKeywords(b)) return "century";
+  if (subjectMatchesCenturySubjectWhitelist(b)) return "century";
   return null;
 }
 
@@ -749,9 +776,9 @@ Deno.serve(async (req) => {
     // See: https://resend.com/docs/dashboard/webhooks/event-types#email-received
     const senderEmail = payload.from || payload.sender || payload.email?.from || 
       (typeof payload.data?.from === 'string' ? payload.data.from : payload.data?.from?.email);
-    const subject = payload.subject || payload.data?.subject || payload.email?.subject;
+    const emailHeaders = (payload.headers || payload.data?.headers || {}) as Record<string, unknown>;
+    const subject = resolveInboundEmailSubject(payload as Record<string, unknown>, emailHeaders);
     const attachments = payload.attachments || payload.data?.attachments || payload.email?.attachments || [];
-    const emailHeaders = payload.headers || payload.data?.headers || {};
     
     console.log("From:", senderEmail);
     console.log("Subject:", subject);
@@ -776,7 +803,7 @@ Deno.serve(async (req) => {
       });
     }
     
-    const subjectLower = (subject || "").toLowerCase();
+    const subjectLower = String(subject || "").toLowerCase();
     const emailId = payload.data?.email_id || payload.email_id;
 
     const senderLower = cleanEmail.toLowerCase().trim();

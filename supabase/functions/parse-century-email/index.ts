@@ -14,9 +14,36 @@ const PARSE_CENTURY_ALLOWED_SENDERS = new Set<string>([
 ]);
 const MODEL = "claude-sonnet-4-20250514";
 
-function subjectHasCenturyKeywords(subject: string): boolean {
-  const s = subject.toLowerCase();
-  return s.includes("century") || s.includes("loads");
+/** Subject substrings (case-insensitive) required for Century PDF processing (unless sender is ardell@centuryent.com). */
+const CENTURY_EMAIL_SUBJECT_KEYWORDS = ["century", "loads"] as const;
+
+function subjectMatchesCenturySubjectWhitelist(subject: string): boolean {
+  const s = String(subject ?? "")
+    .normalize("NFKC")
+    .toLowerCase();
+  return CENTURY_EMAIL_SUBJECT_KEYWORDS.some((kw) => s.includes(kw));
+}
+
+function resolveInboundEmailSubject(
+  payload: Record<string, unknown>,
+  emailHeaders: Record<string, unknown>,
+): string {
+  const data = payload.data as Record<string, unknown> | undefined;
+  const email = payload.email as Record<string, unknown> | undefined;
+  const dataHeaders = data?.headers as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    payload.subject,
+    data?.subject,
+    email?.subject,
+    emailHeaders?.subject,
+    emailHeaders?.Subject,
+    dataHeaders?.subject,
+    dataHeaders?.Subject,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return "";
 }
 
 type Extracted = {
@@ -182,9 +209,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const subject = String(payload.subject || payload.data?.subject || payload.email?.subject || "");
-    // Case-insensitive "century" or "loads" in subject; ardell@centuryent.com may use any subject.
-    const subjectOk = subjectHasCenturyKeywords(subject) || clean === "ardell@centuryent.com";
+    const emailHeaders = (payload.headers || payload.data?.headers || {}) as Record<string, unknown>;
+    const subject = resolveInboundEmailSubject(payload as Record<string, unknown>, emailHeaders);
+    // Whitelist: "century" or "loads" in subject; ardell@centuryent.com may use any subject.
+    const subjectOk = subjectMatchesCenturySubjectWhitelist(subject) || clean === "ardell@centuryent.com";
     if (!subjectOk) {
       return new Response(
         JSON.stringify({
@@ -213,7 +241,6 @@ Deno.serve(async (req) => {
     }
 
     const emailId = payload.data?.email_id || payload.email_id;
-    const emailHeaders = payload.headers || payload.data?.headers || {};
 
     const receivedRaw =
       (typeof payload.data?.created_at === "string" && payload.data.created_at) ||

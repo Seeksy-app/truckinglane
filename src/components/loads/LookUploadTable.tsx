@@ -176,7 +176,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
               setLaneSort(null);
             }}
           >
-            <SelectTrigger className="w-[140px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[140px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="No sorting" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -190,7 +190,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
           <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="text-muted-foreground">Client:</span>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[100px] h-7 text-xs bg-background">
+            <SelectTrigger className="w-[100px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -206,7 +206,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="w-[92px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -222,7 +222,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Delivery:</span>
           <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-            <SelectTrigger className="w-[92px] h-7 text-xs bg-background">
+            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -240,7 +240,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-8 px-2 text-sm sm:text-base text-muted-foreground hover:text-foreground"
+            className="h-9 px-2 text-sm sm:text-base text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4 mr-1" /> Clear
           </Button>
@@ -321,13 +321,15 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                 className="cursor-pointer transition-colors hover:bg-muted/50 bg-[hsl(38,92%,50%)]/5"
                 onClick={() => toggleExpand(load.id)}
               >
-                <TableCell className="w-8 px-0.5 text-center align-middle">
+                <TableCell className="w-8 px-0.5 text-center align-middle text-sm sm:text-base">
                   <span className="inline-flex justify-center">
                     {expandedId === load.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </span>
                 </TableCell>
-                <TableCell className="text-center font-medium tabular-nums">{load.load_number || "—"}</TableCell>
-                <TableCell className="text-center align-middle">
+                <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
+                  {load.load_number || "—"}
+                </TableCell>
+                <TableCell className="text-center align-middle text-sm sm:text-base">
                   <Badge variant="outline" className="text-[10px] h-5 px-1">
                     {load.template_type === "adelphia_xlsx"
                       ? "Adelphia"
@@ -338,9 +340,11 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                           : "Aljex"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-center tabular-nums">{load.ship_date || "—"}</TableCell>
+                <TableCell className="text-center tabular-nums text-sm sm:text-base">
+                  {load.ship_date || "—"}
+                </TableCell>
                 <TableCell
-                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate"
+                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
                   title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}
                 >
                   {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
@@ -348,14 +352,14 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                     "—"}
                 </TableCell>
                 <TableCell
-                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate"
+                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
                   title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}
                 >
                   {formatLaneStateCity(load.dest_state, load.dest_city) ??
                     load.dest_location_raw ??
                     "—"}
                 </TableCell>
-                <TableCell className="text-center font-medium tabular-nums">
+                <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
                   {(() => {
                     const rate = formatRate(load);
                     return (
@@ -366,15 +370,15 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                     );
                   })()}
                 </TableCell>
-                <TableCell className="text-center tabular-nums">
+                <TableCell className="text-center tabular-nums text-sm sm:text-base">
                   {load.target_pay && load.target_pay > 0 ? `$${load.target_pay.toLocaleString()}` : "TBD"}
                 </TableCell>
-                <TableCell className="text-center align-middle">
+                <TableCell className="text-center align-middle text-sm sm:text-base">
                   <div className="flex justify-center">
                     <Badge className={`${openBadgeClass} text-[10px] h-5 px-1.5`}>Open</Badge>
                   </div>
                 </TableCell>
-                <TableCell className="text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                <TableCell className="text-center align-middle text-sm sm:text-base" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-center">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -394,7 +398,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
               </TableRow>
               {expandedId === load.id && (
                 <TableRow>
-                  <TableCell colSpan={10} className="p-0">
+                  <TableCell colSpan={10} className="!p-0">
                     <LookUploadExpandedRow load={load} onStatusChange={onRefresh} />
                   </TableCell>
                 </TableRow>

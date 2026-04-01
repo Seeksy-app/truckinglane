@@ -9,17 +9,20 @@ type Load = Tables<"loads">;
 export const DASHBOARD_TABLE_CENTERED_DENSE_CLASS =
   "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-8 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-center [&_td]:!px-1.5 [&_td]:!py-1 [&_td]:!text-center [&_td]:align-middle [&_th]:align-middle";
 
-/** Loads table: same as dashboard dense + nowrap for single-line lanes. */
+/**
+ * Loads table: roomier rows (py-4 body cells) while keeping the same text scale as before
+ * (table base is still text-[11px] sm:text-xs; body cells override with text-sm sm:text-base in components).
+ */
 export const LOADS_TABLE_DENSE_CLASS =
-  `${DASHBOARD_TABLE_CENTERED_DENSE_CLASS} [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap`;
+  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-11 [&_th]:!px-1.5 [&_th]:!py-3 [&_th]:!text-center [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:!text-center [&_td]:align-middle [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
 
 /** AI Calls list: left-aligned cells, same row padding and font scale as Loads dense table. */
 export const CALLS_TABLE_DENSE_CLASS =
   "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-8 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-left [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-1 [&_td]:!text-left [&_td]:align-middle";
 
-/** Toolbar strip above loads table — font scale matches dense table body (text-sm / sm:text-base). */
+/** Toolbar strip above loads table — same font scale as load row cells (text-sm / sm:text-base). */
 export const LOADS_TABLE_TOOLBAR_CLASS =
-  "flex flex-wrap items-center gap-2 px-1.5 py-2 border-b border-border bg-muted/30 text-sm sm:text-base";
+  "flex flex-wrap items-center gap-2 px-2 py-3 border-b border-border bg-muted/30 text-sm sm:text-base";
 
 /** Aljex-style lane label: state code first, then city (e.g. "TX HOUSTON"). */
 export function formatLaneStateCity(

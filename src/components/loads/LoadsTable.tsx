@@ -436,7 +436,7 @@ export function LoadsTable({
               setLaneSort(null);
             }}
           >
-            <SelectTrigger className="w-[140px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[140px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="No sorting" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -453,7 +453,7 @@ export function LoadsTable({
           <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="text-muted-foreground">Client:</span>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[100px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[100px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -472,7 +472,7 @@ export function LoadsTable({
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="w-[92px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -490,7 +490,7 @@ export function LoadsTable({
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Delivery:</span>
           <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-            <SelectTrigger className="w-[92px] h-8 text-sm sm:text-base bg-background">
+            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -510,7 +510,7 @@ export function LoadsTable({
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-9 px-2 text-sm sm:text-base text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4 mr-1" />
             Clear
@@ -768,7 +768,7 @@ export function LoadsTable({
                 </TableRow>
                 {expandedId === load.id && (
                   <TableRow>
-                    <TableCell colSpan={tableColSpan} className="p-0">
+                    <TableCell colSpan={tableColSpan} className="!p-0">
                       <LoadExpandedRow
                         load={load}
                         isDemo={isDemo}

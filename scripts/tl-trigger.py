@@ -81,6 +81,85 @@ def _normalize_aljex_load_row(load: dict) -> dict:
         out["dispatch_status"] = "open"
     return out
 
+
+def _tt_str(v) -> str | None:
+    if v is None:
+        return None
+    t = str(v).strip()
+    return t or None
+
+
+def _truckertools_api_raw_from_row(row: dict) -> dict | None:
+    """API row is nested in source_row JSON as { "raw": { originCity, ... } }."""
+    if str(row.get("template_type") or "") != "truckertools":
+        return None
+    sr = row.get("source_row")
+    if not isinstance(sr, str):
+        return None
+    try:
+        outer = json.loads(sr)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(outer, dict):
+        return None
+    raw = outer.get("raw")
+    return raw if isinstance(raw, dict) else None
+
+
+def _remap_truckertools_load_from_api(row: dict) -> dict:
+    """
+    Map Trucker Tools getNearbyLoadsV5 item shape into loads columns before whitelist.
+    API: originCity, originState, destinationCity, destinationState, pickupDate,
+    equipmentType, weight, offerRate, miles.
+    """
+    raw = _truckertools_api_raw_from_row(row)
+    if not raw:
+        return row
+    out = dict(row)
+    if "originCity" in raw:
+        out["pickup_city"] = _tt_str(raw.get("originCity"))
+    if "originState" in raw:
+        ps = _tt_str(raw.get("originState"))
+        out["pickup_state"] = (ps[:8] if ps else None)
+    if "destinationCity" in raw:
+        out["dest_city"] = _tt_str(raw.get("destinationCity"))
+    if "destinationState" in raw:
+        ds = _tt_str(raw.get("destinationState"))
+        out["dest_state"] = (ds[:8] if ds else None)
+    if "pickupDate" in raw and raw.get("pickupDate") is not None:
+        sd = str(raw.get("pickupDate")).strip()
+        out["ship_date"] = sd or None
+    if "equipmentType" in raw:
+        out["trailer_type"] = _tt_str(raw.get("equipmentType"))
+    if "weight" in raw:
+        wf = _coerce_float(raw.get("weight"))
+        if wf is not None:
+            out["weight_lbs"] = int(wf) if wf == int(wf) else wf
+    if "miles" in raw:
+        mf = _coerce_float(raw.get("miles"))
+        if mf is not None:
+            out["miles"] = int(mf) if mf == int(mf) else mf
+    if "offerRate" in raw:
+        rate = _coerce_float(raw.get("offerRate"))
+        if rate is not None:
+            target_pay = round(rate * 0.80)
+            max_pay = round(rate * 0.85)
+            out["target_pay"] = target_pay
+            out["max_pay"] = max_pay
+            out["target_commission"] = round(rate - target_pay)
+            out["max_commission"] = round(rate - max_pay)
+            out["rate_raw"] = rate
+            out["customer_invoice_total"] = rate
+            out["commission_target_pct"] = 0.2
+            out["commission_max_pct"] = 0.15
+    pco, pso = out.get("pickup_city"), out.get("pickup_state")
+    if pco or pso:
+        out["pickup_location_raw"] = ", ".join(x for x in (pco, pso) if x) or None
+    dco, dso = out.get("dest_city"), out.get("dest_state")
+    if dco or dso:
+        out["dest_location_raw"] = ", ".join(x for x in (dco, dso) if x) or None
+    return out
+
 DAT_SEARCH_URL = "https://freight.api.dat.com/search/v2/loads"
 _DAT_LANE_CACHE: dict[str, tuple[float, dict]] = {}
 _DAT_LANE_CACHE_LOCK = threading.Lock()
@@ -291,6 +370,7 @@ def insert_aljex_loads():
     for row in loads:
         if not isinstance(row, dict):
             return jsonify({"error": "each load must be a JSON object"}), 400
+        row = _remap_truckertools_load_from_api(row)
         normalized.append(_normalize_aljex_load_row(row))
     loads = normalized
 

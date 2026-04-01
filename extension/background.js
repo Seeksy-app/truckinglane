@@ -719,25 +719,50 @@ function extractTruckerToolsLoadsArray(json) {
 }
 
 function mapTruckerToolsLoad(raw, idx) {
+  /** getNearbyLoadsV5 flat shape: originCity, destinationCity, offerRate, equipmentType, … */
   const origins = Array.isArray(raw.origins) ? raw.origins : raw.origin ? [raw.origin] : [];
   const o0 = origins[0] || {};
-  const pickup_city = ttStr(o0.city || o0.cityName || o0.locality || o0.name);
-  const pickup_state = ttStr(o0.state || o0.stateCode || o0.region).slice(0, 8);
-
   const dests = Array.isArray(raw.destinations) ? raw.destinations : [];
   const d0 = dests[0] || {};
-  const dest_city = ttStr(d0.city || d0.cityName || d0.locality || d0.name);
-  const dest_state = ttStr(d0.state || d0.stateCode || d0.region).slice(0, 8);
 
-  const ship_raw = raw.pickupDate ?? raw.pickupDateFrom ?? raw.pickup_date ?? raw.pickupFrom ?? null;
+  const pickup_city_f = ttStr(
+    raw.originCity || o0.city || o0.cityName || o0.locality || o0.name
+  );
+  const pickup_state = ttStr(
+    raw.originState || o0.state || o0.stateCode || o0.region
+  ).slice(0, 8);
+
+  const dest_city_f = ttStr(
+    raw.destinationCity || d0.city || d0.cityName || d0.locality || d0.name
+  );
+  const dest_state = ttStr(
+    raw.destinationState || d0.state || d0.stateCode || d0.region
+  ).slice(0, 8);
+
+  const ship_raw =
+    raw.pickupDate ??
+    raw.pickupDateFrom ??
+    raw.pickup_date ??
+    raw.pickupFrom ??
+    null;
   const ship_date = ship_raw != null ? ttStr(ship_raw) : null;
 
   const trailer_type = ttStr(
-    raw.truckType || raw.equipment || raw.trailerType || raw.equipmentType || raw.trailer_type
+    raw.equipmentType ||
+      raw.truckType ||
+      raw.equipment ||
+      raw.trailerType ||
+      raw.trailer_type
   );
 
-  const weight_lbs = ttPickNumber(raw.weight, raw.weightLbs, raw.weight_lbs, raw.totalWeight);
+  const weight_lbs = ttPickNumber(
+    raw.weight,
+    raw.weightLbs,
+    raw.weight_lbs,
+    raw.totalWeight
+  );
   const rate = ttPickNumber(
+    raw.offerRate,
     raw.rate,
     raw.totalRate,
     raw.customerRate,
@@ -745,11 +770,11 @@ function mapTruckerToolsLoad(raw, idx) {
     raw.lineHaul,
     raw.rateAmount,
     raw.brokerRate,
-    raw.offerRate,
     raw.pay,
     raw.carrierPay,
     raw.totalPay
   );
+  const miles_tt = ttPickNumber(raw.miles);
 
   const target_pay =
     rate != null && Number.isFinite(rate) ? Math.round(rate * 0.8) : 0;
@@ -777,15 +802,22 @@ function mapTruckerToolsLoad(raw, idx) {
     load_number,
     dispatch_status: 'open',
     status: 'open',
-    pickup_city: pickup_city || null,
+    pickup_city: pickup_city_f || null,
     pickup_state: pickup_state || null,
-    pickup_location_raw: pickup_city && pickup_state ? `${pickup_city}, ${pickup_state}` : pickup_city || null,
-    dest_city: dest_city || null,
+    pickup_location_raw:
+      pickup_city_f && pickup_state
+        ? `${pickup_city_f}, ${pickup_state}`
+        : pickup_city_f || null,
+    dest_city: dest_city_f || null,
     dest_state: dest_state || null,
-    dest_location_raw: dest_city && dest_state ? `${dest_city}, ${dest_state}` : dest_city || null,
+    dest_location_raw:
+      dest_city_f && dest_state
+        ? `${dest_city_f}, ${dest_state}`
+        : dest_city_f || null,
     ship_date,
     trailer_type: trailer_type || null,
     weight_lbs,
+    miles: miles_tt != null ? miles_tt : undefined,
     rate_raw: rate,
     customer_invoice_total: rate != null ? rate : 0,
     target_pay,

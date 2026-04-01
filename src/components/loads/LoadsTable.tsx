@@ -30,9 +30,10 @@ import {
   X,
   ExternalLink,
   Loader2,
-  Trash2,
+  Archive,
   Upload,
 } from "lucide-react";
+import { format } from "date-fns";
 import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -70,15 +71,17 @@ interface LoadsTableProps {
 
 const INITIAL_DISPLAY_COUNT = 25;
 
-/** Posted within last 24h → green; older → orange; null → yellow */
-const DAT_FRESH_MS = 24 * 60 * 60 * 1000;
-
-function getDatPillState(datPostedAt: string | null | undefined, nowMs = Date.now()): "yellow" | "orange" | "green" {
-  if (datPostedAt == null || String(datPostedAt).trim() === "") return "yellow";
+/** Source of truth for DAT posted state: valid timestamp from DB only (never infer green from stale client state). */
+function hasValidDatPosted(datPostedAt: string | null | undefined): boolean {
+  if (datPostedAt == null || String(datPostedAt).trim() === "") return false;
   const t = new Date(datPostedAt).getTime();
-  if (Number.isNaN(t)) return "yellow";
-  if (t >= nowMs - DAT_FRESH_MS) return "green";
-  return "orange";
+  return !Number.isNaN(t);
+}
+
+function formatDatPostedLine(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Posted to DAT";
+  return `Posted to DAT · ${format(d, "MMM d, yyyy h:mm a")}`;
 }
 
 export function LoadsTable({
@@ -100,8 +103,8 @@ export function LoadsTable({
   const [archiving, setArchiving] = useState(false);
   const [datPostingId, setDatPostingId] = useState<string | null>(null);
   const [bulkDatBusy, setBulkDatBusy] = useState(false);
-  /** After stamp, show green until parent `loads` includes new dat_posted_at */
-  const [optimisticDatPostedAt, setOptimisticDatPostedAt] = useState<Record<string, string>>({});
+  /** Demo only: rows user "posted" locally (no DB). */
+  const [demoDatPostedIds, setDemoDatPostedIds] = useState<Set<string>>(() => new Set());
 
   /** Matches dashboard query: no archived dispatch rows in table or Client counts. */
   const loadsExcludingArchived = useMemo(
@@ -225,19 +228,6 @@ export function LoadsTable({
     });
   }, [enableOpenLoadActions, filteredIds]);
 
-  useEffect(() => {
-    setOptimisticDatPostedAt((prev) => {
-      if (Object.keys(prev).length === 0) return prev;
-      const next = { ...prev };
-      for (const id of Object.keys(next)) {
-        const row = loads.find((l) => l.id === id);
-        const posted = row && (row as { dat_posted_at?: string | null }).dat_posted_at;
-        if (posted) delete next[id];
-      }
-      return next;
-    });
-  }, [loads]);
-
   const selectedInView = useMemo(() => {
     const set = selectedIds;
     return filteredAndSortedLoads.filter((l) => set.has(l.id));
@@ -295,10 +285,10 @@ export function LoadsTable({
     try {
       const { error } = await supabase
         .from("loads")
-        .update({ dispatch_status: "archived" })
+        .update({ dispatch_status: "archived", is_active: false })
         .in("id", ids);
       if (error) throw error;
-      toast.success(`Archived ${ids.length} load${ids.length === 1 ? "" : "s"}`);
+      toast.success(`${ids.length} load${ids.length === 1 ? "" : "s"} archived`);
       setSelectedIds(new Set());
       setArchiveDialogOpen(false);
       onRefresh();
@@ -312,9 +302,9 @@ export function LoadsTable({
   const handleRowPostToDat = async (load: Load, e: React.MouseEvent) => {
     e.stopPropagation();
     const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
-    const effectivePosted = optimisticDatPostedAt[load.id] ?? serverPosted ?? null;
-    const pillState = getDatPillState(effectivePosted);
-    if (pillState === "green") return;
+    const isPosted =
+      hasValidDatPosted(serverPosted) || (isDemo && demoDatPostedIds.has(load.id));
+    if (isPosted) return;
 
     if (!isExportableLoad(load)) {
       toast.error("Add pickup and destination city/state before posting to DAT.");
@@ -326,7 +316,7 @@ export function LoadsTable({
       const name = `DAT_Load_${(load.load_number || load.id).toString().replace(/[^\w.-]+/g, "_")}.csv`;
       downloadDATExport([load], name);
       if (isDemo) {
-        setOptimisticDatPostedAt((prev) => ({ ...prev, [load.id]: nowIso }));
+        setDemoDatPostedIds((prev) => new Set(prev).add(load.id));
         toast.success("DAT file downloaded (demo — not saved)");
         return;
       }
@@ -335,10 +325,7 @@ export function LoadsTable({
         .update({ dat_posted_at: nowIso })
         .eq("id", load.id);
       if (error) throw error;
-      setOptimisticDatPostedAt((prev) => ({ ...prev, [load.id]: nowIso }));
-      toast.success(
-        pillState === "orange" ? "DAT refreshed and marked current" : "DAT downloaded and load marked posted",
-      );
+      toast.success("DAT downloaded and load marked posted");
       onRefresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update load");
@@ -631,8 +618,11 @@ export function LoadsTable({
                     <div className="flex items-center gap-0.5 justify-end">
                       {enableOpenLoadActions && (() => {
                         const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
-                        const effectivePosted = optimisticDatPostedAt[load.id] ?? serverPosted ?? null;
-                        const pillState = getDatPillState(effectivePosted);
+                        const isPosted =
+                          hasValidDatPosted(serverPosted) ||
+                          (isDemo && demoDatPostedIds.has(load.id));
+                        const postedIso =
+                          hasValidDatPosted(serverPosted) ? String(serverPosted) : null;
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -641,34 +631,29 @@ export function LoadsTable({
                                 variant="outline"
                                 size="sm"
                                 className={cn(
-                                  "h-7 px-1.5 text-[10px] font-semibold shrink-0",
-                                  pillState === "green" &&
-                                    "cursor-default border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white",
-                                  pillState === "orange" &&
-                                    "border-orange-600 bg-orange-600 text-white hover:bg-orange-600 hover:text-white",
-                                  pillState === "yellow" &&
-                                    "border-yellow-400 bg-yellow-300 text-yellow-950 hover:bg-yellow-400 dark:border-yellow-500 dark:bg-yellow-400/90 dark:text-yellow-950 dark:hover:bg-yellow-400",
+                                  "h-7 px-1.5 text-[10px] font-semibold shrink-0 cursor-pointer",
+                                  isPosted
+                                    ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white"
+                                    : "border-amber-400/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                                 )}
                                 disabled={datPostingId === load.id}
                                 onClick={(e) => handleRowPostToDat(load, e)}
                               >
                                 {datPostingId === load.id ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : pillState === "green" ? (
+                                ) : isPosted ? (
                                   "DAT ✓"
-                                ) : pillState === "orange" ? (
-                                  "DAT ↻"
                                 ) : (
                                   "DAT"
                                 )}
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              {pillState === "green"
-                                ? "Posted to DAT (current — last 24h)"
-                                : pillState === "orange"
-                                  ? "Stale on DAT — click to refresh CSV and re-post"
-                                  : "Download DAT CSV and mark as posted"}
+                              {isPosted
+                                ? postedIso
+                                  ? formatDatPostedLine(postedIso)
+                                  : "Posted to DAT (demo)"
+                                : "Not posted to DAT yet"}
                             </TooltipContent>
                           </Tooltip>
                         );
@@ -749,11 +734,12 @@ export function LoadsTable({
           </Button>
           <Button
             size="sm"
-            variant="destructive"
+            variant="outline"
+            className="border-amber-500/80 bg-amber-500/10 text-amber-950 hover:bg-amber-500/20 dark:text-amber-100"
             onClick={() => setArchiveDialogOpen(true)}
           >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Delete
+            <Archive className="h-4 w-4 mr-1" />
+            Archive
           </Button>
         </div>
       </div>
@@ -771,7 +757,8 @@ export function LoadsTable({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
           <Button
-            variant="destructive"
+            variant="outline"
+            className="border-amber-600 bg-amber-600 text-white hover:bg-amber-700 hover:text-white"
             disabled={archiving}
             onClick={() => void handleArchiveSelected()}
           >

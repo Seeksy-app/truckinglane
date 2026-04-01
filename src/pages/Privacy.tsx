@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 export default function Privacy() {
   return (
     <div className="min-h-screen flex flex-col bg-[hsl(220,15%,8%)]">
-      <header className="py-6 px-2 border-b border-white/10 shrink-0">
+      <header className="py-6 tl-page-gutter border-b border-white/10 shrink-0">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
           <Link to="/">
             <Logo size="sm" />
@@ -16,7 +16,7 @@ export default function Privacy() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-2 py-10">
+      <main className="flex-1 max-w-3xl mx-auto w-full tl-page-gutter py-10">
         <article className="text-white/80 space-y-6 text-sm leading-relaxed">
           <h1 className="font-serif text-3xl font-medium text-white">Privacy Policy</h1>
           <p className="text-white/50 text-sm">Last updated: March 29, 2026</p>

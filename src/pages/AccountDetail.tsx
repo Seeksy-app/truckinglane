@@ -251,7 +251,7 @@ export default function AccountDetail() {
   if (isLoading) {
     return (
       <LeadGenLayout>
-        <div className="w-full max-w-none mx-auto px-2 py-8">
+        <div className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-8">
           <div className="text-center py-12 text-muted-foreground">Loading account...</div>
         </div>
       </LeadGenLayout>
@@ -261,7 +261,7 @@ export default function AccountDetail() {
   if (!account) {
     return (
       <LeadGenLayout>
-        <div className="w-full max-w-none mx-auto px-2 py-8">
+        <div className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-8">
           <div className="text-center py-12">
             <h2 className="text-xl font-semibold mb-2">Account Not Found</h2>
             <Button onClick={() => navigate('/accounts')}>Back to Accounts</Button>
@@ -273,7 +273,7 @@ export default function AccountDetail() {
 
   return (
     <LeadGenLayout>
-      <div className="w-full max-w-6xl mx-auto px-2 py-8">
+      <div className="w-full max-w-6xl mx-auto tl-page-gutter py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <button onClick={() => navigate('/dashboard')} className="hover:text-foreground transition-colors">

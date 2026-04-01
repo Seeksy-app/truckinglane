@@ -430,7 +430,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <AppHeader />
 
-      <main className="w-full max-w-none mx-auto px-2 py-8 space-y-8">
+      <main className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-8 space-y-8">
         {/* Broker/Agency Profile Card */}
         <Card>
           <CardContent className="py-6">

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
  */
 export function SiteFooter() {
   return (
-    <footer className="border-t border-white/10 bg-[hsl(220,15%,6%)] py-8 px-2">
+    <footer className="border-t border-white/10 bg-[hsl(220,15%,6%)] py-8 tl-page-gutter">
       <div className="max-w-4xl mx-auto flex flex-col items-center justify-center gap-3 text-center text-xs text-white/70">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
           <Link to="/privacy" className="text-white/80 hover:text-white transition-colors">

@@ -61,7 +61,7 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center py-6 px-2">
+      <div className="min-h-screen bg-background flex items-center justify-center py-6 tl-page-gutter">
         <div className="max-w-md w-full text-center space-y-6">
           <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
             <CheckCircle className="h-10 w-10 text-primary" />
@@ -84,7 +84,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center py-6 px-2">
+    <div className="min-h-screen bg-background flex items-center justify-center py-6 tl-page-gutter">
       <div className="w-full max-w-md space-y-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3">

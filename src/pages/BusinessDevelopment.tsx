@@ -12,7 +12,7 @@ export default function BusinessDevelopment() {
     <div className="min-h-screen bg-background">
       <AppHeader />
       
-      <div className="w-full max-w-none mx-auto px-2 py-6">
+      <div className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Business Development</h1>
           <p className="text-muted-foreground">Strategic planning and growth roadmap for Trucking Lane</p>

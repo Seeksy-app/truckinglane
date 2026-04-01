@@ -234,7 +234,7 @@ export default function ProspectingQueue() {
 
   return (
     <LeadGenLayout>
-      <div className="w-full max-w-6xl mx-auto px-2 py-8">
+      <div className="w-full max-w-6xl mx-auto tl-page-gutter py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold">Prospecting Queue</h1>

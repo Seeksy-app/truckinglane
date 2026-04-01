@@ -174,7 +174,7 @@ export default function AcceptInvite() {
 
   if (error || !invite) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center py-4 px-2">
+      <div className="min-h-screen bg-background flex items-center justify-center py-4 tl-page-gutter">
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 text-center">
             <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -193,7 +193,7 @@ export default function AcceptInvite() {
 
   if (invite.accepted_at) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center py-4 px-2">
+      <div className="min-h-screen bg-background flex items-center justify-center py-4 tl-page-gutter">
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 text-center">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -211,7 +211,7 @@ export default function AcceptInvite() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center py-4 px-2">
+    <div className="min-h-screen bg-background flex items-center justify-center py-4 tl-page-gutter">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">

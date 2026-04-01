@@ -79,7 +79,7 @@ export default function Help() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-      <main className="mx-auto max-w-3xl px-2 py-8 pb-16">
+      <main className="mx-auto max-w-3xl tl-page-gutter py-8 pb-16">
         <div className="mb-8">
           <div className="mb-2 flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2">

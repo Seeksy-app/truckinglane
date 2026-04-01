@@ -122,7 +122,7 @@ const ExtensionPage = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="w-full max-w-none mx-auto px-2 py-4 flex items-center justify-between">
+        <div className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/">
               <Button variant="ghost" size="sm" className="gap-2">
@@ -143,7 +143,7 @@ const ExtensionPage = () => {
         </div>
       </header>
 
-      <main className="w-full max-w-3xl mx-auto px-2 py-12">
+      <main className="w-full max-w-3xl mx-auto tl-page-gutter py-12">
         {/* Hero */}
         <div className="text-center mb-12">
           <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/20">

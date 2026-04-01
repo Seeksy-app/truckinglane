@@ -120,7 +120,7 @@ function HeroSection() {
           </div>
         </motion.header>
 
-        <main className="flex-1 flex items-center justify-center px-2 py-12">
+        <main className="flex-1 flex items-center justify-center tl-page-gutter py-12">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(25,95%,53%)]/20 border border-[hsl(25,95%,53%)]/30 text-[hsl(25,95%,53%)] mb-6">
@@ -271,7 +271,7 @@ function AIFeaturesSection() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 bg-gradient-to-b from-[hsl(220,15%,8%)] to-[hsl(220,15%,12%)]">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter bg-gradient-to-b from-[hsl(220,15%,8%)] to-[hsl(220,15%,12%)]">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -364,7 +364,7 @@ function AudienceSection() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 bg-[hsl(220,15%,12%)]">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter bg-[hsl(220,15%,12%)]">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -464,7 +464,7 @@ function HowItWorksSection() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 relative overflow-hidden">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter relative overflow-hidden">
       <div className="absolute inset-0">
         <img src={aiTechnology} alt="AI Technology" className="w-full h-full object-cover opacity-10" />
         <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220,15%,12%)] via-[hsl(220,15%,8%)]/95 to-[hsl(220,15%,8%)]" />
@@ -529,7 +529,7 @@ function IntegrationsSection() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 bg-[hsl(220,15%,10%)]">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter bg-[hsl(220,15%,10%)]">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -609,7 +609,7 @@ function StatsSection() {
   ];
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 bg-[hsl(25,95%,53%)]">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter bg-[hsl(25,95%,53%)]">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -646,7 +646,7 @@ function CTASection() {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="py-24 lg:py-32 px-2 bg-[hsl(220,15%,8%)]">
+    <section ref={ref} className="py-24 lg:py-32 tl-page-gutter bg-[hsl(220,15%,8%)]">
       <div className="max-w-4xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}

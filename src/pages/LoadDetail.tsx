@@ -42,7 +42,7 @@ const statusLabels: Record<LoadStatus, string> = {
 function LoadDetailSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Skeleton className="h-10 w-32 mb-6" />
         <div className="space-y-6">
           <div className="flex items-start justify-between">
@@ -74,7 +74,7 @@ function LoadDetailSkeleton() {
 function LoadDetailError({ error, onBack }: { error: Error | null; onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
@@ -111,7 +111,7 @@ function LoadDetailError({ error, onBack }: { error: Error | null; onBack: () =>
 function LoadNotFound({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
@@ -148,7 +148,7 @@ function LoadNotFound({ onBack }: { onBack: () => void }) {
 function LoadPermissionDenied({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -338,7 +338,7 @@ function LoadDetailContent() {
         </div>
       )}
       
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={handleBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard

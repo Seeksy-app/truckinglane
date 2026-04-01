@@ -175,3 +175,10 @@
     background-color: hsl(var(--charcoal));
   }
 }
+
+/* Horizontal inset for app/marketing shells — keeps line length readable on wide screens */
+@layer utilities {
+  .tl-page-gutter {
+    @apply px-4 sm:px-6 lg:px-10 xl:px-16 2xl:px-24;
+  }
+}

@@ -891,7 +891,7 @@ const Dashboard = () => {
       {/* System Reset Banner - Admin only, dismissible */}
       {showResetBanner && (
         <div className="bg-emerald-500/10 border-b border-emerald-500/20">
-          <div className="w-full max-w-7xl mx-auto px-2 py-3 flex items-center justify-between">
+          <div className="w-full max-w-7xl mx-auto tl-page-gutter py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle className="h-5 w-5 text-emerald-500" />
               <p className="text-sm text-emerald-700 dark:text-emerald-300">
@@ -909,7 +909,7 @@ const Dashboard = () => {
         </div>
       )}
       
-      <div className="w-full max-w-none mx-auto px-2 py-4">
+      <div className="w-full max-w-screen-2xl mx-auto tl-page-gutter py-4">
         
         {/* Welcome Banner with name + weather */}
         <WelcomeBanner />

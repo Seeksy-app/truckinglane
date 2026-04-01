@@ -64,7 +64,7 @@ function TranscriptSection({ transcript }: { transcript: string }) {
 function LeadDetailSkeleton() {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Skeleton className="h-10 w-32 mb-6" />
         <div className="space-y-6">
           <div className="flex items-start justify-between">
@@ -96,7 +96,7 @@ function LeadDetailSkeleton() {
 function LeadDetailError({ error, onBack }: { error: Error | null; onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
@@ -133,7 +133,7 @@ function LeadDetailError({ error, onBack }: { error: Error | null; onBack: () =>
 function LeadNotFound({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
@@ -170,7 +170,7 @@ function LeadNotFound({ onBack }: { onBack: () => void }) {
 function LeadPermissionDenied({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button variant="ghost" onClick={onBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
@@ -395,7 +395,7 @@ function LeadDetailContent() {
         </div>
       )}
       
-      <div className="max-w-4xl mx-auto px-2 py-8">
+      <div className="max-w-4xl mx-auto tl-page-gutter py-8">
         <Button
           variant="ghost"
           onClick={handleBack}

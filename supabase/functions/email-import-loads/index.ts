@@ -382,13 +382,78 @@ type CenturyPdfClaudeExtract = {
   contains_bales: boolean;
 };
 
+/** Parse numeric from JSON field (strips $, commas). */
+function centuryParseLooseNumber(value: unknown): number {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  const cleaned = String(value).replace(/[$,\s]/g, "").trim();
+  if (!cleaned) return NaN;
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function centuryFirstPositive(...candidates: number[]): number {
+  for (const n of candidates) {
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+}
+
+/**
+ * Best-effort weight (US tons, 2000 lb/ton) and $/ton from flexible Claude JSON keys.
+ */
+function normalizeCenturyWeightAndRate(parsed: Record<string, unknown>): { weight_tons: number; rate_per_ton: number } {
+  const wtDirect = centuryFirstPositive(
+    centuryParseLooseNumber(parsed.weight_tons),
+    centuryParseLooseNumber(parsed.net_tons),
+    centuryParseLooseNumber(parsed.estimated_tons),
+    centuryParseLooseNumber(parsed.tons),
+  );
+
+  const lbs = centuryFirstPositive(
+    centuryParseLooseNumber(parsed.weight_lbs),
+    centuryParseLooseNumber(parsed.net_weight_lbs),
+    centuryParseLooseNumber(parsed.lbs),
+    centuryParseLooseNumber(parsed.weight_in_lbs),
+  );
+  const fromLbs = lbs > 0 ? lbs / 2000 : 0;
+
+  const weight_tons = centuryFirstPositive(wtDirect, fromLbs);
+
+  let rate_per_ton = centuryFirstPositive(
+    centuryParseLooseNumber(parsed.rate_per_ton),
+    centuryParseLooseNumber(parsed.rate_per_ton_usd),
+    centuryParseLooseNumber(parsed.dollar_per_ton),
+    centuryParseLooseNumber(parsed.price_per_ton),
+    centuryParseLooseNumber(parsed.rate),
+    centuryParseLooseNumber(parsed.price),
+  );
+
+  const flatTotal = centuryFirstPositive(
+    centuryParseLooseNumber(parsed.total_rate),
+    centuryParseLooseNumber(parsed.linehaul_total),
+    centuryParseLooseNumber(parsed.flat_rate),
+    centuryParseLooseNumber(parsed.total_price),
+  );
+  if (!(rate_per_ton > 0) && flatTotal > 0 && weight_tons > 0) {
+    rate_per_ton = flatTotal / weight_tons;
+  }
+
+  return { weight_tons, rate_per_ton };
+}
+
+type CenturyPdfClaudeExtractionResult = {
+  extract: CenturyPdfClaudeExtract;
+  raw_claude_text: string;
+};
+
 async function extractCenturyPdfWithClaude(
   pdfBase64: string,
   anthropicKey: string,
-): Promise<CenturyPdfClaudeExtract> {
+): Promise<CenturyPdfClaudeExtractionResult> {
   const body = {
     model: CENTURY_CLAUDE_MODEL,
-    max_tokens: 1800,
+    max_tokens: 2400,
     messages: [
       {
         role: "user",
@@ -403,15 +468,32 @@ async function extractCenturyPdfWithClaude(
           },
           {
             type: "text",
-            text: `You are parsing a freight load PDF (Century / scrap metal). Return ONLY valid JSON (no markdown) with these keys:
-{"load_number":"","reference_number":"","pickup_city":"","pickup_state":"2-letter US state","dest_city":"","dest_state":"2-letter US state","weight_tons":0,"rate_per_ton":0,"pickup_date":null,"destination_company":"","contains_bales":false}
+            text: `You are parsing a freight / scrap-metal load PDF (e.g. Century). Return ONLY valid JSON (no markdown code fences) with exactly these keys:
+{"load_number":"","reference_number":"","pickup_city":"","pickup_state":"","dest_city":"","dest_state":"","weight_tons":0,"rate_per_ton":0,"weight_lbs":null,"pickup_date":null,"destination_company":"","contains_bales":false}
 
-load_number / reference_number: shipment or reference ID as printed (prefer the clearest primary load ID). Use empty string if not found.
-weight_tons: shipment weight in US tons (2000 lb tons), numeric only.
-rate_per_ton: dollars per ton from patterns like $85/NT or $85 / NT (number only).
-pickup_date: string "YYYY-MM-DD" if a pickup or ship date is clearly shown on the document, otherwise null.
-destination_company: consignee / mill / recycler at destination.
-contains_bales: true if the word BALES appears anywhere (any case), else false.`,
+Best-effort rules — extract whatever matches; use 0 or null only if nothing plausible exists.
+
+WEIGHT (US tons = 2000 lb per ton):
+- Labels may include: TONS, NET TONS, ESTIMATED TONS, NT, LBS, WEIGHT, GW, or an unlabeled number with "tons" / "lbs" nearby.
+- If the document shows weight in LBS only, set "weight_lbs" to that number and set "weight_tons" to (weight_lbs / 2000). If it shows tons (any label), set "weight_tons" to that number (numeric).
+- You may also use net_tons / estimated_tons mentally; the required output field is still "weight_tons" as the final US tons value.
+
+RATE ($ per ton):
+- Labels may include: RATE, RATE/TON, $/TON, /NT, PER TON, PRICE, LINE HAUL, or a standalone dollar amount tied to per-ton pricing.
+- Put the dollars-per-ton number in "rate_per_ton" (number only, no $).
+- If only a flat total $ amount and a weight in tons are both visible, set rate_per_ton = (flat_total / tons).
+
+LOCATIONS: pickup_city, pickup_state, dest_city, dest_state (2-letter US state when possible).
+
+load_number / reference_number: primary shipment or reference IDs on the document.
+
+pickup_date: "YYYY-MM-DD" if a clear ship/pickup date exists, else null.
+
+destination_company: consignee / mill / destination company if shown.
+
+contains_bales: true if "BALES" appears anywhere.
+
+Even if ambiguous, return your best numeric guesses for weight_tons and rate_per_ton when any reasonable numbers exist on the page.`,
           },
         ],
       },
@@ -436,28 +518,39 @@ contains_bales: true if the word BALES appears anywhere (any case), else false.`
   };
   const text = data.content?.find((c) => c.type === "text")?.text ?? "";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Claude did not return JSON");
-  const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-  const tons = Number(parsed.weight_tons);
-  const rpt = Number(parsed.rate_per_ton);
+  if (!jsonMatch) {
+    throw new Error(`Claude did not return JSON. raw_response=${text.slice(0, 4000)}`);
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Claude JSON parse failed. raw_response=${text.slice(0, 4000)}`);
+  }
+
+  const { weight_tons, rate_per_ton } = normalizeCenturyWeightAndRate(parsed);
+
   const pickupDateRaw = parsed.pickup_date;
   const pickupDate =
     pickupDateRaw === null || pickupDateRaw === undefined
       ? null
       : String(pickupDateRaw).trim() || null;
-  return {
+
+  const extract: CenturyPdfClaudeExtract = {
     load_number: String(parsed.load_number ?? "").trim(),
     reference_number: String(parsed.reference_number ?? "").trim(),
     pickup_city: String(parsed.pickup_city ?? "").trim(),
     pickup_state: String(parsed.pickup_state ?? "").trim().toUpperCase().slice(0, 2),
     dest_city: String(parsed.dest_city ?? "").trim(),
     dest_state: String(parsed.dest_state ?? "").trim().toUpperCase().slice(0, 2),
-    weight_tons: Number.isFinite(tons) ? tons : 0,
-    rate_per_ton: Number.isFinite(rpt) ? rpt : 0,
+    weight_tons,
+    rate_per_ton,
     pickup_date: pickupDate,
     destination_company: String(parsed.destination_company ?? "").trim(),
     contains_bales: Boolean(parsed.contains_bales),
   };
+
+  return { extract, raw_claude_text: text };
 }
 
 function sanitizeCenturyLoadNumberFromPdf(loadNum: string, refNum: string): string {
@@ -1342,12 +1435,31 @@ Deno.serve(async (req) => {
         try {
           const buf = await fetchInboundPdfAttachmentBuffer(emailId, att, resendApiKey);
           const pdfBase64 = uint8ToBase64(new Uint8Array(buf));
-          const ext = await extractCenturyPdfWithClaude(pdfBase64, anthropicKey);
+          const { extract: ext, raw_claude_text: rawClaudeText } = await extractCenturyPdfWithClaude(
+            pdfBase64,
+            anthropicKey,
+          );
 
           const tons = ext.weight_tons;
           const ratePerTon = ext.rate_per_ton;
           if (!(tons > 0) || !(ratePerTon > 0)) {
-            parseErrors.push(`${att.filename ?? `pdf_${idx}`}: missing weight_tons or rate_per_ton`);
+            const rawForLog =
+              rawClaudeText.length > 50000
+                ? `${rawClaudeText.slice(0, 50000)}…[truncated]`
+                : rawClaudeText;
+            parseErrors.push(
+              `${att.filename ?? `pdf_${idx}`}: missing weight_tons or rate_per_ton | claude_raw=${rawForLog}`,
+            );
+            console.error(
+              "[century] missing weight/rate",
+              att.filename,
+              "tons=",
+              tons,
+              "rpt=",
+              ratePerTon,
+              "raw_len=",
+              rawClaudeText.length,
+            );
             continue;
           }
 
@@ -1413,6 +1525,10 @@ Deno.serve(async (req) => {
               century_pdf: att.filename ?? "load.pdf",
               index: idx,
               document_pickup_date: ext.pickup_date,
+              claude_response_raw:
+                rawClaudeText.length > 120000
+                  ? `${rawClaudeText.slice(0, 120000)}…[truncated]`
+                  : rawClaudeText,
             },
             load_call_script:
               `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +

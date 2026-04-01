@@ -755,7 +755,24 @@ export function LoadsTable({
                 {expandedId === load.id && (
                   <TableRow>
                     <TableCell colSpan={tableColSpan} className="p-0">
-                      <LoadExpandedRow load={load} isDemo={isDemo} onStatusChange={onRefresh} />
+                      <LoadExpandedRow
+                        load={load}
+                        isDemo={isDemo}
+                        onStatusChange={onRefresh}
+                        enableOpenLoadActions={enableOpenLoadActions}
+                        onPostToDat={
+                          enableOpenLoadActions
+                            ? (e) => handleRowPostToDat(load, e)
+                            : undefined
+                        }
+                        onOpenDetail={
+                          enableOpenLoadActions
+                            ? (e) => handleNavigateToDetail(load.id, load, e)
+                            : undefined
+                        }
+                        datPostingId={datPostingId}
+                        demoDatPostedIds={demoDatPostedIds}
+                      />
                     </TableCell>
                   </TableRow>
                 )}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
@@ -24,6 +25,16 @@ const formatCurrency = (load: Load, value: number | null): string | null => {
 const formatLocation = (city?: string | null, state?: string | null, zip?: string | null): string | null => {
   const parts = [city, state, zip].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
+};
+
+/** City + state only (expanded row route cards). */
+export function formatCityState(city?: string | null, state?: string | null): string | null {
+  const c = city?.trim();
+  const s = state?.trim();
+  if (c && s) return `${c}, ${s.toUpperCase()}`;
+  if (s) return s.toUpperCase();
+  if (c) return c;
+  return null;
 };
 
 // Clean copy format - omits null/empty fields
@@ -81,29 +92,37 @@ export function formatLoadNotes(load: Load): string {
   return lines.filter(l => l !== "").join("\n");
 }
 
-// Field component for compact display
-interface FieldProps {
+function DetailField({
+  label,
+  value,
+}: {
   label: string;
   value: string | number | null | undefined;
-  className?: string;
-}
-
-function Field({ label, value, className = "" }: FieldProps) {
-  if (!value && value !== 0) return null;
+}) {
+  const display =
+    value === null || value === undefined || value === ""
+      ? "—"
+      : value;
   return (
-    <div className={className}>
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <p className="text-sm font-medium leading-tight">{value}</p>
+    <div className="space-y-0.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-sm font-semibold text-foreground leading-tight">
+        {display}
+      </div>
     </div>
   );
 }
 
-// Section header component
-function SectionHeader({ title }: { title: string }) {
+function DetailCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-      {title}
-    </h4>
+    <div className="rounded-md border border-border/70 bg-background/50 p-2 min-h-0">
+      <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+        {title}
+      </h4>
+      <div className="flex flex-col gap-1.5">{children}</div>
+    </div>
   );
 }
 
@@ -126,63 +145,60 @@ function getCommodityDisplay(load: Load): string | null {
 }
 
 export function LoadDetailsGrid({ load }: LoadDetailsGridProps) {
-  const pickup = formatLocation(load.pickup_city, load.pickup_state, load.pickup_zip);
-  const delivery = formatLocation(load.dest_city, load.dest_state, load.dest_zip);
+  const pickup = formatCityState(load.pickup_city, load.pickup_state);
+  const delivery = formatCityState(load.dest_city, load.dest_state);
   const rate = formatRateDisplay(load);
   const invoice = formatCurrency(load, load.customer_invoice_total);
   const targetPay = formatCurrency(load, load.target_pay);
   const targetComm = formatCurrency(load, load.target_commission);
   const maxPay = formatCurrency(load, load.max_pay);
   const maxComm = formatCurrency(load, load.max_commission);
-  
-  // Combine tarps info
-  const tarpsDisplay = load.tarps 
-    ? (load.tarp_size ? `${load.tarps} (${load.tarp_size})` : load.tarps)
-    : null;
 
-  // Get commodity (with inference for Adelphia)
+  const tarpsDisplay = load.tarps
+    ? load.tarp_size
+      ? `${load.tarps} (${load.tarp_size})`
+      : String(load.tarps)
+    : null;
+  const trailerTypeDisplay = [load.trailer_type, tarpsDisplay].filter(Boolean).join(" · ") || null;
+
   const commodityDisplay = getCommodityDisplay(load);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Route Section */}
-      <div className="space-y-2">
-        <SectionHeader title="Route" />
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          <Field label="Ship Date" value={load.ship_date} />
-          <Field label="Miles" value={load.miles} />
-          <Field label="Pickup" value={pickup} className="col-span-2" />
-          <Field label="Delivery" value={delivery} className="col-span-2" />
-        </div>
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      <DetailCard title="Route">
+        <DetailField label="Ship date" value={load.ship_date} />
+        <DetailField label="Pickup" value={pickup} />
+        <DetailField label="Delivery" value={delivery} />
+      </DetailCard>
 
-      {/* Equipment Section */}
-      <div className="space-y-2">
-        <SectionHeader title="Equipment" />
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          <Field label="Trailer Type" value={load.trailer_type} />
-          <Field label="Footage" value={load.trailer_footage ? `${load.trailer_footage} ft` : null} />
-          <Field label="Tarps" value={tarpsDisplay} />
-          <Field label="Weight" value={load.weight_lbs ? `${load.weight_lbs.toLocaleString()} lbs` : null} />
-          <Field label="Commodity" value={commodityDisplay} className="col-span-2" />
-          {load.dispatch_status && (
-            <Field label="Dispatch" value={load.dispatch_status} className="col-span-2" />
-          )}
-        </div>
-      </div>
+      <DetailCard title="Equipment">
+        <DetailField label="Trailer type" value={trailerTypeDisplay} />
+        <DetailField
+          label="Footage"
+          value={load.trailer_footage != null ? `${load.trailer_footage} ft` : null}
+        />
+        <DetailField
+          label="Weight"
+          value={load.weight_lbs != null ? `${load.weight_lbs.toLocaleString()} lbs` : null}
+        />
+        <DetailField label="Commodity" value={commodityDisplay} />
+      </DetailCard>
 
-      {/* Financials Section */}
-      <div className="space-y-2">
-        <SectionHeader title="Financials" />
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-          <Field label={load.is_per_ton ? "Rate ($/ton)" : "Rate"} value={rate} />
-          <Field label="Invoice" value={invoice} />
-          <Field label="Target Pay" value={targetPay} />
-          <Field label="Target Comm" value={targetComm} />
-          <Field label="Max Pay" value={maxPay} />
-          <Field label="Max Comm" value={maxComm} />
-        </div>
-      </div>
+      <DetailCard title="Rates">
+        <DetailField
+          label={load.is_per_ton ? "Rate ($/ton)" : "Rate"}
+          value={rate}
+        />
+        <DetailField label="Invoice" value={invoice} />
+        <DetailField label="Target pay" value={targetPay} />
+        <DetailField label="Max pay" value={maxPay} />
+      </DetailCard>
+
+      <DetailCard title="Commission">
+        <DetailField label="Target comm" value={targetComm} />
+        <DetailField label="Max comm" value={maxComm} />
+        <DetailField label="Dispatch status" value={load.dispatch_status} />
+      </DetailCard>
     </div>
   );
 }

@@ -33,6 +33,7 @@ import { LeadResolvePanel } from "./LeadResolvePanel";
 import { HotLeadTimer } from "./HotLeadTimer";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import { formatPhone } from "@/lib/utils";
+import { DASHBOARD_TABLE_CENTERED_DENSE_CLASS } from "@/lib/loadTableDisplay";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -336,7 +337,7 @@ export const LeadsTable = ({
 
       {/* Delete selected bar */}
       {someSelected && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-destructive/10 border-b border-border">
+        <div className="flex items-center gap-3 px-2 py-2 bg-destructive/10 border-b border-border">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <Button
             variant="destructive"
@@ -359,29 +360,32 @@ export const LeadsTable = ({
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <Table>
+      <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
+      <div className="w-full min-w-0 overflow-x-auto">
+      <Table className={DASHBOARD_TABLE_CENTERED_DENSE_CLASS}>
         <TableHeader>
           <TableRow className="bg-muted/50 border-b border-border">
             <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-              <Checkbox
-                checked={allVisibleSelected}
-                onCheckedChange={toggleSelectAll}
-                aria-label="Select all"
-              />
+              <div className="flex justify-center">
+                <Checkbox
+                  checked={allVisibleSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </div>
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Date</TableHead>
-            <TableHead className="w-[180px] text-xs uppercase tracking-wide font-medium text-muted-foreground">Phone</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Company</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Follow-Up</TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Date</TableHead>
+            <TableHead className="w-[180px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Phone</TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Company</TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Status</TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Follow-Up</TableHead>
             {showClaimedBy && (
-              <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Claimed By</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Claimed By</TableHead>
             )}
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Intent</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Timer</TableHead>
-            <TableHead className="w-[100px] text-xs uppercase tracking-wide font-medium text-muted-foreground">Actions</TableHead>
-            <TableHead className="w-[40px]"></TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Intent</TableHead>
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Timer</TableHead>
+            <TableHead className="w-[100px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Actions</TableHead>
+            <TableHead className="w-[40px]" />
           </TableRow>
         </TableHeader>
         <TableBody onKeyDown={handleKeyDown}>
@@ -416,23 +420,27 @@ export const LeadsTable = ({
                   onFocus={() => handleRowFocus(index)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()} className="w-[40px]">
-                    <Checkbox
-                      checked={selectedIds.has(lead.id)}
-                      onCheckedChange={() => toggleSelect(lead.id)}
-                      aria-label={`Select lead ${formatPhone(lead.caller_phone)}`}
-                    />
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={selectedIds.has(lead.id)}
+                        onCheckedChange={() => toggleSelect(lead.id)}
+                        aria-label={`Select lead ${formatPhone(lead.caller_phone)}`}
+                      />
+                    </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
-                  <TableCell className="w-[180px] text-sm whitespace-nowrap">
-                    <PhoneDisplay
-                      phone={lead.caller_phone}
-                      className="font-semibold text-[0.95rem] whitespace-nowrap"
-                    />
+                  <TableCell className="w-[180px] text-sm whitespace-nowrap text-center">
+                    <div className="flex justify-center">
+                      <PhoneDisplay
+                        phone={lead.caller_phone}
+                        className="font-semibold text-[0.95rem] whitespace-nowrap"
+                      />
+                    </div>
                   </TableCell>
-                  <TableCell className="min-w-[220px]">
-                    <div className="flex items-center gap-1.5">
+                  <TableCell className="min-w-[220px] text-center">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       <span>{lead.caller_company || "—"}</span>
                       {/* Shipper & Equipment Tags */}
                       {lead.shipper && (
@@ -477,7 +485,8 @@ export const LeadsTable = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-center">
                     {(isPending || isClaimed) && (
                       <Badge 
                         className={statusStyles[status]}
@@ -491,15 +500,17 @@ export const LeadsTable = ({
                         {statusLabels[status]}
                       </Badge>
                     )}
+                    </div>
                   </TableCell>
                   {/* Follow-Up Status - Only for claimed leads */}
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                     {isClaimed ? (
+                      <div className="flex justify-center">
                       <Select
                         value={lead.follow_up_status || "null"}
                         onValueChange={(value) => handleFollowUpChange(lead.id, value)}
                       >
-                        <SelectTrigger className="h-7 text-xs w-[140px]">
+                        <SelectTrigger className="h-7 text-xs w-[140px] mx-auto">
                           <SelectValue placeholder="Not Set" />
                         </SelectTrigger>
                         <SelectContent>
@@ -514,17 +525,18 @@ export const LeadsTable = ({
                           ))}
                         </SelectContent>
                       </Select>
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
                   {showClaimedBy && (
-                    <TableCell className="text-sm text-foreground">
+                    <TableCell className="text-sm text-foreground text-center">
                       {lead.claimed_by ? (profilesMap?.[lead.claimed_by] || "Loading...") : "—"}
                     </TableCell>
                   )}
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
+                  <TableCell className="text-center">
+                    <div className="flex flex-wrap items-center justify-center gap-1">
                       {lead.is_high_intent ? (
                         <Badge variant="outline" className="border-emerald-500 text-emerald-700">
                           High Intent
@@ -569,14 +581,16 @@ export const LeadsTable = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <HotLeadTimer 
-                      createdAt={lead.created_at} 
-                      claimedAt={lead.claimed_at} 
-                    />
+                  <TableCell className="text-center">
+                    <div className="flex justify-center">
+                      <HotLeadTimer 
+                        createdAt={lead.created_at} 
+                        claimedAt={lead.claimed_at} 
+                      />
+                    </div>
                   </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
                       {/* View Detail Button */}
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -633,15 +647,17 @@ export const LeadsTable = ({
                     </div>
                   </TableCell>
                   <TableCell 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 text-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRowClick(lead.id);
                     }}
                   >
-                    <ChevronDown 
-                      className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} 
-                    />
+                    <div className="flex justify-center">
+                      <ChevronDown 
+                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} 
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
                 {isExpanded && (
@@ -662,6 +678,7 @@ export const LeadsTable = ({
           })}
         </TableBody>
       </Table>
+      </div>
       
       {/* Load More / Show All */}
       {leads.length > displayCount && (

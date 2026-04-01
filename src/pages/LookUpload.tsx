@@ -44,7 +44,7 @@ const LookUpload = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <AppHeader />
-      <main className="flex-1 w-full max-w-none mx-auto px-0.5 sm:px-1 py-4">
+      <main className="flex-1 w-full max-w-none mx-auto px-0 py-4">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-serif font-semibold">Open Loads</h1>

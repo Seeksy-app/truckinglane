@@ -2,13 +2,20 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type Load = Tables<"loads">;
 
-/** Dense loads `<Table>`: small type, tight padding, centered cells, single-line rows. */
+/**
+ * Dashboard data tables (loads, leads, AI calls): centered headers/cells, compact padding.
+ * Use LOADS_TABLE_DENSE_CLASS for loads-only single-line nowrap.
+ */
+export const DASHBOARD_TABLE_CENTERED_DENSE_CLASS =
+  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-8 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-center [&_td]:!px-1.5 [&_td]:!py-1 [&_td]:!text-center [&_td]:align-middle [&_th]:align-middle";
+
+/** Loads table: same as dashboard dense + nowrap for single-line lanes. */
 export const LOADS_TABLE_DENSE_CLASS =
-  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-8 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-center [&_td]:!px-1.5 [&_td]:!py-1 [&_td]:!text-center [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
+  `${DASHBOARD_TABLE_CENTERED_DENSE_CLASS} [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap`;
 
 /** Toolbar strip above loads table (reduced padding). */
 export const LOADS_TABLE_TOOLBAR_CLASS =
-  "flex flex-wrap items-center gap-2 px-2 py-2 border-b border-border bg-muted/30 text-xs";
+  "flex flex-wrap items-center gap-2 px-1.5 py-2 border-b border-border bg-muted/30 text-xs";
 
 /** Aljex-style lane label: state code first, then city (e.g. "TX HOUSTON"). */
 export function formatLaneStateCity(

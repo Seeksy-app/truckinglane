@@ -276,7 +276,7 @@ function DemoDashboardContent() {
         </div>
       </div>
 
-      <div className="w-full max-w-none mx-auto px-0.5 sm:px-1 py-4">
+      <div className="w-full max-w-none mx-auto px-0 py-4">
         {/* Main Tabs Navigation */}
         <Tabs
           value={activeTab}

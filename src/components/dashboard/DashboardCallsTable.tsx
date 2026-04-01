@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTurnsList } from "@/lib/callTranscript";
+import { cn } from "@/lib/utils";
+import { DASHBOARD_TABLE_CENTERED_DENSE_CLASS } from "@/lib/loadTableDisplay";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -204,16 +206,17 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
         </CardHeader>
         <CardContent className="p-0">
           <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
+            <div className="w-full min-w-0 overflow-x-auto">
+            <Table className={DASHBOARD_TABLE_CENTERED_DENSE_CLASS}>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Time</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Phone</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Duration</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Call Status</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Lead Status</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Title</TableHead>
+                  <TableHead className="w-8 px-0.5" />
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Time</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Phone</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Duration</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Call Status</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Lead Status</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Title</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,31 +245,38 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${highIntent ? "bg-amber-500/5" : ""}`}
                         onClick={() => toggleExpand(call.id)}
                       >
-                        <TableCell>
+                        <TableCell className="w-8 px-0.5 text-center align-middle">
+                          <span className="inline-flex justify-center">
                           {expandedId === call.id ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
+                          </span>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm text-center tabular-nums">
                           {format(parseISO(call.created_at), "MMM d, h:mm a")}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          <PhoneDisplay
-                            phone={phoneNumber}
-                            className="font-semibold text-[0.95rem]"
-                          />
+                        <TableCell className="text-sm text-center">
+                          <div className="flex justify-center">
+                            <PhoneDisplay
+                              phone={phoneNumber}
+                              className="font-semibold text-[0.95rem]"
+                            />
+                          </div>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm text-center tabular-nums">
                           {call.duration_secs ? `${call.duration_secs}s` : "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
                           <Badge className={outcomeStyles[call.call_outcome || 'unknown'] || outcomeStyles.unknown}>
                             {call.call_outcome || "unknown"}
                           </Badge>
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
                           {(() => {
                             const status = call.lead_status || 'none';
                             const config = leadStatusConfig[status] || leadStatusConfig.none;
@@ -276,9 +286,10 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                               </Badge>
                             );
                           })()}
+                          </div>
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate text-sm">
-                          <div className="flex items-center gap-2 min-w-0">
+                        <TableCell className="max-w-[200px] text-sm text-center">
+                          <div className="flex items-center justify-center gap-2 min-w-0 flex-wrap">
                             {highIntent && <Flame className="h-4 w-4 text-amber-500 flex-shrink-0" />}
                             <Link
                               to={`/calls/${call.id}`}
@@ -427,6 +438,7 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                 })}
               </TableBody>
             </Table>
+            </div>
           </div>
           
           {/* Load More / Show All */}

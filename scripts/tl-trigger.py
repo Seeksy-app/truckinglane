@@ -511,16 +511,18 @@ def insert_aljex_loads():
         dc = dupes_by_pair.get((aid, tt), 0)
         log_payloads.append((aid, tt, len(grp), new_c, upd_c, dc))
 
-    # Must match UNIQUE (agency_id, template_type, load_number). merge-duplicates = ON CONFLICT DO UPDATE (not ignore).
-    url = f"{SUPABASE_URL}/rest/v1/loads?on_conflict=agency_id,template_type,load_number"
+    # PostgREST merge-duplicates cannot limit ON CONFLICT columns updated. Use RPC with explicit
+    # ON CONFLICT (agency_id, template_type, load_number) DO UPDATE SET … (not DO NOTHING).
+    # DB has no UNIQUE(load_number) alone; conflict target matches loads_agency_id_template_type_load_number_key.
+    rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/tl_upsert_aljex_loads_batch"
     headers = {
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates",
+        "Prefer": "return=minimal",
     }
-    r = requests.post(url, json=deduped, headers=headers, timeout=60)
-    if r.status_code not in (200, 201):
+    r = requests.post(rpc_url, json={"p_rows": deduped}, headers=headers, timeout=120)
+    if r.status_code not in (200, 201, 204):
         return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
 
     for aid, tt, ic, new_c, upd_c, dc in log_payloads:

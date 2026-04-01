@@ -50,6 +50,10 @@ import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
 import { DatPendingReminderBanner } from "@/components/dashboard/DatPendingReminderBanner";
 import { useDatPendingReminder } from "@/hooks/useDatPendingReminder";
+import {
+  BookingRequestModal,
+  type PendingBookingLoad,
+} from "@/components/dashboard/BookingRequestModal";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -276,6 +280,55 @@ const Dashboard = () => {
     },
     enabled: !!user && !!effectiveAgencyId,
   });
+
+  const { data: pendingSmsBookings = [] } = useQuery({
+    queryKey: ["pending_sms_bookings", effectiveAgencyId],
+    queryFn: async () => {
+      if (!effectiveAgencyId) return [];
+      const { data, error } = await supabase
+        .from("loads")
+        .select(
+          "id, agency_id, load_number, pickup_city, pickup_state, dest_city, dest_state, trailer_type, target_pay, booked_by_phone, booked_by_mc, booked_by_company",
+        )
+        .eq("agency_id", effectiveAgencyId)
+        .eq("sms_book_status", "pending_review")
+        .is("booked_handled_at", null)
+        .order("updated_at", { ascending: true })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []) as PendingBookingLoad[];
+    },
+    enabled: !!user && !!effectiveAgencyId,
+    refetchInterval: 30_000,
+  });
+
+  const { data: bookingAgencyUsersRaw = [] } = useQuery({
+    queryKey: ["dashboard_booking_agency_users", effectiveAgencyId],
+    queryFn: async () => {
+      if (!effectiveAgencyId) return [];
+      const { data, error } = await supabase
+        .from("agency_members")
+        .select("user_id, profiles(full_name, email)")
+        .eq("agency_id", effectiveAgencyId);
+      if (error) throw error;
+      return (data ?? []).map((row) => {
+        const p = row.profiles as { full_name: string | null; email: string | null } | null;
+        const label =
+          [p?.full_name?.trim(), p?.email?.trim()].filter(Boolean).join(" · ") || row.user_id;
+        return { user_id: row.user_id, label };
+      });
+    },
+    enabled: !!user && !!effectiveAgencyId,
+    staleTime: 60_000,
+  });
+
+  const bookingAgencyUsers = useMemo(() => {
+    if (bookingAgencyUsersRaw.length > 0) return bookingAgencyUsersRaw;
+    if (user) return [{ user_id: user.id, label: "You" }];
+    return [];
+  }, [bookingAgencyUsersRaw, user]);
+
+  const pendingBookingLoad = pendingSmsBookings[0] ?? null;
 
   // Fetch calls from ai_call_summaries for rich data (agency filtered - supports impersonation)
   const { data: rawCalls = [], isLoading: callsLoading } = useQuery({
@@ -880,6 +933,18 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader leadSoundMuted={leadSoundMuted} onLeadSoundMutedChange={setLeadSoundMuted} />
+
+      {pendingBookingLoad && user && (
+        <BookingRequestModal
+          key={pendingBookingLoad.id}
+          load={pendingBookingLoad}
+          agencyUsers={bookingAgencyUsers}
+          currentUserId={user.id}
+          onComplete={() =>
+            queryClient.invalidateQueries({ queryKey: ["pending_sms_bookings", effectiveAgencyId] })
+          }
+        />
+      )}
 
       {datReminder.showBanner && (
         <DatPendingReminderBanner

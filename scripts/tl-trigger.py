@@ -12,7 +12,8 @@ Environment:
   SUPABASE_URL          https://vjgakkomhphvdbwjjwiv.supabase.co
   SUPABASE_SERVICE_ROLE_KEY   Service role key (never expose to clients)
   DAT_BEARER_TOKEN      Optional; DAT freight API bearer (or DAT_TOKEN_FILE, default /root/.dat_bearer_token)
-  SIMPLETEXTING_API_KEY     Optional env override; defaults to in-file key for SimpleTexting api-app2.simpletexting.com/v2/api/messages
+  SIMPLETEXTING_API_KEY     Optional env override; SimpleTexting messages + contacts API
+  SIMPLETEXTING_CONTACTS_URL  Optional; default https://api-app2.simpletexting.com/v2/api/contacts
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 try:
     from flask import Flask, jsonify, request
@@ -48,6 +50,10 @@ SIMPLETEXTING_API_KEY = os.environ.get(
 SIMPLETEXTING_MESSAGES_URL = os.environ.get(
     "SIMPLETEXTING_MESSAGES_URL",
     "https://api-app2.simpletexting.com/v2/api/messages",
+).rstrip("/")
+SIMPLETEXTING_CONTACTS_URL = os.environ.get(
+    "SIMPLETEXTING_CONTACTS_URL",
+    "https://api-app2.simpletexting.com/v2/api/contacts",
 ).rstrip("/")
 
 # Full key set for /insert-aljex-loads so PostgREST upsert rows share identical columns.
@@ -402,6 +408,54 @@ def _simpletexting_send(contact_phone: str | int | float | None, message: str) -
     return True, ""
 
 
+def _simpletexting_contact_create_silent(phone_norm: str) -> None:
+    """POST contact create/upsert; failures are ignored (does not block SMS)."""
+    if not SIMPLETEXTING_API_KEY or not phone_norm:
+        return
+    try:
+        requests.post(
+            SIMPLETEXTING_CONTACTS_URL,
+            headers={
+                "Authorization": f"Bearer {SIMPLETEXTING_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "contactPhone": phone_norm,
+                "firstName": "Driver",
+                "lastName": "",
+                "comment": "TruckingLane auto-added",
+            },
+            timeout=20,
+        )
+    except requests.RequestException:
+        pass
+
+
+def _simpletexting_contact_patch_mc_silent(
+    phone_norm: str, company_name: str | None, mc_number: str | None
+) -> None:
+    """PATCH contact with company + MC comment; failures ignored."""
+    if not SIMPLETEXTING_API_KEY or not phone_norm or not mc_number:
+        return
+    fn = (company_name or "").strip()
+    path_seg = quote(phone_norm, safe="")
+    try:
+        requests.patch(
+            f"{SIMPLETEXTING_CONTACTS_URL}/{path_seg}",
+            headers={
+                "Authorization": f"Bearer {SIMPLETEXTING_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "firstName": fn,
+                "comment": f"MC# {mc_number}",
+            },
+            timeout=20,
+        )
+    except requests.RequestException:
+        pass
+
+
 def _sms_fmt_field(val, fallback: str = "—") -> str:
     if val is None:
         return fallback
@@ -413,6 +467,18 @@ def _sms_fmt_field(val, fallback: str = "—") -> str:
         return str(val)
     t = str(val).strip()
     return t if t else fallback
+
+
+def _parse_mc_and_company_from_sms(text: str) -> tuple[str | None, str | None]:
+    """
+    MC# = first run of digits; company = remainder stripped (e.g. '123456 Appleton Trucking').
+    """
+    m = re.search(r"\d+", text or "")
+    if not m:
+        return None, None
+    mc = m.group(0)
+    company = (text[m.end() :] or "").strip()
+    return mc, company if company else None
 
 
 def _parse_inbound_sms_request() -> tuple[str, str]:
@@ -1149,6 +1215,7 @@ def send_sms():
 
     pnorm = _normalize_sms_phone(phone)
     if pnorm:
+        _simpletexting_contact_create_silent(pnorm)
         _sms_context_upsert(pnorm, load_id, "offered")
 
     aid = row.get("agency_id")
@@ -1160,13 +1227,37 @@ def send_sms():
     return jsonify({"ok": True})
 
 
+@app.post("/notify-sms")
+def notify_sms():
+    """Send arbitrary SMS (SimpleTexting). Body JSON: { \"phone\", \"text\" }. Requires X-TL-Trigger-Key."""
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+    if not SIMPLETEXTING_API_KEY:
+        return jsonify({"error": "SIMPLETEXTING_API_KEY not configured"}), 500
+
+    body = request.get_json(silent=True) or {}
+    phone = body.get("phone")
+    text = str(body.get("text") or "").strip()
+    if phone is None or not text:
+        return jsonify({"error": "phone and text required"}), 400
+
+    ok_send, send_err = _simpletexting_send(phone, text)
+    if not ok_send:
+        return jsonify({"error": send_err}), 502
+    return jsonify({"ok": True})
+
+
 @app.post("/sms-inbound")
 def sms_inbound():
     """
     SimpleTexting inbound webhook (no TL trigger key). Parses phone + body; sends replies via API.
     """
     j = request.get_json(silent=True) or {}
-    if j.get("type") == "OUTGOING_MESSAGE":
+    _values = j.get("values")
+    _values_d = _values if isinstance(_values, dict) else {}
+    msg_type = j.get("type") or _values_d.get("type") or ""
+    if msg_type == "OUTGOING_MESSAGE":
         return jsonify({"ok": True, "skipped": "outgoing"}), 200
 
     print(f"[SMS-INBOUND] payload: {request.get_data(as_text=True)}", flush=True)
@@ -1203,10 +1294,14 @@ def sms_inbound():
 
     if any(ch.isdigit() for ch in text_body) and ctx:
         lid = str(ctx.get("load_id") or "").strip()
-        patch = {
+        mc, company = _parse_mc_and_company_from_sms(text_body)
+        patch: dict = {
             "sms_book_status": "pending_review",
             "booked_by_phone": phone_norm,
         }
+        if mc is not None:
+            patch["booked_by_mc"] = mc
+            patch["booked_by_company"] = company
         pr = requests.patch(
             f"{SUPABASE_URL}/rest/v1/loads",
             headers={**_supabase_headers(json_body=True), "Prefer": "return=minimal"},
@@ -1223,6 +1318,9 @@ def sms_inbound():
         lead_for_thread = (
             _find_lead_id_for_sms(ag, phone_norm) if ag and phone_norm else None
         )
+        if mc is not None and phone_norm:
+            co = company if company is not None else ""
+            _simpletexting_contact_patch_mc_silent(phone_norm, co, mc)
         _simpletexting_send(reply_to, reply)
         _log_sms_exchange_for_lead(lead_for_thread, text_body, reply)
         return "", 200

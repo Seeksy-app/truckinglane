@@ -1928,7 +1928,12 @@ export type Database = {
           board_date: string
           booked_at: string | null
           booked_by: string | null
+          booked_by_company: string | null
+          booked_by_mc: string | null
+          booked_by_phone: string | null
           booked_call_id: string | null
+          booked_handled_at: string | null
+          booked_handled_by: string | null
           booked_lead_id: string | null
           booked_source: string | null
           claimed_at: string | null
@@ -1963,6 +1968,7 @@ export type Database = {
           pickup_zip: string | null
           rate_raw: number | null
           ship_date: string | null
+          sms_book_status: string | null
           source_row: Json | null
           status: string
           target_commission: number | null
@@ -1985,7 +1991,12 @@ export type Database = {
           board_date?: string
           booked_at?: string | null
           booked_by?: string | null
+          booked_by_company?: string | null
+          booked_by_mc?: string | null
+          booked_by_phone?: string | null
           booked_call_id?: string | null
+          booked_handled_at?: string | null
+          booked_handled_by?: string | null
           booked_lead_id?: string | null
           booked_source?: string | null
           claimed_at?: string | null
@@ -2020,6 +2031,7 @@ export type Database = {
           pickup_zip?: string | null
           rate_raw?: number | null
           ship_date?: string | null
+          sms_book_status?: string | null
           source_row?: Json | null
           status?: string
           target_commission?: number | null
@@ -2042,7 +2054,12 @@ export type Database = {
           board_date?: string
           booked_at?: string | null
           booked_by?: string | null
+          booked_by_company?: string | null
+          booked_by_mc?: string | null
+          booked_by_phone?: string | null
           booked_call_id?: string | null
+          booked_handled_at?: string | null
+          booked_handled_by?: string | null
           booked_lead_id?: string | null
           booked_source?: string | null
           claimed_at?: string | null
@@ -2077,6 +2094,7 @@ export type Database = {
           pickup_zip?: string | null
           rate_raw?: number | null
           ship_date?: string | null
+          sms_book_status?: string | null
           source_row?: Json | null
           status?: string
           target_commission?: number | null

@@ -1,3 +1,7 @@
+// TEMPORARILY DISABLED - injector paused
+// Set INJECTOR_ENABLED to true to re-enable
+const INJECTOR_ENABLED = false;
+if (!INJECTOR_ENABLED) { /* injector disabled */ } else {
 /**
  * Aljex Spot auto-submit — content script on https://dandl.aljex.com/*
  * Loads only arrive via background → tab message { type: "PUSH_LOADS", loads }.
@@ -459,3 +463,4 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
   return true;
 });
+}

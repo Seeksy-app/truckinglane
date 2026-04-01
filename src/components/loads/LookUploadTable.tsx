@@ -176,7 +176,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
               setLaneSort(null);
             }}
           >
-            <SelectTrigger className="w-[140px] h-7 text-xs bg-background">
+            <SelectTrigger className="w-[140px] h-8 text-sm sm:text-base bg-background">
               <SelectValue placeholder="No sorting" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -206,7 +206,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="w-[92px] h-7 text-xs bg-background">
+            <SelectTrigger className="w-[92px] h-8 text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -240,13 +240,13 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-8 px-2 text-sm sm:text-base text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4 mr-1" /> Clear
           </Button>
         )}
         {hasActiveFilters && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm sm:text-base text-muted-foreground">
             Showing {filteredAndSortedLoads.length} of {openLoads.length}
           </span>
         )}

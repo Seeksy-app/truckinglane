@@ -17,9 +17,9 @@ export const LOADS_TABLE_DENSE_CLASS =
 export const CALLS_TABLE_DENSE_CLASS =
   "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-8 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-left [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-1 [&_td]:!text-left [&_td]:align-middle";
 
-/** Toolbar strip above loads table (reduced padding). */
+/** Toolbar strip above loads table — font scale matches dense table body (text-sm / sm:text-base). */
 export const LOADS_TABLE_TOOLBAR_CLASS =
-  "flex flex-wrap items-center gap-2 px-1.5 py-2 border-b border-border bg-muted/30 text-xs";
+  "flex flex-wrap items-center gap-2 px-1.5 py-2 border-b border-border bg-muted/30 text-sm sm:text-base";
 
 /** Aljex-style lane label: state code first, then city (e.g. "TX HOUSTON"). */
 export function formatLaneStateCity(

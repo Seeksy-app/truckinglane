@@ -108,27 +108,40 @@ def _truckertools_api_raw_from_row(row: dict) -> dict | None:
 
 def _remap_truckertools_load_from_api(row: dict) -> dict:
     """
-    Map Trucker Tools getNearbyLoadsV5 item shape into loads columns before whitelist.
-    API: originCity, originState, destinationCity, destinationState, pickupDate,
-    equipmentType, weight, offerRate, miles.
+    Map Trucker Tools API item (nested in source_row.raw) to Supabase `loads` columns.
+    API keys -> columns (never delivery_* / rate / weight on loads):
+      originCity -> pickup_city
+      originState -> pickup_state
+      destinationCity -> dest_city
+      destinationState -> dest_state
+      pickupDate -> ship_date
+      equipmentType -> trailer_type
+      weight -> weight_lbs
+      offerRate -> rate_raw AND customer_invoice_total
+      target_pay = rate * 0.80, max_pay = rate * 0.85,
+      target_commission = rate - target_pay, max_commission = rate - max_pay
     """
     raw = _truckertools_api_raw_from_row(row)
     if not raw:
         return row
     out = dict(row)
+    # Wrong column names (never use on loads): strip if a client sent them
+    for bad in ("delivery_city", "delivery_state", "rate", "weight"):
+        out.pop(bad, None)
+
     if "originCity" in raw:
         out["pickup_city"] = _tt_str(raw.get("originCity"))
     if "originState" in raw:
         ps = _tt_str(raw.get("originState"))
-        out["pickup_state"] = (ps[:8] if ps else None)
+        out["pickup_state"] = ps[:8] if ps else None
     if "destinationCity" in raw:
         out["dest_city"] = _tt_str(raw.get("destinationCity"))
     if "destinationState" in raw:
         ds = _tt_str(raw.get("destinationState"))
-        out["dest_state"] = (ds[:8] if ds else None)
+        out["dest_state"] = ds[:8] if ds else None
     if "pickupDate" in raw and raw.get("pickupDate") is not None:
-        sd = str(raw.get("pickupDate")).strip()
-        out["ship_date"] = sd or None
+        pd = raw.get("pickupDate")
+        out["ship_date"] = str(pd).strip() or None
     if "equipmentType" in raw:
         out["trailer_type"] = _tt_str(raw.get("equipmentType"))
     if "weight" in raw:
@@ -139,19 +152,20 @@ def _remap_truckertools_load_from_api(row: dict) -> dict:
         mf = _coerce_float(raw.get("miles"))
         if mf is not None:
             out["miles"] = int(mf) if mf == int(mf) else mf
-    if "offerRate" in raw:
-        rate = _coerce_float(raw.get("offerRate"))
-        if rate is not None:
-            target_pay = round(rate * 0.80)
-            max_pay = round(rate * 0.85)
-            out["target_pay"] = target_pay
-            out["max_pay"] = max_pay
-            out["target_commission"] = round(rate - target_pay)
-            out["max_commission"] = round(rate - max_pay)
-            out["rate_raw"] = rate
-            out["customer_invoice_total"] = rate
-            out["commission_target_pct"] = 0.2
-            out["commission_max_pct"] = 0.15
+
+    rate = _coerce_float(raw.get("offerRate")) if "offerRate" in raw else None
+    if rate is not None:
+        target_pay = round(rate * 0.80)
+        max_pay = round(rate * 0.85)
+        out["target_pay"] = target_pay
+        out["max_pay"] = max_pay
+        out["target_commission"] = round(rate - target_pay)
+        out["max_commission"] = round(rate - max_pay)
+        out["rate_raw"] = rate
+        out["customer_invoice_total"] = rate
+        out["commission_target_pct"] = 0.2
+        out["commission_max_pct"] = 0.15
+
     pco, pso = out.get("pickup_city"), out.get("pickup_state")
     if pco or pso:
         out["pickup_location_raw"] = ", ".join(x for x in (pco, pso) if x) or None

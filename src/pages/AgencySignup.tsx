@@ -167,7 +167,7 @@ export default function AgencySignup() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center py-4 px-2">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">

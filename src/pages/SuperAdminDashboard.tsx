@@ -278,7 +278,7 @@ export default function SuperAdminDashboard() {
     <div className="min-h-screen bg-background">
       <AppHeader />
       
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="w-full max-w-none mx-auto px-2 py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

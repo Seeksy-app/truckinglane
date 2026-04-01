@@ -192,7 +192,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       {/* Impersonation Banner */}
       {isSuperAdmin && isImpersonating && (
         <div className="bg-amber-500/10 border-b border-amber-500/30">
-          <div className="container mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="w-full max-w-none mx-auto px-2 py-2 flex items-center justify-between">
             <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
               <Eye className="h-4 w-4" />
               <span className="text-sm font-medium">Viewing:</span>
@@ -215,7 +215,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
       )}
       
       <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="w-full max-w-none mx-auto px-2 py-3 flex items-center justify-between">
           {/* Logo & Nav */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">

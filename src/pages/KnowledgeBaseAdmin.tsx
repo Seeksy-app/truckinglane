@@ -436,7 +436,7 @@ export default function KnowledgeBaseAdmin() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-      <main className="mx-auto max-w-3xl px-4 py-8 pb-16 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-3xl px-2 py-8 pb-16">
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <Button variant="ghost" size="sm" className="mb-2 gap-1 px-0" onClick={() => navigate("/platform")}>

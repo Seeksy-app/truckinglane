@@ -137,7 +137,7 @@ export default function Trust() {
   // Email gate UI
   if (step === "email" || step === "code") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 flex items-center justify-center px-2">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -249,7 +249,7 @@ export default function Trust() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5 py-24 px-4">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5 py-24 px-2">
         <div className="max-w-5xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -289,7 +289,7 @@ export default function Trust() {
       </section>
 
       {/* What It Does */}
-      <section className="py-20 px-4 bg-card/50">
+      <section className="py-20 px-2 bg-card/50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-foreground text-center mb-4">What It Does</h2>
           <p className="text-lg text-muted-foreground text-center max-w-3xl mx-auto mb-12">
@@ -323,7 +323,7 @@ export default function Trust() {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-2">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-foreground text-center mb-12">How It Works</h2>
 
@@ -359,7 +359,7 @@ export default function Trust() {
       </section>
 
       {/* Tech Stack */}
-      <section className="py-20 px-4 bg-card/50">
+      <section className="py-20 px-2 bg-card/50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-foreground text-center mb-12">Technology Stack</h2>
 
@@ -390,7 +390,7 @@ export default function Trust() {
       </section>
 
       {/* Security */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-2">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-4">
             <Shield className="h-8 w-8 text-accent" />
@@ -422,7 +422,7 @@ export default function Trust() {
       </section>
 
       {/* Performance */}
-      <section className="py-20 px-4 bg-card/50">
+      <section className="py-20 px-2 bg-card/50">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-8">
             <Server className="h-8 w-8 text-accent" />
@@ -453,7 +453,7 @@ export default function Trust() {
       </section>
 
       {/* ROI */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-2">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-8">
             <TrendingUp className="h-8 w-8 text-accent" />
@@ -484,7 +484,7 @@ export default function Trust() {
       </section>
 
       {/* Visuals */}
-      <section className="py-20 px-4 bg-card/50">
+      <section className="py-20 px-2 bg-card/50">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-foreground text-center mb-8">Platform Preview</h2>
 
@@ -514,7 +514,7 @@ export default function Trust() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-border">
+      <footer className="py-12 px-2 border-t border-border">
         <div className="max-w-5xl mx-auto text-center">
           <p className="text-muted-foreground mb-2">
             Questions? Contact us at{" "}

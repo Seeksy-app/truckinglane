@@ -37,7 +37,7 @@ export default function Legal() {
 
   return (
     <div className="min-h-screen bg-[hsl(220,15%,8%)]">
-      <header className="p-6 border-b border-white/10">
+      <header className="py-6 px-2 border-b border-white/10">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <Link to="/"><Logo size="sm" /></Link>
           <nav className="flex gap-6 text-sm">
@@ -54,7 +54,7 @@ export default function Legal() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-12">
+      <main className="max-w-4xl mx-auto px-2 py-12">
         {loading ? (
           <p className="text-white/50">Loading...</p>
         ) : content ? (

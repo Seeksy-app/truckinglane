@@ -61,7 +61,7 @@ export default function AccessDenied() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex items-center justify-center py-6 px-2">
       <div className="max-w-md w-full text-center space-y-6">
         <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
           <ShieldX className="h-10 w-10 text-destructive" />

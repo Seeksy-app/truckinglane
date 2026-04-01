@@ -150,7 +150,7 @@ export default function CsvConverter() {
   const mappedCount = mappings.filter(m => m.sourceColumn).length;
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background py-6 px-2">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

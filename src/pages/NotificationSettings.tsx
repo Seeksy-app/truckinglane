@@ -68,7 +68,7 @@ export default function NotificationSettings() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
-      <main className="container mx-auto px-4 py-6 max-w-2xl">
+      <main className="w-full max-w-2xl mx-auto px-2 py-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Notification Settings</h1>
           <p className="text-muted-foreground mt-1">

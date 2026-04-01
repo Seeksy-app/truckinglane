@@ -282,7 +282,7 @@ const Analytics = () => {
     <TooltipProvider>
       <div className="min-h-screen bg-background">
         <AppHeader />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-full max-w-7xl mx-auto px-2 py-6">
           {/* Header */}
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

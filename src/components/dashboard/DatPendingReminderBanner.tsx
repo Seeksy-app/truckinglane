@@ -10,7 +10,7 @@ export function DatPendingReminderBanner({ pendingCount, onDismiss }: Props) {
   return (
     <div
       role="alert"
-      className="bg-destructive/15 border-b border-destructive/40 text-destructive px-4 py-2.5 flex items-center justify-center gap-3 relative"
+      className="bg-destructive/15 border-b border-destructive/40 text-destructive px-2 py-2.5 flex items-center justify-center gap-3 relative"
     >
       <p className="text-sm font-medium text-center pr-8 sm:pr-0">
         ⚠️ {pendingCount} load{pendingCount === 1 ? "" : "s"} pending DAT upload — export now

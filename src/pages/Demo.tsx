@@ -202,7 +202,7 @@ function DemoDashboardContent() {
     <div className="min-h-screen bg-background">
       {/* Demo Header - matches AppHeader style */}
       <header className="border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-7xl mx-auto px-2">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-4">
               <Link to="/" className="flex items-center gap-2">
@@ -240,7 +240,7 @@ function DemoDashboardContent() {
 
       {/* Call-to-Test Banner */}
       <div className="bg-[hsl(25,95%,53%)] border-b border-[hsl(25,95%,45%)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="w-full max-w-7xl mx-auto px-2 py-3">
           <div className="flex items-center justify-center gap-3 text-white text-sm sm:text-base font-medium">
             <Phone className="h-5 w-5 animate-pulse" />
             <span>
@@ -256,7 +256,7 @@ function DemoDashboardContent() {
 
       {/* Feature Highlights Banner */}
       <div className="bg-gradient-to-r from-[hsl(220,15%,15%)] to-[hsl(220,15%,20%)] border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="w-full max-w-7xl mx-auto px-2 py-4">
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2 text-white/90">
               <Phone className="h-4 w-4 text-[hsl(25,95%,53%)]" />
@@ -276,7 +276,7 @@ function DemoDashboardContent() {
         </div>
       </div>
 
-      <div className="w-full max-w-none mx-auto px-0 py-4">
+      <div className="w-full max-w-none mx-auto px-2 py-4">
         {/* Main Tabs Navigation */}
         <Tabs
           value={activeTab}
@@ -479,7 +479,7 @@ function DemoDashboardContent() {
 
       {/* Demo CTA Footer */}
       <div className="border-t border-border bg-gradient-to-r from-[hsl(220,15%,15%)] to-[hsl(220,15%,20%)] mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+        <div className="w-full max-w-7xl mx-auto px-2 py-12 text-center">
           <h3 className="text-2xl font-bold text-white mb-2">
             Ready to transform your brokerage?
           </h3>

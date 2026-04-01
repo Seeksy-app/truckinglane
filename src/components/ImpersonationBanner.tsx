@@ -20,7 +20,7 @@ export function ImpersonationBanner() {
 
   return (
     <div className="bg-amber-500/10 border-b border-amber-500/30">
-      <div className="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div className="w-full max-w-none mx-auto px-2 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
           <Eye className="h-4 w-4" />
           <span className="text-sm font-medium">

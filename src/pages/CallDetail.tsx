@@ -64,7 +64,7 @@ export default function CallDetail() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto px-2 py-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -79,7 +79,7 @@ export default function CallDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto px-2 py-8">
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -90,7 +90,7 @@ export default function CallDetail() {
   if (isError || !call) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto px-2 py-8">
           <Button variant="ghost" onClick={handleBack} className="mb-6">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
@@ -117,7 +117,7 @@ export default function CallDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-3xl mx-auto px-2 py-8">
         <Button variant="ghost" onClick={handleBack} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back

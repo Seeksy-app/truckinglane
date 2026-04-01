@@ -2672,6 +2672,10 @@ export type Database = {
         Args: { _agency_id: string; _lead_id?: string; _load_id: string }
         Returns: Json
       }
+      claim_sms_booking_load: {
+        Args: { p_load_id: string; p_load_number: string }
+        Returns: Json
+      }
       count_agent_active_keywords: {
         Args: { _agent_id: string }
         Returns: number
@@ -2683,6 +2687,10 @@ export type Database = {
       count_global_active_keywords: {
         Args: { _agency_id: string }
         Returns: number
+      }
+      decline_sms_booking_load: {
+        Args: { p_load_id: string; p_load_number: string }
+        Returns: Json
       }
       get_agency_daily_report: {
         Args: { _agency_id: string; _date?: string }
@@ -2729,6 +2737,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      revert_sms_booking_claim: {
+        Args: { p_load_id: string; p_load_number: string; p_prev_status: string }
+        Returns: Json
       }
       reset_agent_daily_state: {
         Args: { _agency_id: string; _agent_id: string; _timezone?: string }

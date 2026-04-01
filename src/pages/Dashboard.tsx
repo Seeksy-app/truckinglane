@@ -288,7 +288,7 @@ const Dashboard = () => {
       const { data, error } = await supabase
         .from("loads")
         .select(
-          "id, agency_id, load_number, pickup_city, pickup_state, dest_city, dest_state, trailer_type, target_pay, booked_by_phone, booked_by_mc, booked_by_company",
+          "id, agency_id, load_number, status, pickup_city, pickup_state, dest_city, dest_state, trailer_type, target_pay, booked_by_phone, booked_by_mc, booked_by_company",
         )
         .eq("agency_id", effectiveAgencyId)
         .eq("sms_book_status", "pending_review")
@@ -329,6 +329,24 @@ const Dashboard = () => {
   }, [bookingAgencyUsersRaw, user]);
 
   const pendingBookingLoad = pendingSmsBookings[0] ?? null;
+
+  const [dismissedSmsBookingIds, setDismissedSmsBookingIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const stillPending = new Set(pendingSmsBookings.map((l) => l.id));
+    setDismissedSmsBookingIds((prev) => {
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (stillPending.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [pendingSmsBookings]);
+
+  const visibleBookingLoad =
+    pendingBookingLoad && !dismissedSmsBookingIds.has(pendingBookingLoad.id)
+      ? pendingBookingLoad
+      : null;
 
   // Fetch calls from ai_call_summaries for rich data (agency filtered - supports impersonation)
   const { data: rawCalls = [], isLoading: callsLoading } = useQuery({
@@ -934,12 +952,16 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <AppHeader leadSoundMuted={leadSoundMuted} onLeadSoundMutedChange={setLeadSoundMuted} />
 
-      {pendingBookingLoad && user && (
+      {visibleBookingLoad && user && (
         <BookingRequestModal
-          key={pendingBookingLoad.id}
-          load={pendingBookingLoad}
+          key={visibleBookingLoad.id}
+          load={visibleBookingLoad}
           agencyUsers={bookingAgencyUsers}
           currentUserId={user.id}
+          refetchLoads={refetchLoads}
+          onDismiss={() =>
+            setDismissedSmsBookingIds((s) => new Set(s).add(visibleBookingLoad.id))
+          }
           onComplete={() =>
             queryClient.invalidateQueries({ queryKey: ["pending_sms_bookings", effectiveAgencyId] })
           }

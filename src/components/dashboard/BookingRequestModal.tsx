@@ -20,12 +20,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import { sendBookingNotifySms } from "@/lib/bookingNotifySms";
-import { getErrorMessage, isoTimestampNow } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/utils";
 
 export type PendingBookingLoad = {
   id: string;
   agency_id: string;
   load_number: string;
+  /** Prior status (for reverting if SMS fails after claim). */
+  status: string;
   pickup_city: string | null;
   pickup_state: string | null;
   dest_city: string | null;
@@ -42,10 +44,23 @@ export type AgencyUserOption = {
   label: string;
 };
 
+type RpcOk = { ok?: boolean; error?: string; detail?: string };
+
+function readRpcResult(data: unknown): RpcOk {
+  if (data && typeof data === "object" && "ok" in data) {
+    return data as RpcOk;
+  }
+  return { ok: false, error: "invalid_rpc_response" };
+}
+
 type BookingRequestModalProps = {
   load: PendingBookingLoad;
   agencyUsers: AgencyUserOption[];
   currentUserId: string;
+  /** Dashboard `useLoads().refetch` so BOOKED KPI updates (loads are not React Query–cached). */
+  refetchLoads: () => void;
+  /** Close / X / overlay — user can dismiss if stuck (e.g. RPC not deployed yet). */
+  onDismiss: () => void;
   onComplete: () => void;
 };
 
@@ -53,11 +68,18 @@ export function BookingRequestModal({
   load,
   agencyUsers,
   currentUserId,
+  refetchLoads,
+  onDismiss,
   onComplete,
 }: BookingRequestModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [assignUserId, setAssignUserId] = useState(currentUserId);
+  const [dialogOpen, setDialogOpen] = useState(true);
+
+  useEffect(() => {
+    setDialogOpen(true);
+  }, [load.id]);
 
   useEffect(() => {
     if (agencyUsers.length === 0) {
@@ -81,31 +103,48 @@ export function BookingRequestModal({
   const confirmMutation = useMutation({
     mutationFn: async () => {
       const ln = load.load_number?.trim() || "—";
-      const smsText = `You're confirmed on Load #${ln}. Dispatcher will be in touch shortly.`;
+      const smsText = `You're confirmed on Load #${ln}. Your dispatcher will be in touch shortly. — D&L Transport`;
 
-      const { error: upErr } = await supabase
-        .from("loads")
-        .update({
-          sms_book_status: "booked",
-          booked_handled_at: isoTimestampNow(),
-          booked_handled_by: assignUserId,
-        })
-        .eq("id", load.id)
-        .eq("agency_id", load.agency_id);
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("claim_sms_booking_load", {
+        p_load_id: load.id,
+        p_load_number: load.load_number,
+      });
 
-      if (upErr) throw upErr;
+      if (rpcErr) {
+        console.error("[BookingRequestModal] claim_sms_booking_load transport error", rpcErr, {
+          code: rpcErr.code,
+          message: rpcErr.message,
+          details: rpcErr.details,
+          hint: rpcErr.hint,
+        });
+        throw rpcErr;
+      }
+
+      const claimed = readRpcResult(rpcData);
+      if (!claimed.ok) {
+        console.error("[BookingRequestModal] claim_sms_booking_load rejected", rpcData);
+        throw new Error(
+          [claimed.error, claimed.detail].filter(Boolean).join(": ") || "claim_failed",
+        );
+      }
 
       if (load.booked_by_phone?.trim()) {
         const sms = await sendBookingNotifySms(load.booked_by_phone.trim(), smsText);
         if (!sms.ok) {
-          await supabase
-            .from("loads")
-            .update({
-              sms_book_status: "pending_review",
-              booked_handled_at: null,
-              booked_handled_by: null,
-            })
-            .eq("id", load.id);
+          console.error("[BookingRequestModal] Claim SMS failed, reverting load", sms);
+          const { data: revData, error: revErr } = await supabase.rpc("revert_sms_booking_claim", {
+            p_load_id: load.id,
+            p_load_number: load.load_number,
+            p_prev_status: load.status || "open",
+          });
+          if (revErr) {
+            console.error("[BookingRequestModal] revert_sms_booking_claim error", revErr);
+          } else {
+            const rev = readRpcResult(revData);
+            if (!rev.ok) {
+              console.error("[BookingRequestModal] revert_sms_booking_claim rejected", revData);
+            }
+          }
           throw new Error(sms.error || "SMS send failed");
         }
       } else {
@@ -121,7 +160,8 @@ export function BookingRequestModal({
         meta: {
           load_id: load.id,
           load_number: load.load_number,
-          handled_by: assignUserId,
+          handled_by: currentUserId,
+          assigned_to: assignUserId,
           booked_by_phone: load.booked_by_phone,
         },
       });
@@ -135,12 +175,14 @@ export function BookingRequestModal({
     },
     onSuccess: () => {
       invalidate();
-      toast({ title: "Booking confirmed", description: "Driver notified and load updated." });
+      refetchLoads();
+      toast({ title: "Load claimed", description: "Driver notified and load updated." });
       onComplete();
     },
     onError: (e) => {
+      console.error("[BookingRequestModal] Claim mutation error", e);
       toast({
-        title: "Could not confirm booking",
+        title: "Could not claim load",
         description: getErrorMessage(e),
         variant: "destructive",
       });
@@ -150,29 +192,35 @@ export function BookingRequestModal({
   const declineMutation = useMutation({
     mutationFn: async () => {
       const smsText =
-        "Sorry, that load is no longer available. Contact dispatch for other options.";
+        "Sorry, that load is no longer available. Contact dispatch for other options. — D&L Transport";
 
-      const { error: upErr } = await supabase
-        .from("loads")
-        .update({
-          sms_book_status: "declined",
-          booked_handled_at: isoTimestampNow(),
-        })
-        .eq("id", load.id)
-        .eq("agency_id", load.agency_id);
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("decline_sms_booking_load", {
+        p_load_id: load.id,
+        p_load_number: load.load_number,
+      });
 
-      if (upErr) throw upErr;
+      if (rpcErr) {
+        console.error("[BookingRequestModal] decline_sms_booking_load transport error", rpcErr, {
+          code: rpcErr.code,
+          message: rpcErr.message,
+          details: rpcErr.details,
+          hint: rpcErr.hint,
+        });
+        throw rpcErr;
+      }
+
+      const declined = readRpcResult(rpcData);
+      if (!declined.ok) {
+        console.error("[BookingRequestModal] decline_sms_booking_load rejected", rpcData);
+        throw new Error(
+          [declined.error, declined.detail].filter(Boolean).join(": ") || "decline_failed",
+        );
+      }
 
       if (load.booked_by_phone?.trim()) {
         const sms = await sendBookingNotifySms(load.booked_by_phone.trim(), smsText);
         if (!sms.ok) {
-          await supabase
-            .from("loads")
-            .update({
-              sms_book_status: "pending_review",
-              booked_handled_at: null,
-            })
-            .eq("id", load.id);
+          console.error("[BookingRequestModal] Decline SMS failed — load already declined in DB", sms);
           throw new Error(sms.error || "SMS send failed");
         }
       } else {
@@ -201,10 +249,12 @@ export function BookingRequestModal({
     },
     onSuccess: () => {
       invalidate();
+      refetchLoads();
       toast({ title: "Booking declined", description: "Driver notified." });
       onComplete();
     },
     onError: (e) => {
+      console.error("[BookingRequestModal] Decline mutation error", e);
       toast({
         title: "Could not decline booking",
         description: getErrorMessage(e),
@@ -223,13 +273,14 @@ export function BookingRequestModal({
     .join(" → ");
 
   return (
-    <Dialog open={true} onOpenChange={() => {}}>
-      <DialogContent
-        className="max-w-md sm:max-w-lg [&>button]:hidden border-amber-500/40 shadow-lg shadow-amber-500/10"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+    <Dialog
+      open={dialogOpen}
+      onOpenChange={(open) => {
+        setDialogOpen(open);
+        if (!open) onDismiss();
+      }}
+    >
+      <DialogContent className="max-w-md sm:max-w-lg border-amber-500/40 shadow-lg shadow-amber-500/10">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <span aria-hidden>🚨</span>
@@ -301,7 +352,7 @@ export function BookingRequestModal({
             disabled={busy || !assignUserId || agencyUsers.length === 0}
             onClick={() => confirmMutation.mutate()}
           >
-            ✅ Confirm Booked
+            ✅ Claim
           </Button>
         </DialogFooter>
       </DialogContent>

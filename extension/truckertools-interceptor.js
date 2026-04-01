@@ -1,3 +1,4 @@
+console.log('[TruckingLane] Trucker Tools interceptor injected');
 /**
  * Trucker Tools (oldcastle.truckertools.com) — intercept getNearbyLoadsV5 fetch responses.
  * Loads a page-world script (fetch wrapper) from web_accessible_resources and relays to SW.

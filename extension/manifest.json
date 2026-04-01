@@ -18,7 +18,8 @@
     "https://one.dat.com/*",
     "http://187.77.217.123:3098/*",
     "https://axel.podlogix.io/*",
-    "https://oldcastle.truckertools.com/*"
+    "https://oldcastle.truckertools.com/*",
+    "https://*.truckertools.com/*"
   ],
   "externally_connectable": {
     "matches": [
@@ -49,7 +50,10 @@
   "web_accessible_resources": [
     {
       "resources": ["truckertools-page-hook.js"],
-      "matches": ["https://oldcastle.truckertools.com/*"]
+      "matches": [
+        "https://oldcastle.truckertools.com/*",
+        "https://*.truckertools.com/*"
+      ]
     }
   ],
   "content_scripts": [
@@ -59,7 +63,10 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://oldcastle.truckertools.com/*"],
+      "matches": [
+        "https://oldcastle.truckertools.com/*",
+        "https://*.truckertools.com/*"
+      ],
       "js": ["truckertools-interceptor.js"],
       "run_at": "document_start"
     }

@@ -26,6 +26,8 @@ import {
   ChevronRight,
   Package,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Filter,
   X,
   ExternalLink,
@@ -55,10 +57,13 @@ import {
   getAljexTemplateBadgeLabel,
   getLoadBoardClientPrimaryLabel,
 } from "@/lib/aljexLoadBoard";
+import { compareLoadsByStateThenCity, formatLaneStateCity } from "@/lib/loadTableDisplay";
 
 type Load = Tables<"loads">;
 
-type SortOption = "none" | "template_type" | "pickup_city" | "pickup_state" | "dest_city" | "dest_state";
+type ToolbarSortOption = "none" | "template_type";
+
+type LaneHeaderSort = { column: "pickup" | "delivery"; dir: "asc" | "desc" };
 
 interface LoadsTableProps {
   loads: Load[];
@@ -94,7 +99,8 @@ export function LoadsTable({
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
-  const [sortBy, setSortBy] = useState<SortOption>("none");
+  const [toolbarSort, setToolbarSort] = useState<ToolbarSortOption>("none");
+  const [laneSort, setLaneSort] = useState<LaneHeaderSort | null>(null);
   const [pickupStateFilter, setPickupStateFilter] = useState<string>("all");
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
@@ -188,31 +194,29 @@ export function LoadsTable({
       );
     }
     
-    // Apply sorting
-    if (sortBy !== "none") {
+    // Apply sorting: lane headers (state, then city) take precedence over toolbar
+    if (laneSort) {
+      result = [...result].sort((a, b) =>
+        compareLoadsByStateThenCity(a, b, laneSort.column, laneSort.dir),
+      );
+    } else if (toolbarSort === "template_type") {
       result = [...result].sort((a, b) => {
-        if (sortBy === "template_type") {
-          // Custom order: VMS first, then Adelphia, then Aljex
-          const templateOrder: Record<string, number> = {
-            vms_email: 1,
-            adelphia_xlsx: 2,
-            aljex_flat: 3,
-            aljex_big500: 3,
-            aljex_spot: 4,
-            oldcastle_gsheet: 5,
-          };
-          const aOrder = templateOrder[a.template_type] || 99;
-          const bOrder = templateOrder[b.template_type] || 99;
-          return aOrder - bOrder;
-        }
-        const aVal = (a[sortBy] || "").toLowerCase();
-        const bVal = (b[sortBy] || "").toLowerCase();
-        return aVal.localeCompare(bVal);
+        const templateOrder: Record<string, number> = {
+          vms_email: 1,
+          adelphia_xlsx: 2,
+          aljex_flat: 3,
+          aljex_big500: 3,
+          aljex_spot: 4,
+          oldcastle_gsheet: 5,
+        };
+        const aOrder = templateOrder[a.template_type] || 99;
+        const bOrder = templateOrder[b.template_type] || 99;
+        return aOrder - bOrder;
       });
     }
-    
+
     return result;
-  }, [loadsExcludingArchived, clientFilter, pickupStateFilter, destStateFilter, sortBy]);
+  }, [loadsExcludingArchived, clientFilter, pickupStateFilter, destStateFilter, toolbarSort, laneSort]);
 
   const filteredIds = useMemo(
     () => filteredAndSortedLoads.map((l) => l.id),
@@ -342,6 +346,16 @@ export function LoadsTable({
     setDestStateFilter("all");
   };
 
+  const handleLaneHeaderClick = (column: "pickup" | "delivery") => {
+    setToolbarSort("none");
+    setLaneSort((prev) => {
+      if (prev?.column !== column) {
+        return { column, dir: "asc" };
+      }
+      return { column, dir: prev.dir === "asc" ? "desc" : "asc" };
+    });
+  };
+
   const statusStyles: Record<string, string> = {
     open: "bg-[hsl(25,95%,53%)]/15 text-[hsl(25,95%,40%)] border-[hsl(25,95%,53%)]/30",
     claimed: "bg-[hsl(210,80%,50%)]/15 text-[hsl(210,80%,40%)] border-[hsl(210,80%,50%)]/30",
@@ -408,17 +422,19 @@ export function LoadsTable({
         <div className="flex items-center gap-2">
           <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Sort:</span>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <Select
+            value={toolbarSort}
+            onValueChange={(v) => {
+              setToolbarSort(v as ToolbarSortOption);
+              setLaneSort(null);
+            }}
+          >
             <SelectTrigger className="w-[160px] h-8 text-sm bg-background">
               <SelectValue placeholder="No sorting" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="none">No sorting</SelectItem>
               <SelectItem value="template_type">Client</SelectItem>
-              <SelectItem value="pickup_city">Pickup City (A-Z)</SelectItem>
-              <SelectItem value="pickup_state">Pickup State (A-Z)</SelectItem>
-              <SelectItem value="dest_city">Delivery City (A-Z)</SelectItem>
-              <SelectItem value="dest_state">Delivery State (A-Z)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -506,7 +522,7 @@ export function LoadsTable({
         <TableHeader>
           <TableRow className="bg-muted/50 border-b border-border">
             {enableOpenLoadActions && (
-              <TableHead className="w-10 pl-3">
+              <TableHead className="w-10 pl-3 text-center align-middle">
                 <Checkbox
                   disabled={filteredIds.length === 0}
                   checked={
@@ -523,16 +539,66 @@ export function LoadsTable({
                 />
               </TableHead>
             )}
-            <TableHead className="w-10"></TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Load #</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Client</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Ship Date</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Pickup</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Delivery</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">Invoice</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-right">Target Pay</TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Status</TableHead>
-            <TableHead className={enableOpenLoadActions ? "w-[100px] text-xs uppercase tracking-wide font-medium text-muted-foreground" : "w-[60px] text-xs uppercase tracking-wide font-medium text-muted-foreground"}>
+            <TableHead className="w-10 text-center align-middle" />
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Load #
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Client
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Ship Date
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              <button
+                type="button"
+                onClick={() => handleLaneHeaderClick("pickup")}
+                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
+                aria-label="Sort by pickup state"
+              >
+                Pickup
+                {laneSort?.column === "pickup" ? (
+                  laneSort.dir === "asc" ? (
+                    <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )
+                ) : null}
+              </button>
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              <button
+                type="button"
+                onClick={() => handleLaneHeaderClick("delivery")}
+                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
+                aria-label="Sort by delivery state"
+              >
+                Delivery
+                {laneSort?.column === "delivery" ? (
+                  laneSort.dir === "asc" ? (
+                    <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )
+                ) : null}
+              </button>
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Invoice
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Target Pay
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+              Status
+            </TableHead>
+            <TableHead
+              className={
+                enableOpenLoadActions
+                  ? "w-[100px] text-xs uppercase tracking-wide font-medium text-muted-foreground text-center"
+                  : "w-[60px] text-xs uppercase tracking-wide font-medium text-muted-foreground text-center"
+              }
+            >
               Actions
             </TableHead>
           </TableRow>
@@ -584,14 +650,14 @@ export function LoadsTable({
                   </TableCell>
                   <TableCell>{load.ship_date || "—"}</TableCell>
                   <TableCell>
-                    {load.pickup_city && load.pickup_state
-                      ? `${load.pickup_city}, ${load.pickup_state}`
-                      : load.pickup_location_raw || "—"}
+                    {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
+                      load.pickup_location_raw ??
+                      "—"}
                   </TableCell>
                   <TableCell>
-                    {load.dest_city && load.dest_state
-                      ? `${load.dest_city}, ${load.dest_state}`
-                      : load.dest_location_raw || "—"}
+                    {formatLaneStateCity(load.dest_state, load.dest_city) ??
+                      load.dest_location_raw ??
+                      "—"}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {(() => {

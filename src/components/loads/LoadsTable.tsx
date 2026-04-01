@@ -57,7 +57,12 @@ import {
   getAljexTemplateBadgeLabel,
   getLoadBoardClientPrimaryLabel,
 } from "@/lib/aljexLoadBoard";
-import { compareLoadsByStateThenCity, formatLaneStateCity } from "@/lib/loadTableDisplay";
+import {
+  compareLoadsByStateThenCity,
+  formatLaneStateCity,
+  LOADS_TABLE_DENSE_CLASS,
+  LOADS_TABLE_TOOLBAR_CLASS,
+} from "@/lib/loadTableDisplay";
 
 type Load = Tables<"loads">;
 
@@ -412,16 +417,16 @@ export function LoadsTable({
     <>
     <div
       className={cn(
-        "rounded-lg border border-border bg-card overflow-hidden",
+        "w-full rounded-lg border border-border bg-card overflow-hidden",
         enableOpenLoadActions && selectedCount > 0 && "pb-16",
       )}
     >
       {/* Sort & Filter Controls */}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-border bg-muted/30">
+      <div className={LOADS_TABLE_TOOLBAR_CLASS}>
         {/* Sort */}
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Sort:</span>
+        <div className="flex items-center gap-1.5">
+          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">Sort:</span>
           <Select
             value={toolbarSort}
             onValueChange={(v) => {
@@ -429,7 +434,7 @@ export function LoadsTable({
               setLaneSort(null);
             }}
           >
-            <SelectTrigger className="w-[160px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-[140px] h-7 text-xs bg-background">
               <SelectValue placeholder="No sorting" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -442,11 +447,11 @@ export function LoadsTable({
         <div className="h-6 w-px bg-border hidden sm:block" />
 
         {/* Filter by Client */}
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Client:</span>
+        <div className="flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">Client:</span>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[110px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-[100px] h-7 text-xs bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -462,10 +467,10 @@ export function LoadsTable({
         </div>
 
         {/* Filter by Pickup State */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Pickup:</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="w-[100px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-[92px] h-7 text-xs bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -480,10 +485,10 @@ export function LoadsTable({
         </div>
 
         {/* Filter by Delivery State */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Delivery:</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Delivery:</span>
           <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-            <SelectTrigger className="w-[100px] h-8 text-sm bg-background">
+            <SelectTrigger className="w-[92px] h-7 text-xs bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent className="bg-popover max-h-[300px]">
@@ -503,7 +508,7 @@ export function LoadsTable({
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4 mr-1" />
             Clear
@@ -517,12 +522,13 @@ export function LoadsTable({
           </span>
         )}
       </div>
-      
-      <Table>
+
+      <div className="w-full min-w-0 overflow-x-auto">
+        <Table className={LOADS_TABLE_DENSE_CLASS}>
         <TableHeader>
           <TableRow className="bg-muted/50 border-b border-border">
             {enableOpenLoadActions && (
-              <TableHead className="w-10 pl-3 text-center align-middle">
+              <TableHead className="w-8 px-0.5 text-center align-middle">
                 <Checkbox
                   disabled={filteredIds.length === 0}
                   checked={
@@ -539,17 +545,17 @@ export function LoadsTable({
                 />
               </TableHead>
             )}
-            <TableHead className="w-10 text-center align-middle" />
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="w-8 px-0.5 text-center align-middle" />
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Load #
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Client
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Ship Date
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               <button
                 type="button"
                 onClick={() => handleLaneHeaderClick("pickup")}
@@ -566,7 +572,7 @@ export function LoadsTable({
                 ) : null}
               </button>
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               <button
                 type="button"
                 onClick={() => handleLaneHeaderClick("delivery")}
@@ -583,20 +589,20 @@ export function LoadsTable({
                 ) : null}
               </button>
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Invoice
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Target Pay
             </TableHead>
-            <TableHead className="text-xs uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Status
             </TableHead>
             <TableHead
               className={
                 enableOpenLoadActions
-                  ? "w-[100px] text-xs uppercase tracking-wide font-medium text-muted-foreground text-center"
-                  : "w-[60px] text-xs uppercase tracking-wide font-medium text-muted-foreground text-center"
+                  ? "w-[88px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center"
+                  : "w-14 text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center"
               }
             >
               Actions
@@ -615,7 +621,7 @@ export function LoadsTable({
                 >
                   {enableOpenLoadActions && (
                     <TableCell
-                      className="w-10 pl-3"
+                      className="w-8 px-0.5 text-center align-middle"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Checkbox
@@ -625,63 +631,69 @@ export function LoadsTable({
                       />
                     </TableCell>
                   )}
-                  <TableCell>
-                    {expandedId === load.id ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
+                  <TableCell className="w-8 px-0.5 text-center align-middle">
+                    <span className="inline-flex justify-center">
+                      {expandedId === load.id ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                    </span>
                   </TableCell>
-                  <TableCell className="font-medium">{load.load_number || "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className="text-xs font-medium">
+                  <TableCell className="text-center font-medium tabular-nums">
+                    {load.load_number || "—"}
+                  </TableCell>
+                  <TableCell className="text-center align-middle">
+                    <div className="flex flex-nowrap items-center justify-center gap-0.5 min-w-0">
+                      <Badge variant="outline" className="text-[10px] font-medium h-5 px-1 shrink-0">
                         {getLoadBoardClientPrimaryLabel(load.template_type)}
                       </Badge>
                       {aljexTemplateBadge ? (
                         <Badge
                           variant="secondary"
-                          className="h-5 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+                          className="h-5 px-1 py-0 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0"
                         >
                           {aljexTemplateBadge}
                         </Badge>
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell>{load.ship_date || "—"}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center tabular-nums">{load.ship_date || "—"}</TableCell>
+                  <TableCell className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate" title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}>
                     {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
                       load.pickup_location_raw ??
                       "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate" title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}>
                     {formatLaneStateCity(load.dest_state, load.dest_city) ??
                       load.dest_location_raw ??
                       "—"}
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-center font-medium tabular-nums">
                     {(() => {
                       const rate = formatRate(load);
                       return (
                         <>
                           {rate.display}
-                          {rate.isPerTon && <span className="text-xs text-muted-foreground ml-1">/ ton</span>}
+                          {rate.isPerTon && <span className="text-[10px] text-muted-foreground ml-0.5">/ ton</span>}
                         </>
                       );
                     })()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center tabular-nums">
                     {load.target_pay && load.target_pay > 0
                       ? `$${load.target_pay.toLocaleString()}`
                       : "TBD"}
                   </TableCell>
-                  <TableCell>
-                    <Badge className={statusStyles[load.status] || statusStyles.open}>
-                      {load.status === "booked" ? "Booked" : load.status === "closed" ? "Closed" : load.status === "claimed" ? "Claimed" : "Open"}
-                    </Badge>
+                  <TableCell className="text-center align-middle">
+                    <div className="flex justify-center">
+                      <Badge className={`${statusStyles[load.status] || statusStyles.open} text-[10px] h-5 px-1.5`}>
+                        {load.status === "booked" ? "Booked" : load.status === "closed" ? "Closed" : load.status === "claimed" ? "Claimed" : "Open"}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-0.5 justify-end">
+                    <div className="flex items-center gap-0.5 justify-center">
                       {enableOpenLoadActions && (() => {
                         const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
                         const isPosted =
@@ -752,7 +764,8 @@ export function LoadsTable({
           })}
         </TableBody>
       </Table>
-      
+      </div>
+
       {/* Load More / Show All */}
       {filteredAndSortedLoads.length > displayCount && (
         <div className="flex items-center justify-center gap-3 py-4 border-t border-border">

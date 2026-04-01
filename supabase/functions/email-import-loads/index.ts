@@ -318,7 +318,7 @@ function calculateRateFields(rateRaw: number | null, weightLbs: number | null, i
 }
 
 // ============= CENTURY PDF (Claude) =============
-const CENTURY_CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const CENTURY_CLAUDE_MODEL = "claude-sonnet-4-5";
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -422,7 +422,7 @@ contains_bales: true if the word BALES appears anywhere (any case), else false.`
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": anthropicKey,
+      'x-api-key': anthropicKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
@@ -1004,7 +1004,8 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+  console.log('Anthropic key prefix:', anthropicKey?.slice(0, 10));
 
   const supabase = createClient(supabaseUrl, supabaseKey);
   const resend = resendApiKey ? new Resend(resendApiKey) : null;

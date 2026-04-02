@@ -699,12 +699,14 @@ async function syncDatToken() {
 // ── TRUCKER TOOLS: webRequest sees getNearbyLoadsV5 on oldcastle → store URL + Authorization,
 // then onCompleted debounce-refetch from SW (same as poll). Mapping: truckertools-tt-map.js.
 
-const TT_WEBREQUEST_FILTER = { urls: ['https://oldcastle.truckertools.com/*'] };
+const TT_WEBREQUEST_FILTER = {
+  urls: ['https://oldcastle.truckertools.com/*', 'https://api.truckertools.com/*'],
+};
 
 function ttRequestUrlMatches(url) {
   return (
     typeof url === 'string' &&
-    url.includes('oldcastle.truckertools.com') &&
+    (url.includes('oldcastle.truckertools.com') || url.includes('api.truckertools.com')) &&
     url.includes('getNearbyLoadsV5')
   );
 }

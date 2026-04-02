@@ -21,6 +21,7 @@
     "http://187.77.217.123:3098/*",
     "https://axel.podlogix.io/*",
     "https://oldcastle.truckertools.com/*",
+    "https://api.truckertools.com/*",
     "https://*.truckertools.com/*"
   ],
   "externally_connectable": {

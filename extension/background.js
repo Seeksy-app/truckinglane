@@ -1,6 +1,6 @@
 importScripts('truckertools-tt-map.js');
 
-const VPS_URL = 'http://187.77.217.123:3098';
+const VPS_URL = 'https://axel.podlogix.io/tl';
 const TRIGGER_KEY = 'tl-trigger-7b747d391801b8e5f55b4542';
 const SUPABASE_URL = 'https://vjgakkomhphvdbwjjwiv.supabase.co';
 const SYNC_INTERVAL_MINUTES = 30;

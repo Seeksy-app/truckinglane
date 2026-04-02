@@ -654,14 +654,25 @@ async function syncDatToken() {
 
 async function pushTruckerToolsLoadsToVps(mappedLoads) {
   if (!mappedLoads || mappedLoads.length === 0) return null;
-  console.log('[TT MAP] First mapped load:', JSON.stringify(mappedLoads[0], null, 2));
+  // Mapping sets template_type to truckertools (truckertools-tt-map.js), not aljex_big500.
+  for (const load of mappedLoads) {
+    if (load?.template_type && load.template_type !== 'truckertools') {
+      console.warn('[truckertools] expected template_type truckertools, got:', load.template_type);
+    }
+  }
+  const payloads = mappedLoads.map((load) => {
+    if (!load || typeof load !== 'object') return load;
+    const { source_row: _sr, ...rest } = load;
+    return rest;
+  });
+  console.log('[TT MAP] First load (VPS payload, no source_row):', JSON.stringify(payloads[0], null, 2));
   const res = await fetch(`${VPS_URL}/insert-aljex-loads`, {
     method: 'POST',
     headers: {
       'X-TL-Trigger-Key': TRIGGER_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ loads: mappedLoads }),
+    body: JSON.stringify({ loads: payloads }),
   });
   const text = await res.text();
   console.log(`[truckertools] VPS insert: ${res.status} ${text.slice(0, 200)}`);

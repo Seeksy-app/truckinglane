@@ -396,6 +396,27 @@ async function syncAljexWithScrape() {
 // ── INJECTED INTO ALJEX TAB ───────────────────────────────────
 function scrapeAljexLoads() {
   const loads = [];
+  function aljexTargetMaxPay(isPerTon, customerInvoiceTotal, rateRaw) {
+    const inv = Number(customerInvoiceTotal);
+    const hasInv = Number.isFinite(inv) && inv > 0;
+    if (!hasInv) {
+      return { target_pay: 0, max_pay: 0 };
+    }
+    if (isPerTon) {
+      const r = Number(rateRaw);
+      if (!Number.isFinite(r) || r <= 0) {
+        return { target_pay: 0, max_pay: 0 };
+      }
+      return {
+        target_pay: Math.round(r - 10),
+        max_pay: Math.round(r - 8),
+      };
+    }
+    return {
+      target_pay: Math.round(inv * 0.8),
+      max_pay: Math.round(inv * 0.85),
+    };
+  }
   try {
     // Status is in the TD class attribute, not textContent
     const statusCells = document.querySelectorAll('td.OPEN, td.COVERED');
@@ -432,6 +453,11 @@ function scrapeAljexLoads() {
       const weightRaw = cells[12]?.textContent?.trim() || '';
       const weightNum = parseFloat(weightRaw.replace(/[^0-9.]/g, '')) || null;
 
+      const isPerTonBig = false;
+      const customerInvoiceBig = 0;
+      const rateRawBig = null;
+      const payBig = aljexTargetMaxPay(isPerTonBig, customerInvoiceBig, rateRawBig);
+
       const load = {
         agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
         template_type: 'aljex_big500',
@@ -446,6 +472,11 @@ function scrapeAljexLoads() {
         ship_date: cells[6]?.textContent?.trim() || null,
         trailer_type: cells[11]?.textContent?.trim() || '',
         weight_lbs: weightNum,
+        is_per_ton: isPerTonBig,
+        rate_raw: rateRawBig,
+        customer_invoice_total: customerInvoiceBig,
+        target_pay: payBig.target_pay,
+        max_pay: payBig.max_pay,
         is_active: true,
         status: 'open',
         source_row: JSON.stringify({customer, scraped_from: 'chrome_extension', scraped_at: new Date().toISOString()})
@@ -485,7 +516,9 @@ function scrapeAljexLoads() {
       const weightRaw = cells[6]?.textContent?.trim() || '';
       const weightNum = parseFloat(weightRaw.replace(/[^0-9.]/g, '')) || null;
       const rateNum = parseFloat(customerRate.replace(/[^0-9.]/g, '')) || 0;
-      const carrierNum = parseFloat(carrierRate.replace(/[^0-9.]/g, '')) || 0;
+      const isPerTonSpot = false;
+      const rateRawSpot = rateNum;
+      const paySpot = aljexTargetMaxPay(isPerTonSpot, rateNum, rateRawSpot);
 
       loads.push({
         agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
@@ -493,9 +526,11 @@ function scrapeAljexLoads() {
         load_number: spotNum,
         dispatch_status: 'open',
         status: 'open',
+        is_per_ton: isPerTonSpot,
+        rate_raw: rateRawSpot,
         customer_invoice_total: rateNum,
-        target_pay: carrierNum,
-        max_pay: carrierNum,
+        target_pay: paySpot.target_pay,
+        max_pay: paySpot.max_pay,
         pickup_city: originCity,
         pickup_state: originState,
         pickup_location_raw: originRaw,

@@ -665,12 +665,32 @@ function generateLoadCallScript(load: Record<string, unknown>): string {
   const rateStr = isPerTon ? `$${rate}/ton` : `$${rate} flat`;
   const invoiceTotal = load.customer_invoice_total;
   const invoiceStr = invoiceTotal ? `$${Number(invoiceTotal).toFixed(2)}` : "n/a";
-  const notes = load.commodity || load.notes || "";
-  
+  const sr = load.source_row && typeof load.source_row === "object" && !Array.isArray(load.source_row)
+    ? (load.source_row as Record<string, unknown>)
+    : null;
+  const vmsNotes = sr && typeof sr.vms_line_notes === "string" ? sr.vms_line_notes.trim() : "";
+  const notes =
+    vmsNotes ||
+    (typeof load.notes === "string" ? load.notes.trim() : "") ||
+    "";
+
   return `Load ${loadNumber}: Pickup ${pickupRaw}. Deliver ${destRaw}. Delivery ${deliveryDate}. Weight ${weightLbs} lbs. Length ${lengthFt} ft. Tarp ${tarpRequired}. Rate ${rateStr}. Invoice est ${invoiceStr}. Notes: ${notes}`;
 }
 
 // ============= VMS EMAIL BODY PARSER =============
+
+/** Strip routing / FSC tail from the commodity segment (regex may over-capture on odd lines). */
+function vmsCommodityNameOnly(raw: string): string {
+  let s = raw.trim();
+  if (!s) return s;
+  const fscAt = s.search(/\bfsc\b/i);
+  if (fscAt >= 0) s = s.slice(0, fscAt).trim();
+  const spacedDash = s.indexOf(" - ");
+  if (spacedDash >= 0) s = s.slice(0, spacedDash).trim();
+  const dash = s.indexOf("-");
+  if (dash >= 0) s = s.slice(0, dash).trim();
+  return s.trim();
+}
 
 // Generate a simple hash for deterministic load number generation
 function simpleHash(str: string): string {
@@ -742,7 +762,7 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const count = parseInt(match[1], 10);
     const pickupCity = match[2].trim();
     const pickupState = match[3].toUpperCase();
-    const commodityRaw = match[4].trim().toLowerCase();
+    const commodityRaw = vmsCommodityNameOnly(match[4]).toLowerCase();
     const destCity = match[5].trim();
     const destState = match[6].toUpperCase();
     const rateRaw = parseFloat(match[7].replace(/,/g, ''));
@@ -751,7 +771,8 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const trailerType = rateDenom != null && rateDenom > 0 ? "Van" : "Flatbed";
     
     // Normalize commodity - "cars" or "bales" = "Crushed Cars"
-    const commodity = (commodityRaw === 'cars' || commodityRaw === 'bales') ? 'Crushed Cars' : commodityRaw;
+    const commodity =
+      commodityRaw === "cars" || commodityRaw === "bales" ? "Crushed Cars" : commodityRaw;
     
     // Fixed weight of 47,000 lbs per user specification
     const weightLbs = 47000;
@@ -804,13 +825,10 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
           load_instance: i + 1,
           total_instances: count,
           rate_per_unit_denom: rateDenom,
+          ...(notes ? { vms_line_notes: notes } : {}),
         },
       };
-      
-      if (notes) {
-        baseLoad.commodity = `${commodity} - ${notes}`;
-      }
-      
+
       baseLoad.load_call_script = generateLoadCallScript(baseLoad);
       
       loads.push(baseLoad);

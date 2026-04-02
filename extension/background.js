@@ -6,8 +6,14 @@ const SUPABASE_URL = 'https://vjgakkomhphvdbwjjwiv.supabase.co';
 const SYNC_INTERVAL_MINUTES = 30;
 
 const TRUCKERTOOLS_ALARM = 'truckertools-nearby';
+/** Must match TRUCKERTOOLS_ALARM period (re-scheduled on install + browser startup for reliable MV3 SW). */
+const TRUCKERTOOLS_POLL_INTERVAL_MINUTES = 30;
 const TRUCKERTOOLS_ADVANTAGE_ID = 'oc6bt2hs';
 const TRUCKERTOOLS_USERNAME = 'andrew@podlogix.co';
+
+function scheduleTruckerToolsAlarm() {
+  chrome.alarms.create(TRUCKERTOOLS_ALARM, { periodInMinutes: TRUCKERTOOLS_POLL_INTERVAL_MINUTES });
+}
 
 /** Parse "N unique loads" from parse-big500.py stdout returned as JSON message. */
 function parseBig500UniqueLoadsCount(result) {
@@ -22,9 +28,14 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.clear('cookie-sync');
   chrome.alarms.create('auto-sync', { periodInMinutes: SYNC_INTERVAL_MINUTES });
-  chrome.alarms.create(TRUCKERTOOLS_ALARM, { periodInMinutes: 30 });
+  scheduleTruckerToolsAlarm();
   // chrome.alarms.create('cookie-sync', { periodInMinutes: 25 });
   runFullSync();
+});
+
+/** Re-register alarm after browser restart (alarms persist, but this guarantees the 30m schedule is defined). */
+chrome.runtime.onStartup.addListener(() => {
+  scheduleTruckerToolsAlarm();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -854,10 +865,28 @@ function normalizeAuthHeader(token) {
   return `Bearer ${t}`;
 }
 
+/**
+ * TRUCKERTOOLS_ALARM (~30m): read truckertools_token + truckertools_nearby_url from chrome.storage.local,
+ * POST getNearbyLoadsV5, mapTruckerToolsResponseToLoads, then pushTruckerToolsLoadsToVps (via ingest).
+ */
 async function pollTruckerToolsNearby() {
   try {
-    await ingestTruckerToolsNearbyFromStoredCredentials();
-  } catch {
-    /* skip silently until next visit or alarm */
+    const result = await ingestTruckerToolsNearbyFromStoredCredentials();
+    if (result?.skipped) {
+      console.log('[truckertools] poll: skipped (set token/URL by opening oldcastle Trucker Tools first)');
+      return;
+    }
+    if (result?.parseError) {
+      console.warn('[truckertools] poll: could not parse JSON response');
+      return;
+    }
+    const n = result?.loadsCount ?? 0;
+    const st = result?.vpsStatus;
+    console.log(
+      `[truckertools] poll: ${n} load(s) mapped` +
+        (st != null ? `, VPS insert HTTP ${st}` : ''),
+    );
+  } catch (e) {
+    console.warn('[truckertools] poll error:', e?.message || e);
   }
 }

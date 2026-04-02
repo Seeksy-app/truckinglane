@@ -1673,12 +1673,9 @@ Deno.serve(async (req) => {
           const tonsPositive = tons > 0;
           const weightLbs = tonsPositive ? Math.round(tons * 2000) : null;
           const customerInvoiceTotal = tonsPositive ? Math.round(ratePerTon * tons) : 0;
-          const targetPay = tonsPositive
-            ? Math.round(customerInvoiceTotal * 0.8)
-            : Math.round(Math.max(0, ratePerTon - 10));
-          const maxPay = tonsPositive
-            ? Math.round(customerInvoiceTotal * 0.85)
-            : Math.round(Math.max(0, ratePerTon - 5));
+          // Per-ton loads: target/max are $/ton off rate, not % of invoice
+          const targetPay = Math.round(Math.max(0, ratePerTon - 10));
+          const maxPay = Math.round(Math.max(0, ratePerTon - 5));
           const targetCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.2) : 0;
           const maxCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.15) : 0;
 

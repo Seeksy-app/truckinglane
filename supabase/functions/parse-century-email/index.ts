@@ -263,6 +263,8 @@ Deno.serve(async (req) => {
       const h = await hash3(ext.pickup_state, ext.dest_state, `${j}-${ext.pickup_city}-${ext.dest_city}`);
       const loadNumber = `CENT-${ext.pickup_state}-${ext.dest_state}-${h}`;
       const commodity = ext.contains_bales ? "baled aluminum" : "crushed cars";
+      const targetPay = Math.round(Math.max(0, rate - 10));
+      const maxPay = Math.round(Math.max(0, rate - 5));
 
       finalRows.push({
         agency_id: CENTURY_AGENCY_ID,
@@ -284,8 +286,12 @@ Deno.serve(async (req) => {
         weight_lbs: null,
         is_per_ton: true,
         customer_invoice_total: 0,
-        target_pay: Math.round(rate - 10),
-        max_pay: Math.round(rate - 5),
+        target_pay: targetPay,
+        max_pay: maxPay,
+        target_commission: 0,
+        max_commission: 0,
+        commission_target_pct: 0.2,
+        commission_max_pct: 0.15,
         rate_raw: rate,
         commodity,
         dispatch_status: "pending",

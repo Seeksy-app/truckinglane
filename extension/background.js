@@ -393,6 +393,7 @@ function scrapeAljexLoads() {
       const weightNum = parseFloat(weightRaw.replace(/[^0-9.]/g, '')) || null;
 
       const load = {
+        agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
         template_type: 'aljex_big500',
         load_number: proNum,
         dispatch_status: status.toLowerCase() === 'open' ? 'open' : status.toLowerCase(),
@@ -447,6 +448,7 @@ function scrapeAljexLoads() {
       const carrierNum = parseFloat(carrierRate.replace(/[^0-9.]/g, '')) || 0;
 
       loads.push({
+        agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
         template_type: 'aljex_spot',
         load_number: spotNum,
         dispatch_status: 'open',

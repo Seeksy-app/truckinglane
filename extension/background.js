@@ -127,7 +127,41 @@ async function uploadBig500(downloadItem, aljexTab) {
   }
 }
 
+async function handleTruckerToolsInterceptedMessage(msg) {
+  const url = String(msg.url || '').trim();
+  if (url) {
+    await chrome.storage.local.set({ truckertools_nearby_url: url });
+  }
+  const loadsArray = Array.isArray(msg.loads) ? msg.loads : [];
+  const mapped = mapTruckerToolsResponseToLoads(loadsArray);
+  let vpsStatus = null;
+  if (mapped.length > 0) {
+    vpsStatus = await pushTruckerToolsLoadsToVps(mapped);
+  }
+  const ttOk =
+    mapped.length === 0 ||
+    (vpsStatus != null && vpsStatus >= 200 && vpsStatus < 300);
+  await chrome.storage.local.set({
+    lastTruckerToolsSync: new Date().toISOString(),
+    truckerToolsLoadsCount: mapped.length,
+    truckerToolsOk: ttOk,
+  });
+  return { vpsStatus, loadsCount: mapped.length };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === 'truckertools-intercepted') {
+    handleTruckerToolsInterceptedMessage(msg)
+      .then((r) =>
+        sendResponse({
+          ok: true,
+          status: r?.vpsStatus ?? null,
+          loadsCount: r?.loadsCount ?? 0,
+        }),
+      )
+      .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
+    return true;
+  }
   if (msg.action === 'sync-now') {
     Promise.all([
       runFullSync(),
@@ -696,8 +730,8 @@ async function syncDatToken() {
   }
 }
 
-// ── TRUCKER TOOLS: webRequest sees getNearbyLoadsV5 on oldcastle → store URL + Authorization,
-// then onCompleted debounce-refetch from SW (same as poll). Mapping: truckertools-tt-map.js.
+// ── TRUCKER TOOLS: page fetch hook (tt_loads_captured → truckertools-intercepted) maps + VPS;
+// webRequest fallback stores URL/token and refetches via ingest. Mapping: truckertools-tt-map.js.
 
 const TT_WEBREQUEST_FILTER = {
   urls: ['https://oldcastle.truckertools.com/*', 'https://api.truckertools.com/*'],

@@ -9,6 +9,13 @@ const TRUCKERTOOLS_ALARM = 'truckertools-nearby';
 const TRUCKERTOOLS_ADVANTAGE_ID = 'oc6bt2hs';
 const TRUCKERTOOLS_USERNAME = 'andrew@podlogix.co';
 
+/** Parse "N unique loads" from parse-big500.py stdout returned as JSON message. */
+function parseBig500UniqueLoadsCount(result) {
+  const msg = String((result && (result.message || result.output)) || '');
+  const m = msg.match(/(\d+)\s+unique\s+loads/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // Supabase anon key for TruckingLanes
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZ2Fra29taHBodmRid2pqd2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTIzNjMsImV4cCI6MjA4MjA2ODM2M30.mQRJK5Bj04P-hxwIWkVxG7lXiXI4daMs59UuxU2w1Ow';
 
@@ -92,13 +99,16 @@ async function uploadBig500(downloadItem, aljexTab) {
       body: csvText
     });
     
-    const result = await res.json();
-    console.log('TruckingLane: Big 500 upload result:', result.output);
+    const result = await res.json().catch(() => ({}));
+    const count = res.ok ? parseBig500UniqueLoadsCount(result) : null;
+    console.log('TruckingLane: Big 500 upload result:', result.message || result.output);
     
     // Update status
     await chrome.storage.local.set({
       lastBig500Sync: new Date().toISOString(),
-      lastBig500Status: result.output
+      lastBig500Status: result.message || result.output || '',
+      lastBig500Ok: res.ok,
+      ...(count != null ? { lastBig500LoadsCount: count } : {}),
     });
     
   } catch(err) {
@@ -120,9 +130,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.action === 'sync-now') {
-    runFullSync()
-      .then(() => pollTruckerToolsNearby())
-      .then(() => sendResponse({ success: true }));
+    Promise.all([
+      runFullSync(),
+      triggerBig500Export().catch((e) => console.log('Big 500 sync error:', e.message)),
+      pollTruckerToolsNearby().catch((e) => console.log('Trucker Tools poll error:', e.message)),
+    ]).then(() => sendResponse({ success: true }));
     return true;
   }
   if (msg.action === 'get-unsubmitted-loads') {
@@ -178,7 +190,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.action === 'get-status') {
-    chrome.storage.local.get(['lastSync', 'lastStatus', 'aljexOk', 'datOk', 'loadsScraped'], sendResponse);
+    chrome.storage.local.get(
+      [
+        'lastSync',
+        'lastStatus',
+        'aljexOk',
+        'datOk',
+        'loadsScraped',
+        'lastBig500Sync',
+        'lastBig500Ok',
+        'lastBig500LoadsCount',
+        'lastSpotScrapeAt',
+        'spotLoadsCount',
+        'spotScrapeOk',
+        'lastTruckerToolsSync',
+        'truckerToolsLoadsCount',
+        'truckerToolsOk',
+      ],
+      sendResponse,
+    );
     return true;
   }
   if (msg.action === 'push-to-aljex') {
@@ -209,13 +239,15 @@ async function runFullSync() {
     syncDatToken()
   ]);
   
-  // Also trigger Big 500 export
-  // triggerBig500Export().catch(e => console.log('Big 500 trigger error:', e.message));
-  // triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message));
+  // triggerBig500Export / pollTruckerToolsNearby run from sync-now in parallel with this.
 
+  let spotLoadsCount = 0;
+  let spotScrapeOk = false;
   if (aljexResult.status === 'fulfilled') {
     results.aljex = aljexResult.value.ok;
     results.loads = aljexResult.value.loads || 0;
+    spotLoadsCount = aljexResult.value.spotLoadsCount ?? 0;
+    spotScrapeOk = aljexResult.value.ok === true;
   }
   results.dat = datResult.status === 'fulfilled' && datResult.value;
 
@@ -225,7 +257,10 @@ async function runFullSync() {
     lastStatus: status,
     aljexOk: results.aljex,
     datOk: results.dat,
-    loadsScraped: results.loads
+    loadsScraped: results.loads,
+    lastSpotScrapeAt: results.timestamp,
+    spotLoadsCount,
+    spotScrapeOk,
   });
 
   console.log('Sync complete:', status);
@@ -293,7 +328,7 @@ async function syncAljexWithScrape() {
     
     if (tabs.length === 0) {
       console.log('No Aljex tab open - cannot scrape loads');
-      return { ok: false, loads: 0 };
+      return { ok: false, loads: 0, spotLoadsCount: 0 };
     }
 
     // Inject scraper into the Aljex tab
@@ -303,16 +338,19 @@ async function syncAljexWithScrape() {
     });
 
     const loads = results[0]?.result || [];
-    console.log(`Scraped ${loads.length} loads from Aljex`);
+    const spotLoadsCount = loads.filter(
+      (l) => l && String(l.template_type || '') === 'aljex_spot',
+    ).length;
+    console.log(`Scraped ${loads.length} loads from Aljex (${spotLoadsCount} spot)`);
 
     if (loads.length > 0) {
       await pushLoadsToSupabase(loads);
     }
 
-    return { ok: true, loads: loads.length };
+    return { ok: true, loads: loads.length, spotLoadsCount };
   } catch (err) {
     console.log('Aljex scrape error:', err.message);
-    return { ok: false, loads: 0 };
+    return { ok: false, loads: 0, spotLoadsCount: 0 };
   }
 }
 
@@ -548,8 +586,15 @@ async function triggerBig500Export() {
         headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'text/plain' },
         body: csvText
       });
-      const vpsResult = await vpsResp.json();
-      console.log('TruckingLane: Auto Big 500 uploaded:', vpsResult.output?.substring(0, 100));
+      const vpsResult = await vpsResp.json().catch(() => ({}));
+      const b500Count = vpsResp.ok ? parseBig500UniqueLoadsCount(vpsResult) : null;
+      console.log('TruckingLane: Auto Big 500 uploaded:', (vpsResult.message || vpsResult.output || '').substring(0, 100));
+      await chrome.storage.local.set({
+        lastBig500Sync: new Date().toISOString(),
+        lastBig500Ok: vpsResp.ok,
+        lastBig500Status: vpsResult.message || vpsResult.output || '',
+        ...(b500Count != null ? { lastBig500LoadsCount: b500Count } : {}),
+      });
     }
   } catch(err) {
     console.log('triggerBig500Export error:', err.message);
@@ -663,6 +708,9 @@ async function pushTruckerToolsLoadsToVps(mappedLoads) {
   const payloads = mappedLoads.map((load) => {
     if (!load || typeof load !== 'object') return load;
     const { source_row: _sr, ...rest } = load;
+    if (String(rest.load_number || '').startsWith('TT-')) {
+      rest.template_type = 'truckertools';
+    }
     return rest;
   });
   console.log('[TT MAP] First load (VPS payload, no source_row):', JSON.stringify(payloads[0], null, 2));
@@ -707,6 +755,14 @@ async function handleTruckerToolsIntercepted(msg) {
   if (loads.length > 0) {
     vpsStatus = await pushTruckerToolsLoadsToVps(loads);
   }
+  const ttOk =
+    loads.length === 0 ||
+    (vpsStatus != null && vpsStatus >= 200 && vpsStatus < 300);
+  await chrome.storage.local.set({
+    lastTruckerToolsSync: new Date().toISOString(),
+    truckerToolsLoadsCount: loads.length,
+    truckerToolsOk: ttOk,
+  });
   return { vpsStatus, loadsCount: loads.length };
 }
 
@@ -757,9 +813,11 @@ async function pollTruckerToolsNearby() {
     });
 
     if (res.status === 401 || res.status === 403) {
+      await chrome.storage.local.set({ truckerToolsOk: false });
       return;
     }
     if (!res.ok) {
+      await chrome.storage.local.set({ truckerToolsOk: false });
       return;
     }
 
@@ -771,9 +829,18 @@ async function pollTruckerToolsNearby() {
     }
 
     const loads = mapTruckerToolsResponseToLoads(json);
+    let vpsStatus = null;
     if (loads.length > 0) {
-      await pushTruckerToolsLoadsToVps(loads);
+      vpsStatus = await pushTruckerToolsLoadsToVps(loads);
     }
+    const ttOk =
+      loads.length === 0 ||
+      (vpsStatus != null && vpsStatus >= 200 && vpsStatus < 300);
+    await chrome.storage.local.set({
+      lastTruckerToolsSync: new Date().toISOString(),
+      truckerToolsLoadsCount: loads.length,
+      truckerToolsOk: ttOk,
+    });
   } catch {
     /* skip silently until next visit or alarm */
   }

@@ -12,7 +12,10 @@
   .status-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
   .status-label { font-size: 12px; color: #94a3b8; }
   .status-value { font-size: 12px; font-weight: 600; }
-  .last-sync { font-size: 11px; color: #64748b; text-align: center; margin-bottom: 12px; }
+  .source-block { padding: 8px 0; border-top: 1px solid #334155; }
+  .source-block:first-of-type { border-top: none; padding-top: 0; }
+  .source-title { font-size: 11px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .source-detail { font-size: 11px; color: #64748b; line-height: 1.4; }
   .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; background: #f59e0b; color: #0f172a; margin-bottom: 8px; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .info { font-size: 11px; color: #475569; text-align: center; margin-top: 8px; line-height: 1.5; }
@@ -35,12 +38,33 @@
       <span class="status-label">DAT Token</span>
       <span class="status-value" id="dat-status">Checking...</span>
     </div>
-    <div class="status-row">
-      <span class="status-label">Loads Scraped</span>
-      <span class="status-value" id="loads-count" style="color:#f59e0b">-</span>
+  </div>
+  <div class="status-card">
+    <div class="source-block">
+      <div class="source-title">Big 500</div>
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="big500-conn">—</span>
+      </div>
+      <div class="source-detail" id="big500-detail">No CSV upload yet</div>
+    </div>
+    <div class="source-block">
+      <div class="source-title">Spot loads</div>
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="spot-conn">—</span>
+      </div>
+      <div class="source-detail" id="spot-detail">From Aljex route tab scraper</div>
+    </div>
+    <div class="source-block">
+      <div class="source-title">Trucker Tools</div>
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span class="status-value" id="tt-conn">—</span>
+      </div>
+      <div class="source-detail" id="tt-detail">oldcastle.truckertools.com</div>
     </div>
   </div>
-  <div class="last-sync" id="last-sync">Loading...</div>
   <button class="btn" id="sync-btn">Sync Now</button>
   <div class="note" id="tab-note"></div>
   <div class="info">Keep Aljex and DAT tabs open and logged in.<br>Everything else is automatic.</div>

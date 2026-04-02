@@ -22,6 +22,24 @@ function parseBig500UniqueLoadsCount(result) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+const LAST_BIG500_CSV_HASH_KEY = 'last_big500_csv_hash';
+
+async function sha256HexUtf8(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/** Compare CSV body to last successful upload; skip redundant VPS posts. */
+async function big500CsvNeedsUpload(csvText) {
+  const hash = await sha256HexUtf8(csvText);
+  const stored = await chrome.storage.local.get(LAST_BIG500_CSV_HASH_KEY);
+  const prev = stored[LAST_BIG500_CSV_HASH_KEY];
+  if (prev != null && prev === hash) return { needsUpload: false, hash };
+  return { needsUpload: true, hash };
+}
+
 // Supabase anon key for TruckingLanes
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZ2Fra29taHBodmRid2pqd2l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTIzNjMsImV4cCI6MjA4MjA2ODM2M30.mQRJK5Bj04P-hxwIWkVxG7lXiXI4daMs59UuxU2w1Ow';
 
@@ -55,16 +73,13 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     const filename = (item.filename || '').toLowerCase();
     const url = item.url || '';
     
-    console.log('TruckingLane: Download detected:', filename, url.substring(0, 60));
-    
     // Must be a CSV or XLS file
     if (!filename.match(/\.(csv|xls|xlsx)$/)) return;
     
     // Must have an Aljex tab open
     const aljexTabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
     if (aljexTabs.length === 0) return;
-    
-    console.log('TruckingLane: Aljex CSV download detected! Uploading Big 500...');
+
     await uploadBig500(item, aljexTabs[0]);
   } catch(err) {
     console.log('Download watcher error:', err.message);
@@ -73,8 +88,6 @@ chrome.downloads.onChanged.addListener(async (delta) => {
 
 async function uploadBig500(downloadItem, aljexTab) {
   try {
-    console.log('TruckingLane: Uploading Big 500 to VPS...');
-    
     // Re-fetch the CSV from original URL using Aljex tab credentials
     let csvText = null;
     try {
@@ -98,9 +111,12 @@ async function uploadBig500(downloadItem, aljexTab) {
       console.log('TruckingLane: Could not read CSV - URL may have expired');
       return;
     }
-    
+
+    const { needsUpload, hash: csvHash } = await big500CsvNeedsUpload(csvText);
+    if (!needsUpload) return;
+
     console.log(`TruckingLane: Got CSV, ${csvText.length} chars, uploading...`);
-    
+
     const res = await fetch(`${VPS_URL}/upload-big500`, {
       method: 'POST',
       headers: {
@@ -114,11 +130,11 @@ async function uploadBig500(downloadItem, aljexTab) {
     const count = res.ok ? parseBig500UniqueLoadsCount(result) : null;
     console.log('TruckingLane: Big 500 upload result:', result.message || result.output);
     
-    // Update status
     await chrome.storage.local.set({
       lastBig500Sync: new Date().toISOString(),
       lastBig500Status: result.message || result.output || '',
       lastBig500Ok: res.ok,
+      ...(res.ok ? { [LAST_BIG500_CSV_HASH_KEY]: csvHash } : {}),
       ...(count != null ? { lastBig500LoadsCount: count } : {}),
     });
     
@@ -633,45 +649,51 @@ async function triggerBig500Export() {
     });
     
     const result = results[0]?.result;
-    console.log('TruckingLane: Big 500 trigger result:', JSON.stringify(result));
-    
-    if (result?.url) {
-      // Fetch CSV from inside the Aljex tab (needs auth cookies)
-      const csvResults = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async (url) => {
-          try {
-            const r = await fetch(url, { credentials: 'include' });
-            if (!r.ok) return null;
-            return await r.text();
-          } catch(e) { return null; }
-        },
-        args: [result.url]
-      });
-      
-      const csvText = csvResults[0]?.result;
-      if (!csvText) {
-        console.log('TruckingLane: Could not fetch Big 500 CSV - URL expired, will get fresh one next sync');
-        return;
-      }
-      
-      console.log(`TruckingLane: Auto Big 500 CSV fetched, ${csvText.length} chars`);
-      
-      const vpsResp = await fetch(`${VPS_URL}/upload-big500`, {
-        method: 'POST',
-        headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'text/plain' },
-        body: csvText
-      });
-      const vpsResult = await vpsResp.json().catch(() => ({}));
-      const b500Count = vpsResp.ok ? parseBig500UniqueLoadsCount(vpsResult) : null;
-      console.log('TruckingLane: Auto Big 500 uploaded:', (vpsResult.message || vpsResult.output || '').substring(0, 100));
-      await chrome.storage.local.set({
-        lastBig500Sync: new Date().toISOString(),
-        lastBig500Ok: vpsResp.ok,
-        lastBig500Status: vpsResult.message || vpsResult.output || '',
-        ...(b500Count != null ? { lastBig500LoadsCount: b500Count } : {}),
-      });
+    if (!result?.url) {
+      console.log('TruckingLane: Big 500 trigger result:', JSON.stringify(result));
+      return;
     }
+
+    const csvResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: async (url) => {
+        try {
+          const r = await fetch(url, { credentials: 'include' });
+          if (!r.ok) return null;
+          return await r.text();
+        } catch (e) {
+          return null;
+        }
+      },
+      args: [result.url],
+    });
+
+    const csvText = csvResults[0]?.result;
+    if (!csvText) {
+      console.log('TruckingLane: Could not fetch Big 500 CSV - URL expired, will get fresh one next sync');
+      return;
+    }
+
+    const { needsUpload, hash: csvHash } = await big500CsvNeedsUpload(csvText);
+    if (!needsUpload) return;
+
+    console.log(`TruckingLane: Auto Big 500 CSV fetched, ${csvText.length} chars`);
+
+    const vpsResp = await fetch(`${VPS_URL}/upload-big500`, {
+      method: 'POST',
+      headers: { 'X-TL-Trigger-Key': TRIGGER_KEY, 'Content-Type': 'text/plain' },
+      body: csvText,
+    });
+    const vpsResult = await vpsResp.json().catch(() => ({}));
+    const b500Count = vpsResp.ok ? parseBig500UniqueLoadsCount(vpsResult) : null;
+    console.log('TruckingLane: Auto Big 500 uploaded:', (vpsResult.message || vpsResult.output || '').substring(0, 100));
+    await chrome.storage.local.set({
+      lastBig500Sync: new Date().toISOString(),
+      lastBig500Ok: vpsResp.ok,
+      lastBig500Status: vpsResult.message || vpsResult.output || '',
+      ...(vpsResp.ok ? { [LAST_BIG500_CSV_HASH_KEY]: csvHash } : {}),
+      ...(b500Count != null ? { lastBig500LoadsCount: b500Count } : {}),
+    });
   } catch(err) {
     console.log('triggerBig500Export error:', err.message);
   }

@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
         max_pay: Math.round(rate - 5),
         rate_raw: rate,
         commodity,
-        dispatch_status: "open",
+        dispatch_status: "pending",
         status: "open",
         is_active: true,
         dat_posted_at: null,
@@ -304,36 +304,104 @@ Deno.serve(async (req) => {
     const safeRows = Array.from(byNum.values());
     const dupesDropped = finalRows.length - safeRows.length;
     const nums = safeRows.map((r) => String(r.load_number));
-    const { data: existRows } = await supabase
+    const { data: existRows, error: existErr } = await supabase
       .from("loads")
       .select("load_number")
       .eq("agency_id", CENTURY_AGENCY_ID)
       .eq("template_type", CENTURY_TEMPLATE_TYPE)
       .in("load_number", nums);
-    const existingSet = new Set(
-      (existRows ?? []).map((r: { load_number: string }) => String(r.load_number)),
-    );
-    const newCount = nums.filter((n) => !existingSet.has(n)).length;
-    const updatedCount = nums.length - newCount;
 
-    const { error: upsertError } = await supabase.from("loads").upsert(safeRows, {
-      onConflict: "agency_id,template_type,load_number",
-      ignoreDuplicates: false,
-    });
-
-    if (upsertError) {
+    if (existErr) {
       await supabase.from("email_import_logs").insert({
         agency_id: CENTURY_AGENCY_ID,
         sender_email: clean,
         subject,
         status: "failed",
-        error_message: upsertError.message,
+        error_message: existErr.message,
         raw_headers: emailHeaders,
       });
-      return new Response(JSON.stringify({ error: upsertError.message }), {
+      return new Response(JSON.stringify({ error: existErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const existingSet = new Set(
+      (existRows ?? []).map((r: { load_number: string }) => String(r.load_number)),
+    );
+    const newRows = safeRows.filter((r) => !existingSet.has(String(r.load_number)));
+    const existingInEmailNums = nums.filter((n) => existingSet.has(n));
+    const newCount = newRows.length;
+    const updatedCount = existingInEmailNums.length;
+    const batchSet = new Set(nums);
+    const chunkSize = 100;
+
+    const fail = async (message: string) => {
+      await supabase.from("email_import_logs").insert({
+        agency_id: CENTURY_AGENCY_ID,
+        sender_email: clean,
+        subject,
+        status: "failed",
+        error_message: message,
+        raw_headers: emailHeaders,
+      });
+      return new Response(JSON.stringify({ error: message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    };
+
+    for (let i = 0; i < existingInEmailNums.length; i += chunkSize) {
+      const chunk = existingInEmailNums.slice(i, i + chunkSize);
+      const { error: updErr } = await supabase
+        .from("loads")
+        .update({
+          ship_date: shipDate,
+          purge_date: purgeDate,
+          dat_posted_at: null,
+        })
+        .eq("agency_id", CENTURY_AGENCY_ID)
+        .eq("template_type", CENTURY_TEMPLATE_TYPE)
+        .in("load_number", chunk);
+      if (updErr) return await fail(updErr.message);
+    }
+
+    if (newRows.length > 0) {
+      const { error: upsertError } = await supabase.from("loads").upsert(newRows, {
+        onConflict: "agency_id,template_type,load_number",
+        ignoreDuplicates: false,
+      });
+      if (upsertError) return await fail(upsertError.message);
+    }
+
+    const { data: activeCandidates, error: activeErr } = await supabase
+      .from("loads")
+      .select("id, load_number")
+      .eq("agency_id", CENTURY_AGENCY_ID)
+      .eq("template_type", CENTURY_TEMPLATE_TYPE)
+      .in("dispatch_status", ["open", "pending"]);
+
+    if (activeErr) return await fail(activeErr.message);
+
+    const toArchiveIds = (activeCandidates ?? [])
+      .filter((r: { load_number: string }) => !batchSet.has(String(r.load_number)))
+      .map((r: { id: string }) => r.id);
+
+    let archivedCount = 0;
+    for (let i = 0; i < toArchiveIds.length; i += chunkSize) {
+      const chunk = toArchiveIds.slice(i, i + chunkSize);
+      if (chunk.length === 0) continue;
+      const { data: archived, error: archErr } = await supabase
+        .from("loads")
+        .update({
+          dispatch_status: "archived",
+          is_active: false,
+          archived_at: new Date().toISOString(),
+        })
+        .in("id", chunk)
+        .select("id");
+      if (archErr) return await fail(archErr.message);
+      archivedCount += archived?.length ?? 0;
     }
 
     const mergedHeaders: Record<string, unknown> =
@@ -345,7 +413,8 @@ Deno.serve(async (req) => {
     mergedHeaders.updated = updatedCount;
     mergedHeaders.dupes_dropped = dupesDropped;
     mergedHeaders.duplicates_removed = dupesDropped;
-    mergedHeaders.supports_removal = false;
+    mergedHeaders.supports_removal = true;
+    mergedHeaders.archived = archivedCount;
 
     await supabase.from("email_import_logs").insert({
       agency_id: CENTURY_AGENCY_ID,
@@ -363,6 +432,7 @@ Deno.serve(async (req) => {
         new: newCount,
         updated: updatedCount,
         dupes_dropped: dupesDropped,
+        archived: archivedCount,
         template_type: CENTURY_TEMPLATE_TYPE,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

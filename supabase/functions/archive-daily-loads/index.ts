@@ -74,7 +74,7 @@ serve(async (req: Request) => {
     const { data: centuryFlipped, error: centuryFlipError } = await supabaseAdmin
       .from("loads")
       .update({ is_active: true })
-      .eq("template_type", "century_pdf")
+      .in("template_type", ["century_pdf", "Century"])
       .eq("ship_date", todayUtc)
       .eq("is_active", false)
       .select("id");
@@ -82,13 +82,29 @@ serve(async (req: Request) => {
     if (centuryFlipError) {
       console.error("Century flip error:", centuryFlipError);
     } else {
-      console.log(`Century PDF: flipped active for ship_date=${todayUtc}, count=${centuryFlipped?.length ?? 0}`);
+      console.log(`Century: flipped active for ship_date=${todayUtc}, count=${centuryFlipped?.length ?? 0}`);
+    }
+
+    const { data: centuryPendingOpen, error: centuryPendingOpenError } = await supabaseAdmin
+      .from("loads")
+      .update({ dispatch_status: "open" })
+      .in("template_type", ["century_pdf", "Century"])
+      .eq("ship_date", todayUtc)
+      .eq("dispatch_status", "pending")
+      .select("id");
+
+    if (centuryPendingOpenError) {
+      console.error("Century pending→open error:", centuryPendingOpenError);
+    } else {
+      console.log(
+        `Century: pending→open for ship_date=${todayUtc}, count=${centuryPendingOpen?.length ?? 0}`,
+      );
     }
 
     const { data: centuryPurged, error: centuryPurgeError } = await supabaseAdmin
       .from("loads")
       .update({ is_active: false })
-      .eq("template_type", "century_pdf")
+      .in("template_type", ["century_pdf", "Century"])
       .lt("ship_date", shipDateStrictlyBefore)
       .eq("is_active", true)
       .is("sms_book_status", null)
@@ -98,7 +114,7 @@ serve(async (req: Request) => {
       console.error("Century purge error:", centuryPurgeError);
     } else {
       console.log(
-        `Century PDF: purged inactive for ship_date < ${shipDateStrictlyBefore}, count=${centuryPurged?.length ?? 0}`,
+        `Century: purged inactive for ship_date < ${shipDateStrictlyBefore}, count=${centuryPurged?.length ?? 0}`,
       );
     }
 
@@ -107,8 +123,10 @@ serve(async (req: Request) => {
         success: true,
         archived_count: archivedCount,
         century_pdf_flipped_active: centuryFlipped?.length ?? 0,
+        century_pending_to_open: centuryPendingOpen?.length ?? 0,
         century_pdf_purged_inactive: centuryPurged?.length ?? 0,
         century_flip_error: centuryFlipError?.message ?? null,
+        century_pending_open_error: centuryPendingOpenError?.message ?? null,
         century_purge_error: centuryPurgeError?.message ?? null,
         timestamp: new Date().toISOString(),
       }),

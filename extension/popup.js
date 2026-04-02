@@ -52,9 +52,14 @@ function updateUI(data) {
 
   const ttConn = document.getElementById('tt-conn');
   const ttDetail = document.getElementById('tt-detail');
-  const ttOk = data.truckerToolsOk === true;
-  ttConn.textContent = connLabel(data.lastTruckerToolsSync != null ? ttOk : null);
-  ttConn.style.color = connColor(data.lastTruckerToolsSync != null ? ttOk : null);
+  // TT: Connected if a token was captured (refreshes when the site loads); avoid "Disconnected" for expired tokens.
+  if (data.truckerToolsHasToken === true) {
+    ttConn.textContent = 'Connected';
+    ttConn.style.color = '#4ade80';
+  } else {
+    ttConn.textContent = 'Not synced';
+    ttConn.style.color = '#fbbf24';
+  }
   const nTt = data.truckerToolsLoadsCount;
   const ttParts = [`Last sync: ${fmtTime(data.lastTruckerToolsSync)}`];
   if (nTt != null && nTt !== '') ttParts.push(`${nTt} loads`);

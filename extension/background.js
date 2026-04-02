@@ -239,8 +239,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         'lastTruckerToolsSync',
         'truckerToolsLoadsCount',
         'truckerToolsOk',
+        'truckertools_token',
       ],
-      sendResponse,
+      (data) => {
+        const tok = data.truckertools_token;
+        const truckerToolsHasToken = !!(tok != null && String(tok).trim());
+        const { truckertools_token: _omitToken, ...rest } = data;
+        sendResponse({ ...rest, truckerToolsHasToken });
+      },
     );
     return true;
   }

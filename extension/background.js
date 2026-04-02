@@ -121,7 +121,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.action === 'sync-now') {
     runFullSync()
-      .then(() => triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message)))
+      // .then(() => triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message)))
       .then(() => sendResponse({ success: true }));
     return true;
   }
@@ -182,18 +182,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.action === 'push-to-aljex') {
-    triggerAljexSpotInjector()
-      .then(() => sendResponse({ success: true }))
-      .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    // triggerAljexSpotInjector()
+    //   .then(() => sendResponse({ success: true }))
+    //   .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    sendResponse({ success: true });
     return true;
   }
 });
 
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   if (msg?.action === 'push-to-aljex') {
-    triggerAljexSpotInjector()
-      .then(() => sendResponse({ success: true }))
-      .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    // triggerAljexSpotInjector()
+    //   .then(() => sendResponse({ success: true }))
+    //   .catch((e) => sendResponse({ success: false, error: e?.message || String(e) }));
+    sendResponse({ success: true });
     return true;
   }
 });
@@ -209,7 +211,7 @@ async function runFullSync() {
   
   // Also trigger Big 500 export
   // triggerBig500Export().catch(e => console.log('Big 500 trigger error:', e.message));
-  triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message));
+  // triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message));
 
   if (aljexResult.status === 'fulfilled') {
     results.aljex = aljexResult.value.ok;
@@ -230,45 +232,45 @@ async function runFullSync() {
   return results;
 }
 
-async function triggerAljexSpotInjector() {
-  const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
-    method: 'POST',
-    headers: {
-      'X-TL-Trigger-Key': TRIGGER_KEY,
-      'Content-Type': 'application/json',
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(text || `get-unsubmitted-loads HTTP ${res.status}`);
-  }
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error('Invalid JSON from /get-unsubmitted-loads');
-  }
-  const loads = Array.isArray(data.loads) ? data.loads : [];
+// async function triggerAljexSpotInjector() {
+//   const res = await fetch(`${VPS_URL}/get-unsubmitted-loads`, {
+//     method: 'POST',
+//     headers: {
+//       'X-TL-Trigger-Key': TRIGGER_KEY,
+//       'Content-Type': 'application/json',
+//     },
+//   });
+//   const text = await res.text();
+//   if (!res.ok) {
+//     throw new Error(text || `get-unsubmitted-loads HTTP ${res.status}`);
+//   }
+//   let data = {};
+//   try {
+//     data = text ? JSON.parse(text) : {};
+//   } catch {
+//     throw new Error('Invalid JSON from /get-unsubmitted-loads');
+//   }
+//   const loads = Array.isArray(data.loads) ? data.loads : [];
 
-  if (loads.length === 0) {
-    console.log('[aljex-spot] No unsubmitted loads');
-    return;
-  }
+//   if (loads.length === 0) {
+//     console.log('[aljex-spot] No unsubmitted loads');
+//     return;
+//   }
 
-  const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
-  if (tabs.length === 0) {
-    console.log('[aljex-spot] No Aljex tab open — cannot push loads');
-    return;
-  }
+//   const tabs = await chrome.tabs.query({ url: 'https://dandl.aljex.com/*' });
+//   if (tabs.length === 0) {
+//     console.log('[aljex-spot] No Aljex tab open — cannot push loads');
+//     return;
+//   }
 
-  const tabId = tabs[0].id;
-  const payload = { type: 'PUSH_LOADS', loads };
-  chrome.tabs.sendMessage(tabId, payload, () => {
-    if (chrome.runtime.lastError) {
-      console.warn('[aljex-spot] sendMessage to Aljex tab:', chrome.runtime.lastError.message);
-    }
-  });
-}
+//   const tabId = tabs[0].id;
+//   const payload = { type: 'PUSH_LOADS', loads };
+//   chrome.tabs.sendMessage(tabId, payload, () => {
+//     if (chrome.runtime.lastError) {
+//       console.warn('[aljex-spot] sendMessage to Aljex tab:', chrome.runtime.lastError.message);
+//     }
+//   });
+// }
 
 // ── SYNC COOKIES ONLY (every 25 min) ──────────────────────────
 async function syncCookiesOnly() {

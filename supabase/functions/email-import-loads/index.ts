@@ -724,10 +724,13 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     line = line.replace(/^\*+/, '').replace(/\*+$/, '').trim();
     
     // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
-    // Also handles "$1400" without space before "$" and notes after rate
-    // Format: COUNT - PICKUP_CITY, ST - COMMODITY - DEST_CITY, ST $RATE [- NOTES]
+    // Also: "6 - Homestead, FL - cars - Jacksonville, FL - $825/100 fsc"
+    // Format: COUNT - PICKUP_CITY, ST - COMMODITY - DEST_CITY, ST [ - ] $RATE[/DENOM] [suffix]
+    // Optional " - " before $; optional /100 (rate per unit); "fsc" etc. captured as notes.
     // The regex handles typos like "Jackson,. TN" (extra period/chars between comma and state)
-    const match = line.match(/^(\d+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,$]+),\s*\.?\s*([A-Za-z]{2})\s*\$?([\d,]+)/i);
+    const match = line.match(
+      /^(\d+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*(?:-\s*)?\$?\s*([\d,]+)(?:\/(\d+))?\s*(.*)$/i,
+    );
     
     if (!match) {
       console.log("VMS line did not match pattern:", line);
@@ -743,6 +746,9 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     const destCity = match[5].trim();
     const destState = match[6].toUpperCase();
     const rateRaw = parseFloat(match[7].replace(/,/g, ''));
+    const rateDenom = match[8] ? parseInt(match[8], 10) : null;
+    // New VMS van lines use $825/100 fsc — equipment is Van (V); flat $1700 style stays Flatbed.
+    const trailerType = rateDenom != null && rateDenom > 0 ? "Van" : "Flatbed";
     
     // Normalize commodity - "cars" or "bales" = "Crushed Cars"
     const commodity = (commodityRaw === 'cars' || commodityRaw === 'bales') ? 'Crushed Cars' : commodityRaw;
@@ -753,9 +759,9 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
     // Calculate financial fields (flat rate, not per ton)
     const rateFields = calculateRateFields(rateRaw, weightLbs, false);
     
-    // Extract notes from remainder of line
-    const noteMatch = line.match(/\$[\d,]+\s*-?\s*(.+)$/i);
-    const notes = noteMatch ? noteMatch[1].replace(/^-\s*/, '').trim() : null;
+    // Extract notes from remainder after rate (handles "$825/100 fsc" not only "$1700 - note")
+    const remainder = (match[9] ?? "").trim();
+    const notes = remainder.replace(/^-\s*/, "").trim() || null;
     
     // Create 'count' number of individual load records with FIXED instance numbers
     // The instance number is simply 1 to count, making load numbers deterministic per route
@@ -784,7 +790,7 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
         dest_location_raw: `${destCity}, ${destState}`,
         ship_date: new Date().toISOString().split('T')[0],
         delivery_date: null,
-        trailer_type: "Flatbed", // VMS defaults to flatbed
+        trailer_type: trailerType,
         trailer_footage: null,
         weight_lbs: weightLbs,
         tarp_required: false,
@@ -793,7 +799,12 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
         miles: null,
         status: "open",
         dispatch_status: "open",
-        source_row: { original_line: line, load_instance: i + 1, total_instances: count },
+        source_row: {
+          original_line: line,
+          load_instance: i + 1,
+          total_instances: count,
+          rate_per_unit_denom: rateDenom,
+        },
       };
       
       if (notes) {

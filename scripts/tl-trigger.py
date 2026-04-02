@@ -10,7 +10,7 @@ upload to that function is disabled in-repo.
 Environment:
   TL_TRIGGER_KEY        Shared secret (must match extension header)
   SUPABASE_URL          https://vjgakkomhphvdbwjjwiv.supabase.co
-  SUPABASE_SERVICE_ROLE_KEY   Service role key (never expose to clients)
+  SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_KEY   Service role key (never expose to clients)
   DAT_BEARER_TOKEN      Optional; DAT freight API bearer (or DAT_TOKEN_FILE, default /root/.dat_bearer_token)
   SIMPLETEXTING_API_KEY     Optional env override; SimpleTexting messages + contacts API
   SIMPLETEXTING_CONTACTS_URL  Optional; default https://api-app2.simpletexting.com/v2/api/contacts
@@ -42,7 +42,9 @@ app = Flask(__name__)
 
 TL_TRIGGER_KEY = os.environ.get("TL_TRIGGER_KEY", "tl-trigger-7b747d391801b8e5f55b4542")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vjgakkomhphvdbwjjwiv.supabase.co").rstrip("/")
-SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or os.environ.get(
+    "SUPABASE_SERVICE_KEY", ""
+)
 SIMPLETEXTING_API_KEY = os.environ.get(
     "SIMPLETEXTING_API_KEY",
     "a1637fca1a5131f4c85e499221ff47d1",
@@ -849,17 +851,19 @@ def insert_aljex_loads():
         dc = dupes_by_pair.get((aid, tt), 0)
         log_payloads.append((aid, tt, len(grp), new_c, upd_c, dc))
 
-    # PostgREST merge-duplicates cannot limit ON CONFLICT columns updated. Use RPC with explicit
-    # ON CONFLICT (agency_id, template_type, load_number) DO UPDATE SET … (not DO NOTHING).
-    # DB has no UNIQUE(load_number) alone; conflict target matches loads_agency_id_template_type_load_number_key.
-    rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/tl_upsert_aljex_loads_batch"
+    # POST upsert: ON CONFLICT (agency_id, template_type, load_number) — unique key
+    # loads_agency_id_template_type_load_number_key (not UNIQUE(load_number) alone).
+    loads_url = (
+        f"{SUPABASE_URL}/rest/v1/loads"
+        "?on_conflict=agency_id,template_type,load_number"
+    )
     headers = {
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=minimal",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
     }
-    r = requests.post(rpc_url, json={"p_rows": deduped}, headers=headers, timeout=120)
+    r = requests.post(loads_url, json=deduped, headers=headers, timeout=120)
     if r.status_code not in (200, 201, 204):
         return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
 

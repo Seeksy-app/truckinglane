@@ -186,5 +186,13 @@ function mapTruckerToolsLoad(raw, idx) {
 /** @param json Full API response; load rows are read from json.data via extractTruckerToolsLoadsArray. */
 function mapTruckerToolsResponseToLoads(json) {
   const rows = extractTruckerToolsLoadsArray(json);
-  return rows.map((r, i) => mapTruckerToolsLoad(r, i));
+  return rows.map((r, i) => {
+    const load = mapTruckerToolsLoad(r, i);
+    delete load.trailer_footage;
+    delete load.target_commission;
+    delete load.max_commission;
+    delete load.commission_target_pct;
+    delete load.commission_max_pct;
+    return load;
+  });
 }

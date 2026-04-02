@@ -735,6 +735,7 @@ def _insert_email_import_log(
     *,
     supports_removal: bool = False,
     removed_c: int = 0,
+    sender_email: str = "vps@insert-aljex-loads",
 ) -> None:
     if not SERVICE_KEY:
         return
@@ -754,7 +755,7 @@ def _insert_email_import_log(
         raw_headers["archived"] = removed_c
     body = {
         "agency_id": agency_id,
-        "sender_email": "vps@insert-aljex-loads",
+        "sender_email": sender_email,
         "subject": f"Import sync ({template_type})",
         "status": "success",
         "imported_count": imported_count,
@@ -869,6 +870,118 @@ def insert_aljex_loads():
 
     for aid, tt, ic, new_c, upd_c, dc in log_payloads:
         _insert_email_import_log(aid, tt, ic, new_c, upd_c, dc, supports_removal=False)
+
+    return jsonify(
+        {
+            "ok": True,
+            "success": True,
+            "new": total_new,
+            "updated": total_updated,
+            "dupes_dropped": dupes_total,
+            "count": len(deduped),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+@app.post("/insert-truckertools-loads")
+def insert_truckertools_loads():
+    """
+    Trucker Tools extension: POST JSON { "loads": [ ... ] }.
+    Rows are sent as-is (no _ALJEX_LOAD_UPSERT_TEMPLATE / _normalize_aljex_load_row).
+    Each load must have agency_id, load_number, template_type == truckertools.
+    Upsert: ON CONFLICT (agency_id, template_type, load_number).
+    """
+    ok, err = require_trigger_key()
+    if not ok:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    loads = body.get("loads")
+    if not isinstance(loads, list):
+        return jsonify({"error": "loads array required"}), 400
+    if len(loads) == 0:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify(
+            {
+                "ok": True,
+                "success": True,
+                "new": 0,
+                "updated": 0,
+                "dupes_dropped": 0,
+                "count": 0,
+                "updated_at": now_iso,
+            }
+        )
+
+    rows: list[dict] = []
+    for row in loads:
+        if not isinstance(row, dict):
+            return jsonify({"error": "each load must be a JSON object"}), 400
+        if str(row.get("template_type") or "") != "truckertools":
+            return jsonify({"error": "each load must have template_type truckertools"}), 400
+        aid = row.get("agency_id")
+        ln = row.get("load_number")
+        if aid is None or ln is None:
+            return jsonify({"error": "each load needs agency_id, load_number"}), 400
+        rows.append(dict(row))
+
+    triple_counts: dict[tuple[str, str, str], int] = defaultdict(int)
+    triple_last: dict[tuple[str, str, str], dict] = {}
+    for row in rows:
+        key = (str(row["agency_id"]), str(row["template_type"]), str(row["load_number"]))
+        triple_counts[key] += 1
+        triple_last[key] = row
+    deduped = list(triple_last.values())
+    dupes_total = len(rows) - len(deduped)
+
+    dupes_by_pair: dict[tuple[str, str], int] = defaultdict(int)
+    for (aid, tt, _ln), c in triple_counts.items():
+        if c > 1:
+            dupes_by_pair[(aid, tt)] += c - 1
+
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in deduped:
+        groups[(str(row["agency_id"]), str(row["template_type"]))].append(row)
+
+    log_payloads: list[tuple[str, str, int, int, int, int]] = []
+    total_new = 0
+    total_updated = 0
+    for (aid, tt), grp in groups.items():
+        nums = [str(r["load_number"]) for r in grp]
+        ex = _fetch_existing_load_numbers(aid, tt, nums)
+        new_c = sum(1 for n in nums if n not in ex)
+        upd_c = len(nums) - new_c
+        total_new += new_c
+        total_updated += upd_c
+        dc = dupes_by_pair.get((aid, tt), 0)
+        log_payloads.append((aid, tt, len(grp), new_c, upd_c, dc))
+
+    loads_url = (
+        f"{SUPABASE_URL}/rest/v1/loads"
+        "?on_conflict=agency_id,template_type,load_number"
+    )
+    headers = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    r = requests.post(loads_url, json=deduped, headers=headers, timeout=120)
+    if r.status_code not in (200, 201, 204):
+        return jsonify({"error": r.text or r.reason, "status": r.status_code}), 502
+
+    for aid, tt, ic, new_c, upd_c, dc in log_payloads:
+        _insert_email_import_log(
+            aid,
+            tt,
+            ic,
+            new_c,
+            upd_c,
+            dc,
+            supports_removal=False,
+            sender_email="vps@insert-truckertools-loads",
+        )
 
     return jsonify(
         {

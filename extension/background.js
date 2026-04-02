@@ -714,7 +714,7 @@ async function pushTruckerToolsLoadsToVps(mappedLoads) {
     return rest;
   });
   console.log('[TT MAP] First load (VPS payload, no source_row):', JSON.stringify(payloads[0], null, 2));
-  const res = await fetch(`${VPS_URL}/insert-aljex-loads`, {
+  const res = await fetch(`${VPS_URL}/insert-truckertools-loads`, {
     method: 'POST',
     headers: {
       'X-TL-Trigger-Key': TRIGGER_KEY,

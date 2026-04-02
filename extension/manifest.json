@@ -9,7 +9,9 @@
     "storage",
     "tabs",
     "scripting",
-    "downloads"
+    "downloads",
+    "webRequest",
+    "webRequestAuthProvider"
   ],
   "host_permissions": [
     "https://dandl.aljex.com/*",
@@ -47,28 +49,11 @@
     "48": "icon.png",
     "128": "icon.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["truckertools-page-hook.js"],
-      "matches": [
-        "https://oldcastle.truckertools.com/*",
-        "https://*.truckertools.com/*"
-      ]
-    }
-  ],
   "content_scripts": [
     {
       "matches": ["https://dandl.aljex.com/*"],
       "js": ["aljex-spot-injector.js"],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://oldcastle.truckertools.com/*",
-        "https://*.truckertools.com/*"
-      ],
-      "js": ["truckertools-tt-map.js", "truckertools-interceptor.js"],
-      "run_at": "document_start"
     }
   ]
 }

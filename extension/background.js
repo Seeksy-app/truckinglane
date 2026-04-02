@@ -117,18 +117,6 @@ async function uploadBig500(downloadItem, aljexTab) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === 'truckertools-intercepted') {
-    handleTruckerToolsIntercepted(msg)
-      .then((r) =>
-        sendResponse({
-          ok: true,
-          status: r?.vpsStatus ?? null,
-          loadsCount: r?.loadsCount ?? 0,
-        })
-      )
-      .catch((e) => sendResponse({ ok: false, error: e?.message || String(e) }));
-    return true;
-  }
   if (msg.action === 'sync-now') {
     Promise.all([
       runFullSync(),
@@ -695,7 +683,54 @@ async function syncDatToken() {
   }
 }
 
-// ── TRUCKER TOOLS: getNearbyLoadsV5 intercept + scheduled replay (map*: truckertools-tt-map.js)
+// ── TRUCKER TOOLS: webRequest sees getNearbyLoadsV5 on oldcastle → store URL + Authorization,
+// then onCompleted debounce-refetch from SW (same as poll). Mapping: truckertools-tt-map.js.
+
+const TT_WEBREQUEST_FILTER = { urls: ['https://oldcastle.truckertools.com/*'] };
+
+function ttRequestUrlMatches(url) {
+  return (
+    typeof url === 'string' &&
+    url.includes('oldcastle.truckertools.com') &&
+    url.includes('getNearbyLoadsV5')
+  );
+}
+
+chrome.webRequest.onBeforeSendHeaders.addListener(
+  (details) => {
+    if (!ttRequestUrlMatches(details.url)) return;
+    const headers = details.requestHeaders || [];
+    let auth = null;
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      if (String(h.name).toLowerCase() === 'authorization' && h.value) {
+        auth = h.value;
+        break;
+      }
+    }
+    const patch = { truckertools_nearby_url: details.url };
+    if (auth) patch.truckertools_token = auth;
+    chrome.storage.local.set(patch);
+  },
+  TT_WEBREQUEST_FILTER,
+  ['requestHeaders', 'extraHeaders'],
+);
+
+let ttWebRequestDebounce = null;
+chrome.webRequest.onCompleted.addListener(
+  (details) => {
+    if (!ttRequestUrlMatches(details.url)) return;
+    if (details.statusCode !== 200) return;
+    if (ttWebRequestDebounce) clearTimeout(ttWebRequestDebounce);
+    ttWebRequestDebounce = setTimeout(() => {
+      ttWebRequestDebounce = null;
+      ingestTruckerToolsNearbyFromStoredCredentials().catch((e) =>
+        console.warn('[truckertools] webRequest ingest:', e?.message || e),
+      );
+    }, 500);
+  },
+  TT_WEBREQUEST_FILTER,
+);
 
 async function pushTruckerToolsLoadsToVps(mappedLoads) {
   if (!mappedLoads || mappedLoads.length === 0) return null;
@@ -727,16 +762,45 @@ async function pushTruckerToolsLoadsToVps(mappedLoads) {
   return res.status;
 }
 
-async function handleTruckerToolsIntercepted(msg) {
-  const url = msg.url || '';
-  const authorization = msg.authorization || null;
-  const json = msg.json;
+/**
+ * POST to stored getNearbyLoadsV5 URL with stored Bearer token + default payload,
+ * map response, push to VPS, update extension storage. Used by alarm + webRequest refetch.
+ */
+async function ingestTruckerToolsNearbyFromStoredCredentials() {
+  const { truckertools_token, truckertools_nearby_url } = await chrome.storage.local.get([
+    'truckertools_token',
+    'truckertools_nearby_url',
+  ]);
+  if (!truckertools_token || !truckertools_nearby_url) {
+    return { skipped: true };
+  }
 
-  const toStore = {};
-  if (url) toStore.truckertools_nearby_url = url;
-  if (authorization) toStore.truckertools_token = authorization;
-  if (Object.keys(toStore).length > 0) {
-    await chrome.storage.local.set(toStore);
+  const auth = normalizeAuthHeader(truckertools_token);
+  if (!auth) return { skipped: true };
+
+  const res = await fetch(truckertools_nearby_url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: auth,
+    },
+    body: JSON.stringify(buildTruckerToolsNearbyPayload()),
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    await chrome.storage.local.set({ truckerToolsOk: false });
+    return { status: res.status };
+  }
+  if (!res.ok) {
+    await chrome.storage.local.set({ truckerToolsOk: false });
+    return { status: res.status };
+  }
+
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    return { status: res.status, parseError: true };
   }
 
   const { truckertools_logged_sample: alreadyLogged } = await chrome.storage.local.get([
@@ -744,8 +808,8 @@ async function handleTruckerToolsIntercepted(msg) {
   ]);
   if (!alreadyLogged && json != null) {
     console.log(
-      '[truckertools] first intercepted getNearbyLoadsV5 response (inspect field names):',
-      JSON.stringify(json, null, 2)
+      '[truckertools] first getNearbyLoadsV5 JSON (inspect field names):',
+      JSON.stringify(json, null, 2),
     );
     await chrome.storage.local.set({ truckertools_logged_sample: true });
   }
@@ -791,56 +855,8 @@ function normalizeAuthHeader(token) {
 }
 
 async function pollTruckerToolsNearby() {
-  const { truckertools_token, truckertools_nearby_url } = await chrome.storage.local.get([
-    'truckertools_token',
-    'truckertools_nearby_url',
-  ]);
-  if (!truckertools_token || !truckertools_nearby_url) {
-    return;
-  }
-
-  const auth = normalizeAuthHeader(truckertools_token);
-  if (!auth) return;
-
   try {
-    const res = await fetch(truckertools_nearby_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: auth,
-      },
-      body: JSON.stringify(buildTruckerToolsNearbyPayload()),
-    });
-
-    if (res.status === 401 || res.status === 403) {
-      await chrome.storage.local.set({ truckerToolsOk: false });
-      return;
-    }
-    if (!res.ok) {
-      await chrome.storage.local.set({ truckerToolsOk: false });
-      return;
-    }
-
-    let json;
-    try {
-      json = await res.json();
-    } catch {
-      return;
-    }
-
-    const loads = mapTruckerToolsResponseToLoads(json);
-    let vpsStatus = null;
-    if (loads.length > 0) {
-      vpsStatus = await pushTruckerToolsLoadsToVps(loads);
-    }
-    const ttOk =
-      loads.length === 0 ||
-      (vpsStatus != null && vpsStatus >= 200 && vpsStatus < 300);
-    await chrome.storage.local.set({
-      lastTruckerToolsSync: new Date().toISOString(),
-      truckerToolsLoadsCount: loads.length,
-      truckerToolsOk: ttOk,
-    });
+    await ingestTruckerToolsNearbyFromStoredCredentials();
   } catch {
     /* skip silently until next visit or alarm */
   }

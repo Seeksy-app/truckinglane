@@ -1,4 +1,4 @@
-/* Shared by background.js (importScripts) and truckertools-interceptor.js (content script). */
+/* Imported by background.js (service worker) for mapTruckerToolsResponseToLoads. */
 const TRUCKERTOOLS_AGENCY_ID = '25127efb-6eef-412a-a5d0-3d8242988323';
 
 function ttPickNumber(...vals) {

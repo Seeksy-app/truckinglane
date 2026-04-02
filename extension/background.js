@@ -121,7 +121,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.action === 'sync-now') {
     runFullSync()
-      // .then(() => triggerAljexSpotInjector().catch(e => console.log('Spot injector error:', e.message)))
+      .then(() => pollTruckerToolsNearby())
       .then(() => sendResponse({ success: true }));
     return true;
   }

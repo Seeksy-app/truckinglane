@@ -829,6 +829,7 @@ async function ingestTruckerToolsNearbyFromStoredCredentials() {
     await chrome.storage.local.set({ truckertools_logged_sample: true });
   }
 
+  // getNearbyLoadsV5 returns { data: Load[] }; mapper uses response.data (not loads / data.loads).
   const loads = mapTruckerToolsResponseToLoads(json);
   let vpsStatus = null;
   if (loads.length > 0) {

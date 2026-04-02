@@ -19,15 +19,11 @@ function ttStr(x) {
 function extractTruckerToolsLoadsArray(json) {
   if (Array.isArray(json)) return json;
   if (!json || typeof json !== 'object') return [];
-  if (
-    Array.isArray(json.data) &&
-    json.data.length > 0 &&
-    typeof json.data[0] === 'object'
-  ) {
+  // getNearbyLoadsV5 (and similar): the load array is response.data — not response.loads or data.loads.
+  if (Array.isArray(json.data)) {
     return json.data;
   }
   const keys = [
-    'loads',
     'nearbyLoads',
     'nearby_loads',
     'searchResults',
@@ -40,7 +36,7 @@ function extractTruckerToolsLoadsArray(json) {
     const v = json[k];
     if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v;
   }
-  if (json.data && typeof json.data === 'object') {
+  if (json.data && typeof json.data === 'object' && !Array.isArray(json.data)) {
     for (const k of keys) {
       const v = json.data[k];
       if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v;
@@ -187,6 +183,7 @@ function mapTruckerToolsLoad(raw, idx) {
   };
 }
 
+/** @param json Full API response; load rows are read from json.data via extractTruckerToolsLoadsArray. */
 function mapTruckerToolsResponseToLoads(json) {
   const rows = extractTruckerToolsLoadsArray(json);
   return rows.map((r, i) => mapTruckerToolsLoad(r, i));

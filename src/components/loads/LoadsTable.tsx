@@ -70,8 +70,6 @@ import {
 
 type Load = Tables<"loads">;
 
-type ToolbarSortOption = "none" | "template_type";
-
 type LaneHeaderSort = { column: "pickup" | "delivery"; dir: "asc" | "desc" };
 
 interface LoadsTableProps {
@@ -108,7 +106,6 @@ export function LoadsTable({
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
-  const [toolbarSort, setToolbarSort] = useState<ToolbarSortOption>("none");
   const [laneSort, setLaneSort] = useState<LaneHeaderSort | null>(null);
   const [pickupStateFilter, setPickupStateFilter] = useState<string>("all");
   const [destStateFilter, setDestStateFilter] = useState<string>("all");
@@ -209,7 +206,7 @@ export function LoadsTable({
       result = [...result].sort((a, b) =>
         compareLoadsByStateThenCity(a, b, laneSort.column, laneSort.dir),
       );
-    } else if (toolbarSort === "template_type") {
+    } else {
       result = [...result].sort((a, b) => {
         const templateOrder: Record<string, number> = {
           vms_email: 1,
@@ -227,7 +224,7 @@ export function LoadsTable({
     }
 
     return result;
-  }, [loadsExcludingArchived, clientFilter, pickupStateFilter, destStateFilter, toolbarSort, laneSort]);
+  }, [loadsExcludingArchived, clientFilter, pickupStateFilter, destStateFilter, laneSort]);
 
   const filteredIds = useMemo(
     () => filteredAndSortedLoads.map((l) => l.id),
@@ -358,7 +355,6 @@ export function LoadsTable({
   };
 
   const handleLaneHeaderClick = (column: "pickup" | "delivery") => {
-    setToolbarSort("none");
     setLaneSort((prev) => {
       if (prev?.column !== column) {
         return { column, dir: "asc" };
@@ -435,21 +431,21 @@ export function LoadsTable({
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="text-muted-foreground">Sort:</span>
-          <Select
-            value={toolbarSort}
-            onValueChange={(v) => {
-              setToolbarSort(v as ToolbarSortOption);
-              setLaneSort(null);
-            }}
+          <button
+            type="button"
+            onClick={() => setLaneSort(null)}
+            className={cn(
+              "h-9 inline-flex min-w-[5.5rem] shrink-0 items-center rounded-md border border-border bg-background px-3 text-sm sm:text-base transition-colors hover:bg-muted/60",
+              laneSort != null && "ring-1 ring-primary/35",
+            )}
+            title={
+              laneSort != null
+                ? "Switch back to client order"
+                : "Sorted by client (use Pickup / Delivery headers to sort by lane)"
+            }
           >
-            <SelectTrigger className="w-[140px] h-9 text-sm sm:text-base bg-background">
-              <SelectValue placeholder="No sorting" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover">
-              <SelectItem value="none">No sorting</SelectItem>
-              <SelectItem value="template_type">Client</SelectItem>
-            </SelectContent>
-          </Select>
+            Client
+          </button>
         </div>
 
         <div className="h-6 w-px bg-border hidden sm:block" />
@@ -459,10 +455,10 @@ export function LoadsTable({
           <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="text-muted-foreground">Client:</span>
           <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="w-[100px] h-9 text-sm sm:text-base bg-background">
+            <SelectTrigger className="h-9 min-w-[14rem] w-[min(100%,18rem)] max-w-[20rem] text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
-            <SelectContent className="bg-popover">
+            <SelectContent className="bg-popover min-w-[var(--radix-select-trigger-width)]">
               <SelectItem value="all">All ({loadsExcludingArchived.length})</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client} value={client}>
@@ -478,10 +474,10 @@ export function LoadsTable({
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Pickup:</span>
           <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
+            <SelectTrigger className="h-9 min-w-[8rem] w-[min(100%,11rem)] max-w-[13rem] text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
-            <SelectContent className="bg-popover max-h-[300px]">
+            <SelectContent className="bg-popover max-h-[300px] min-w-[var(--radix-select-trigger-width)]">
               <SelectItem value="all">All States</SelectItem>
               {pickupStates.map((state) => (
                 <SelectItem key={state} value={state}>
@@ -496,10 +492,10 @@ export function LoadsTable({
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground">Delivery:</span>
           <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-            <SelectTrigger className="w-[92px] h-9 text-sm sm:text-base bg-background">
+            <SelectTrigger className="h-9 min-w-[8rem] w-[min(100%,11rem)] max-w-[13rem] text-sm sm:text-base bg-background">
               <SelectValue placeholder="All" />
             </SelectTrigger>
-            <SelectContent className="bg-popover max-h-[300px]">
+            <SelectContent className="bg-popover max-h-[300px] min-w-[var(--radix-select-trigger-width)]">
               <SelectItem value="all">All States</SelectItem>
               {destStates.map((state) => (
                 <SelectItem key={state} value={state}>

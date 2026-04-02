@@ -57,17 +57,17 @@ serve(async (req) => {
         dest_city,
         dest_state,
         ship_date,
-        customer_invoice_total,
         target_pay,
         max_pay,
+        is_per_ton,
+        rate_raw,
         trailer_type,
         weight_lbs,
         miles,
-        commodity,
-        status
+        commodity
       `)
       .eq("is_active", true)
-      .eq("status", "open");
+      .eq("dispatch_status", "open");
 
     // Search by load number (normalize to remove dashes)
     if (load_number) {
@@ -118,17 +118,25 @@ serve(async (req) => {
 
     // Format loads for the AI agent with rate info
     const formattedLoads = loads.map((load) => {
-      const hasRate = load.target_pay && load.target_pay > 0;
+      const targetPay = load.target_pay;
+      const maxPay = load.max_pay;
+      const tp = targetPay != null ? Number(targetPay) : 0;
+      const hasPay = Number.isFinite(tp) && tp > 0;
+      const rr = load.rate_raw != null ? Number(load.rate_raw) : 0;
+      const hasPerTon =
+        load.is_per_ton === true && Number.isFinite(rr) && rr > 0;
+      const rate_available = hasPay || hasPerTon;
       return {
         load_number: load.load_number,
         lane: `${load.pickup_city}, ${load.pickup_state} → ${load.dest_city}, ${load.dest_state}`,
         pickup: `${load.pickup_city}, ${load.pickup_state}`,
         delivery: `${load.dest_city}, ${load.dest_state}`,
         ship_date: load.ship_date,
-        invoice: load.customer_invoice_total,
-        target_rate: hasRate ? load.target_pay : null, // 20% margin - quote this first
-        max_rate: hasRate ? load.max_pay : null, // 15% margin - max we can go
-        rate_available: hasRate,
+        target_pay: targetPay ?? null,
+        max_pay: maxPay ?? null,
+        is_per_ton: Boolean(load.is_per_ton),
+        rate_raw: load.rate_raw ?? null,
+        rate_available,
         trailer_type: load.trailer_type,
         weight: load.weight_lbs,
         miles: load.miles,
@@ -142,8 +150,8 @@ serve(async (req) => {
       loads: formattedLoads,
       instructions: `
 ## Rate Quoting
-- Quote the target_rate first (20% margin). Only go up to max_rate (15% margin) if the driver negotiates.
-- IMPORTANT: If rate_available is false or target_rate is null/zero, say "I will have to connect you with an agent on the rate" - do NOT make up a rate.
+- Quote target_pay first. Only go to max_pay if pushed once. Never mention invoice, customer_invoice_total, or rate_raw.
+- IMPORTANT: If rate_available is false, say "I will have to connect you with an agent on the rate" - do NOT make up a rate.
 
 ## Carrier Information Collection (ALWAYS DO THIS)
 - Always ask for the caller's MC number or DOT number. Say: "May I have your MC or DOT number?"

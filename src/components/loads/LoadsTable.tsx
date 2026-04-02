@@ -215,6 +215,8 @@ export function LoadsTable({
           aljex_big500: 3,
           aljex_spot: 4,
           oldcastle_gsheet: 5,
+          semco_email: 5,
+          semco_xlsx: 5,
           truckertools: 6,
         };
         const aOrder = templateOrder[a.template_type] || 99;

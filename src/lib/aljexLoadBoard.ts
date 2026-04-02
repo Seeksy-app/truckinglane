@@ -48,6 +48,9 @@ export function getLoadBoardClientPrimaryLabel(templateType: string): string {
       return "Adelphia";
     case "vms_email":
       return "VMS";
+    case "semco_email":
+    case "semco_xlsx":
+      return "SEMCO";
     case "oldcastle_gsheet":
       return "Oldcastle";
     case "truckertools":

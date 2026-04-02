@@ -1251,7 +1251,7 @@ Deno.serve(async (req) => {
             ? "century_pdf"
             : importType === "allied"
             ? "allied_xlsx"
-            : "semco_xlsx";
+            : "semco_email";
         console.warn(`${templateType}: agency not found — logging email as received anyway`);
         await supabase.from("email_import_logs").insert({
           agency_id: null,
@@ -1325,9 +1325,133 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ============= ALLIED / SEMCO (parser pending — log only) =============
-    if (importType === "allied" || importType === "semco") {
-      const templateType = importType === "allied" ? "allied_xlsx" : "semco_xlsx";
+    // ============= SEMCO: forward to parse-semco-email (same webhook shape + enriched PDF base64) =============
+    if (importType === "semco") {
+      const SEMCO_TEMPLATE = "semco_email";
+      const semcoPdfs = (attachments as { filename?: string; content?: string; id?: string }[]).filter((a) =>
+        a.filename?.toLowerCase().endsWith(".pdf")
+      );
+      if (semcoPdfs.length === 0) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "SEMCO import: no PDF attachments found",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "No PDF attachments found for SEMCO import" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const forwardPayload = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+      const fwdAttachments =
+        (Array.isArray(forwardPayload.attachments) && forwardPayload.attachments) ||
+        (forwardPayload.data as Record<string, unknown> | undefined)?.attachments ||
+        (forwardPayload.email as Record<string, unknown> | undefined)?.attachments;
+
+      if (!Array.isArray(fwdAttachments)) {
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          error_message: "SEMCO import: payload had no attachments array to forward",
+          raw_headers: emailHeaders,
+        });
+        return new Response(JSON.stringify({ error: "Invalid webhook payload: missing attachments array" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      for (let i = 0; i < fwdAttachments.length; i++) {
+        const a = fwdAttachments[i] as {
+          filename?: string;
+          content?: string;
+          id?: string;
+          contentType?: string;
+        };
+        if (!a?.filename?.toLowerCase().endsWith(".pdf")) continue;
+        if (a.content) continue;
+        try {
+          const buf = await fetchInboundPdfAttachmentBuffer(emailId, a, resendApiKey);
+          fwdAttachments[i] = {
+            ...a,
+            content: uint8ToBase64(new Uint8Array(buf)),
+            contentType: a.contentType || "application/pdf",
+          };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await supabase.from("email_import_logs").insert({
+            agency_id: agency.id,
+            sender_email: senderEmail,
+            subject: subject,
+            status: "failed",
+            error_message: `SEMCO PDF attachment fetch: ${msg}`,
+            raw_headers: emailHeaders,
+          });
+          return new Response(JSON.stringify({ error: msg }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      console.log(`[${SEMCO_TEMPLATE}] Invoking parse-semco-email`);
+      const parseResp = await fetch(`${supabaseUrl}/functions/v1/parse-semco-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseKey}`,
+          apikey: supabaseKey,
+        },
+        body: JSON.stringify(forwardPayload),
+      });
+
+      const parseText = await parseResp.text();
+      let parseJson: Record<string, unknown> = {};
+      try {
+        parseJson = parseText ? JSON.parse(parseText) as Record<string, unknown> : {};
+      } catch {
+        /* non-JSON body */
+      }
+
+      if (!parseResp.ok) {
+        const errMsg =
+          typeof parseJson.error === "string"
+            ? parseJson.error
+            : parseText || `HTTP ${parseResp.status}`;
+        await supabase.from("email_import_logs").insert({
+          agency_id: agency.id,
+          sender_email: senderEmail,
+          subject: subject,
+          status: "failed",
+          imported_count: 0,
+          error_message: `parse-semco-email: ${errMsg}`,
+          raw_headers: { ...emailHeaders, parse_semco_status: parseResp.status },
+        });
+        return new Response(parseText || JSON.stringify({ error: errMsg }), {
+          status: parseResp.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          ...parseJson,
+          agency: agency.name,
+          template_type: SEMCO_TEMPLATE,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ============= ALLIED (parser pending — log only) =============
+    if (importType === "allied") {
+      const templateType = "allied_xlsx";
       console.log(`[${templateType}] Email accepted — full XLSX parser not implemented yet; logging as received`);
       await supabase.from("email_import_logs").insert({
         agency_id: agency.id,

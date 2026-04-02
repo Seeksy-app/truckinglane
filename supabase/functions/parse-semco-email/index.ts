@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
-import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +9,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323";
 const TEMPLATE_TYPE = "semco_email";
+const MODEL = "claude-sonnet-4-20250514";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -22,98 +22,141 @@ function lastDayOfShipMonth(isoYmd: string): string {
   return `${y}-${mm}-${String(last).padStart(2, "0")}`;
 }
 
-function normalizeAttachmentBase64(raw: string): Uint8Array {
+/** Raw base64 for Anthropic PDF document (no data-URL prefix, no whitespace). */
+function stripPdfBase64ForClaude(raw: string): string {
   const s = String(raw).trim();
-  const dataUrl = s.match(/^data:application\/pdf;base64,(.+)$/is);
-  const b64 = dataUrl ? dataUrl[1].replace(/\s/g, "") : s.replace(/\s/g, "");
-  return decodeBase64(b64);
+  const m = s.match(/^data:application\/pdf;base64,(.+)$/is);
+  return (m ? m[1] : s).replace(/\s/g, "");
 }
 
-async function extractPDFText(base64Data: string): Promise<string> {
-  const { default: pdfParse } = await import("npm:pdf-parse@1.1.1");
-  const buffer = normalizeAttachmentBase64(base64Data);
-  const result = await pdfParse(buffer);
-  return typeof result?.text === "string" ? result.text : "";
+type SemcoClaudeRow = {
+  pickup_city: string;
+  pickup_state: string;
+  dest_city: string;
+  dest_state: string;
+  rate_raw: number;
+  notes: string | null;
+};
+
+type ParsedSemcoLoad = {
+  pickup_city: string;
+  pickup_state: string;
+  dest_city: string;
+  dest_state: string;
+  rate_raw: number;
+  load_call_script: string | null;
+};
+
+function normalizeClaudeRow(x: unknown): SemcoClaudeRow | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  const pickup_city = String(o.pickup_city ?? "").trim();
+  const pickup_state = String(o.pickup_state ?? "").trim().toUpperCase().slice(0, 2);
+  const dest_city = String(o.dest_city ?? "").trim();
+  const dest_state = String(o.dest_state ?? "").trim().toUpperCase().slice(0, 2);
+  const rate_raw = Number(o.rate_raw);
+  if (!pickup_city || !pickup_state || !dest_city || !dest_state || Number.isNaN(rate_raw) || rate_raw <= 0) {
+    return null;
+  }
+  const n = o.notes;
+  const notes =
+    n == null || n === ""
+      ? null
+      : String(n).replace(/\*+NEW\*+/gi, "").trim() || null;
+  return { pickup_city, pickup_state, dest_city, dest_state, rate_raw, notes };
 }
 
-function parseSemcoText(text: string) {
-  const loads: Array<{
-    pickup_city: string;
-    pickup_state: string;
-    dest_city: string;
-    dest_state: string;
-    rate_raw: number;
-    load_call_script: string | null;
-  }> = [];
+async function extractSemcoLoadsWithClaude(
+  pdfBase64Raw: string,
+  anthropicKey: string,
+): Promise<ParsedSemcoLoad[]> {
+  const data = stripPdfBase64ForClaude(pdfBase64Raw);
+  if (!data) throw new Error("Empty PDF base64");
 
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const prompt = `You are extracting freight loads from a SEMCO Stone load sheet PDF (exported from Microsoft Excel).
 
-  let inTable = false;
-  let prevPickupCity = "";
-  let prevPickupState = "";
-  let prevDestCity = "";
-  let prevDestState = "";
+The document contains a table with columns:
+- Origin: CITY then 2-letter US state
+- Destination: CITY then 2-letter US state  
+- Rate: dollar amount (may include $ and commas)
+- Notes: optional text
 
-  for (const line of lines) {
-    if (/origin/i.test(line) && /destination/i.test(line)) {
-      inTable = true;
-      continue;
-    }
-    if (/ABOVE LOADS ARE FOR/i.test(line)) break;
-    if (!inTable) continue;
+Rules:
+- A double-quote character " in the Origin or Destination cell means "same as the row above" for that column only. Resolve every output row to the full city and state (never output " as a place).
+- Stop before any disclaimer line that begins with "ABOVE LOADS ARE FOR".
+- Skip header rows and non-data rows.
+- All loads are flatbed, 48000 lbs, no tarp, commodity Landscaping Stone — you only extract the table; do not add those fields to JSON.
 
-    const parts = line.split(/\s{2,}|\t/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length < 3) continue;
+Return ONLY a valid JSON array (no markdown fences, no commentary). Example shape:
+[{"pickup_city":"SAN SABA","pickup_state":"TX","dest_city":"PERRYVILLE","dest_state":"MO","rate_raw":1900,"notes":null}]
 
-    const originRaw = parts[0];
-    const destRaw = parts[1];
-    const rateRaw = parts[2];
-    const notesRaw = parts.slice(3).join(" ").trim() || null;
+Each object must have: pickup_city, pickup_state (2 letters), dest_city, dest_state (2 letters), rate_raw (number only, no $ or commas), notes (string or null).
+Include every data row from the load table.`;
 
-    const invoice = parseFloat(rateRaw.replace(/[$,]/g, ""));
-    if (Number.isNaN(invoice) || invoice <= 0) continue;
+  const body = {
+    model: MODEL,
+    max_tokens: 8192,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: {
+              type: "base64",
+              media_type: "application/pdf",
+              data,
+            },
+          },
+          { type: "text", text: prompt },
+        ],
+      },
+    ],
+  };
 
-    let pickup_city: string;
-    let pickup_state: string;
-    let dest_city: string;
-    let dest_state: string;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
 
-    if (originRaw === '"' || originRaw === '""') {
-      pickup_city = prevPickupCity;
-      pickup_state = prevPickupState;
-    } else {
-      const p = originRaw.split(" ");
-      pickup_state = p.pop()!.toUpperCase();
-      pickup_city = p.join(" ").trim();
-      prevPickupCity = pickup_city;
-      prevPickupState = pickup_state;
-    }
-
-    if (destRaw === '"' || destRaw === '""') {
-      dest_city = prevDestCity;
-      dest_state = prevDestState;
-    } else {
-      const p = destRaw.split(" ");
-      dest_state = p.pop()!.toUpperCase();
-      dest_city = p.join(" ").trim();
-      prevDestCity = dest_city;
-      prevDestState = dest_state;
-    }
-
-    const cleanNotes = notesRaw
-      ? notesRaw.replace(/\*+NEW\*+/gi, "").trim() || null
-      : null;
-
-    loads.push({
-      pickup_city,
-      pickup_state,
-      dest_city,
-      dest_state,
-      rate_raw: invoice,
-      load_call_script: cleanNotes,
-    });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Anthropic ${res.status}: ${t.slice(0, 800)}`);
   }
 
+  const resp = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+  };
+  const text = resp.content?.find((c) => c.type === "text")?.text ?? "";
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("Claude did not return a JSON array");
+
+  let arr: unknown;
+  try {
+    arr = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error("Claude returned invalid JSON array");
+  }
+  if (!Array.isArray(arr)) throw new Error("Claude JSON root is not an array");
+
+  const loads: ParsedSemcoLoad[] = [];
+  for (const item of arr) {
+    const row = normalizeClaudeRow(item);
+    if (!row) continue;
+    loads.push({
+      pickup_city: row.pickup_city,
+      pickup_state: row.pickup_state,
+      dest_city: row.dest_city,
+      dest_state: row.dest_state,
+      rate_raw: row.rate_raw,
+      load_call_script: row.notes,
+    });
+  }
   return loads;
 }
 
@@ -161,29 +204,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    let semcoText: string | null = null;
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) {
+      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let parsedLoads: ParsedSemcoLoad[] = [];
+    let lastError: string | null = null;
 
     for (const att of pdfAttachments) {
       if (!att.content) continue;
-      const text = await extractPDFText(att.content);
-      if (/semco stone/i.test(text) || /LOAD SHEET/i.test(text)) {
-        semcoText = text;
-        break;
+      try {
+        const loads = await extractSemcoLoadsWithClaude(att.content, anthropicKey);
+        if (loads.length > 0) {
+          parsedLoads = loads;
+          break;
+        }
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : String(e);
+        console.error("parse-semco-email Claude:", lastError);
       }
     }
 
-    if (!semcoText) {
-      return new Response(
-        JSON.stringify({ error: "No SEMCO load sheet detected" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const parsedLoads = parseSemcoText(semcoText);
-
     if (parsedLoads.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No loads parsed from SEMCO PDF" }),
+        JSON.stringify({
+          error: "No loads parsed from SEMCO PDF",
+          ...(lastError ? { detail: lastError } : {}),
+        }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -249,6 +300,7 @@ Deno.serve(async (req) => {
         source_row: {
           semco_source_hash: source_hash,
           parser: "parse-semco-email",
+          claude_model: MODEL,
         },
       });
     }
@@ -280,7 +332,7 @@ Deno.serve(async (req) => {
       subject,
       status: "success",
       imported_count: rows.length,
-      raw_headers: { template_type: TEMPLATE_TYPE },
+      raw_headers: { template_type: TEMPLATE_TYPE, parser: "claude-pdf" },
     });
 
     return new Response(

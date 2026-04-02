@@ -9,11 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, XCircle } from "lucide-react";
-import { DAT_ELIGIBLE_TEMPLATE_TYPES, isExportableLoad } from "@/lib/datExport";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Load = Tables<"loads">;
-
+import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { useUserRole } from "@/hooks/useUserRole";
 interface FailedLoad {
   id: string;
   load_number: string;
@@ -26,6 +23,8 @@ interface FailedLoad {
 
 export function DATStatusCard() {
   const queryClient = useQueryClient();
+  const { impersonatedAgencyId } = useImpersonation();
+  const { role } = useUserRole();
   const [showFailed, setShowFailed] = useState(false);
   const [editLoad, setEditLoad] = useState<FailedLoad | null>(null);
   const [editCity, setEditCity] = useState("");
@@ -33,39 +32,67 @@ export function DATStatusCard() {
   const [posting, setPosting] = useState<string | null>(null);
 
   const { data: stats } = useQuery({
-    queryKey: ["dat-stats"],
+    queryKey: ["dat-stats", role, impersonatedAgencyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const applyAgency = <T extends { eq: (c: string, v: string) => T }>(q: T) => {
+        if (role === "super_admin" && impersonatedAgencyId) {
+          return q.eq("agency_id", impersonatedAgencyId);
+        }
+        return q;
+      };
+
+      // Pending: dat_posted_at IS NULL, active, dispatch open
+      let pendingQ = supabase
+        .from("loads")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true)
+        .is("dat_posted_at", null)
+        .eq("dispatch_status", "open");
+      pendingQ = applyAgency(pendingQ);
+      const { count: pending, error: pendingErr } = await pendingQ;
+      if (pendingErr) throw pendingErr;
+
+      // Uploaded: dat_posted_at set, active
+      let uploadedQ = supabase
+        .from("loads")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true)
+        .not("dat_posted_at", "is", null);
+      uploadedQ = applyAgency(uploadedQ);
+      const { count: uploaded, error: uploadedErr } = await uploadedQ;
+      if (uploadedErr) throw uploadedErr;
+
+      // Need destination: same as pending + any of pickup/dest zip or city NULL
+      let needDestQ = supabase
+        .from("loads")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true)
+        .is("dat_posted_at", null)
+        .eq("dispatch_status", "open")
+        .or("pickup_zip.is.null,pickup_city.is.null,dest_zip.is.null,dest_city.is.null");
+      needDestQ = applyAgency(needDestQ);
+      const { count: needDestination, error: needDestErr } = await needDestQ;
+      if (needDestErr) throw needDestErr;
+
+      let failedListQ = supabase
         .from("loads")
         .select(
           "id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type, dat_posted_at, dispatch_status",
         )
         .eq("is_active", true)
-        .neq("dispatch_status", "archived");
+        .is("dat_posted_at", null)
+        .eq("dispatch_status", "open")
+        .or("pickup_zip.is.null,pickup_city.is.null,dest_zip.is.null,dest_city.is.null");
+      failedListQ = applyAgency(failedListQ);
+      const { data: failedRows, error: failedListErr } = await failedListQ;
+      if (failedListErr) throw failedListErr;
 
-      if (error) throw error;
-
-      const eligibleTypes: readonly string[] = DAT_ELIGIBLE_TEMPLATE_TYPES;
-      const loads = (data || []).filter((l) =>
-        eligibleTypes.includes(String(l.template_type || "")),
-      ) as (Load & {
-        dat_posted_at: string | null;
-        dispatch_status: string | null;
-      })[];
-
-      const uploaded = loads.filter((l) => l.dat_posted_at != null).length;
-
-      // Pending = eligible, active, not yet posted (matches modal / nav: dat_posted_at IS NULL)
-      const pendingLoads = loads.filter((l) => l.dat_posted_at == null);
-      const pending = pendingLoads.length;
-      const notExportable = pendingLoads.filter((l) => !isExportableLoad(l));
-      const failedLoads = notExportable as FailedLoad[];
+      const failedLoads = (failedRows || []) as FailedLoad[];
 
       return {
-        total: loads.length,
-        uploaded,
-        pending,
-        failed: failedLoads.length,
+        uploaded: uploaded ?? 0,
+        pending: pending ?? 0,
+        failed: needDestination ?? 0,
         failedLoads,
       };
     },
@@ -98,7 +125,6 @@ export function DATStatusCard() {
   const uploaded = stats?.uploaded ?? 0;
   const pending = stats?.pending ?? 0;
   const failed = stats?.failed ?? 0;
-  const ttMapping = stats?.truckertoolsMappingCount ?? 0;
 
   return (
     <TooltipProvider>
@@ -146,9 +172,9 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {pending} pending (not yet uploaded, <code className="text-xs">dat_posted_at</code> empty) · {uploaded}{" "}
-              uploaded to DAT
-              {failed > 0 ? ` · ${failed} need destination or row fix (click card)` : ""}
+              {pending} pending (<code className="text-xs">dat_posted_at</code> null, open, active) · {uploaded} uploaded (
+              <code className="text-xs">dat_posted_at</code> set, active) · {failed} need destination (missing zip/city on
+              pickup or dest)
             </p>
           </TooltipContent>
         </Tooltip>

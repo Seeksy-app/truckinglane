@@ -679,17 +679,25 @@ function generateLoadCallScript(load: Record<string, unknown>): string {
 
 // ============= VMS EMAIL BODY PARSER =============
 
-/** Strip routing / FSC tail from the commodity segment (regex may over-capture on odd lines). */
-function vmsCommodityNameOnly(raw: string): string {
-  let s = raw.trim();
-  if (!s) return s;
-  const fscAt = s.search(/\bfsc\b/i);
-  if (fscAt >= 0) s = s.slice(0, fscAt).trim();
-  const spacedDash = s.indexOf(" - ");
-  if (spacedDash >= 0) s = s.slice(0, spacedDash).trim();
-  const dash = s.indexOf("-");
-  if (dash >= 0) s = s.slice(0, dash).trim();
-  return s.trim();
+/** "City, ST" from one VMS segment (comma before 2-letter state). */
+function vmsParseCityStateSegment(segment: string): { city: string; state: string } | null {
+  const m = segment.trim().match(/^([^,]+),\s*\.?\s*([A-Za-z]{2})\s*$/);
+  if (!m) return null;
+  return { city: m[1].trim(), state: m[2].toUpperCase() };
+}
+
+/** First $rate or $rate/denom in a string (for invoice / van vs flatbed). */
+function vmsFirstRateInString(s: string): { rate: number; denom: number | null } | null {
+  const m = s.match(/\$\s*([\d,]+)(?:\s*\/\s*(\d+))?/);
+  if (!m) return null;
+  const rate = parseFloat(m[1].replace(/,/g, ""));
+  if (Number.isNaN(rate) || rate <= 0) return null;
+  const denomRaw = m[2];
+  const denom = denomRaw != null && denomRaw !== "" ? parseInt(denomRaw, 10) : null;
+  return {
+    rate,
+    denom: denom != null && !Number.isNaN(denom) && denom > 0 ? denom : null,
+  };
 }
 
 // Generate a simple hash for deterministic load number generation
@@ -740,49 +748,72 @@ function parseVMSEmailBody(body: string, agencyId: string): Record<string, unkno
   const lines = filteredLines;
   
   for (let line of lines) {
-    // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*) 
-    line = line.replace(/^\*+/, '').replace(/\*+$/, '').trim();
-    
-    // Match pattern: "2 - Charleston, SC - cars - Jackson, Tn $1700"
-    // Also: "6 - Homestead, FL - cars - Jacksonville, FL - $825/100 fsc"
-    // Format: COUNT - PICKUP_CITY, ST - COMMODITY - DEST_CITY, ST [ - ] $RATE[/DENOM] [suffix]
-    // Optional " - " before $; optional /100 (rate per unit); "fsc" etc. captured as notes.
-    // The regex handles typos like "Jackson,. TN" (extra period/chars between comma and state)
-    const match = line.match(
-      /^(\d+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*-\s*([^-]+)\s*-\s*([^,]+),\s*\.?\s*([A-Za-z]{2})\s*(?:-\s*)?\$?\s*([\d,]+)(?:\/(\d+))?\s*(.*)$/i,
-    );
-    
-    if (!match) {
-      console.log("VMS line did not match pattern:", line);
+    // Strip Gmail bold formatting (asterisks around text like *2 - City, ST*)
+    line = line.replace(/^\*+/, "").replace(/\*+$/, "").trim();
+
+    // Format: [count]- [Origin City, ST] - [commodity] - [Destination City, ST] [rates / alternates…]
+    // Commodity is ONLY the segment between the 2nd and 3rd " - " (after the leading count).
+    // Example: 6- Homestead, FL - cars - Jacksonville, FL - $725/100 fsc / Jackson, TN $1700/100 fsc
+    const countMatch = line.match(/^(\d+)\s*-\s*(.+)$/);
+    if (!countMatch) {
+      console.log("VMS line did not match count prefix:", line);
       continue;
     }
-    
-    console.log("VMS matched line:", line);
-    
-    const count = parseInt(match[1], 10);
-    const pickupCity = match[2].trim();
-    const pickupState = match[3].toUpperCase();
-    const commodityRaw = vmsCommodityNameOnly(match[4]).toLowerCase();
-    const destCity = match[5].trim();
-    const destState = match[6].toUpperCase();
-    const rateRaw = parseFloat(match[7].replace(/,/g, ''));
-    const rateDenom = match[8] ? parseInt(match[8], 10) : null;
-    // New VMS van lines use $825/100 fsc — equipment is Van (V); flat $1700 style stays Flatbed.
-    const trailerType = rateDenom != null && rateDenom > 0 ? "Van" : "Flatbed";
-    
-    // Normalize commodity - "cars" or "bales" = "Crushed Cars"
+
+    const count = parseInt(countMatch[1], 10);
+    if (Number.isNaN(count) || count < 1) continue;
+
+    const tail = countMatch[2].trim();
+    const segments = tail.split(/\s+-\s+/).map((s) => s.trim()).filter(Boolean);
+    if (segments.length < 3) {
+      console.log("VMS line needs origin, commodity, destination segments:", line);
+      continue;
+    }
+
+    const originSeg = segments[0];
+    const commoditySeg = segments[1];
+    const afterCommodity = segments.slice(2).join(" - ");
+
+    const origin = vmsParseCityStateSegment(originSeg);
+    if (!origin) {
+      console.log("VMS could not parse origin:", originSeg, line);
+      continue;
+    }
+    const pickupCity = origin.city;
+    const pickupState = origin.state;
+
+    const commodityLower = commoditySeg.trim().toLowerCase();
     const commodity =
-      commodityRaw === "cars" || commodityRaw === "bales" ? "Crushed Cars" : commodityRaw;
-    
+      commodityLower === "cars" || commodityLower === "bales"
+        ? "Crushed Cars"
+        : commoditySeg.trim();
+
+    const destMatch = afterCommodity.match(/^([^,]+),\s*\.?\s*([A-Za-z]{2})\b(.*)$/i);
+    if (!destMatch) {
+      console.log("VMS could not parse destination from:", afterCommodity, line);
+      continue;
+    }
+    const destCity = destMatch[1].trim();
+    const destState = destMatch[2].toUpperCase();
+    const tailAfterDest = destMatch[3].trim().replace(/^-\s*/, "").trim();
+    const notes = tailAfterDest || null;
+
+    const rateInfo = vmsFirstRateInString(afterCommodity) ?? vmsFirstRateInString(line);
+    if (!rateInfo) {
+      console.log("VMS no rate found in line:", line);
+      continue;
+    }
+    const rateRaw = rateInfo.rate;
+    const rateDenom = rateInfo.denom;
+    const trailerType = rateDenom != null && rateDenom > 0 ? "Van" : "Flatbed";
+
+    console.log("VMS matched line:", line);
+
     // Fixed weight of 47,000 lbs per user specification
     const weightLbs = 47000;
-    
+
     // Calculate financial fields (flat rate, not per ton)
     const rateFields = calculateRateFields(rateRaw, weightLbs, false);
-    
-    // Extract notes from remainder after rate (handles "$825/100 fsc" not only "$1700 - note")
-    const remainder = (match[9] ?? "").trim();
-    const notes = remainder.replace(/^-\s*/, "").trim() || null;
     
     // Create 'count' number of individual load records with FIXED instance numbers
     // The instance number is simply 1 to count, making load numbers deterministic per route

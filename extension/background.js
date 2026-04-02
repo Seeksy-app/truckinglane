@@ -882,7 +882,8 @@ async function ingestTruckerToolsNearbyFromStoredCredentials() {
 
 /** Body for getNearbyLoadsV5 (poll + webRequest refetch). */
 function buildTruckerToolsNearbyPayload() {
-  const pickupDateFrom = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const pickupDateFrom = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   return {
     type: 'GET_NEARBY_LOADS',
     truckTypes: [],

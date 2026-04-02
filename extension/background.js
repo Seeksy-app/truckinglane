@@ -882,11 +882,7 @@ async function ingestTruckerToolsNearbyFromStoredCredentials() {
 
 /** Body for getNearbyLoadsV5 (poll + webRequest refetch). */
 function buildTruckerToolsNearbyPayload() {
-  const pickupDateFrom = new Date().toLocaleDateString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-  });
+  const pickupDateFrom = new Date().toISOString().slice(0, 10);
   return {
     type: 'GET_NEARBY_LOADS',
     truckTypes: [],

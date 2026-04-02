@@ -9,7 +9,7 @@ const TRUCKERTOOLS_ALARM = 'truckertools-nearby';
 /** Must match TRUCKERTOOLS_ALARM period (re-scheduled on install + browser startup for reliable MV3 SW). */
 const TRUCKERTOOLS_POLL_INTERVAL_MINUTES = 30;
 const TRUCKERTOOLS_ADVANTAGE_ID = 'oc6bt2hs';
-const TRUCKERTOOLS_USERNAME = 'andrew@podlogix.co';
+const TRUCKERTOOLS_USERNAME = 'stephen@dltransport.com';
 
 function scheduleTruckerToolsAlarm() {
   chrome.alarms.create(TRUCKERTOOLS_ALARM, { periodInMinutes: TRUCKERTOOLS_POLL_INTERVAL_MINUTES });
@@ -845,19 +845,32 @@ async function ingestTruckerToolsNearbyFromStoredCredentials() {
   return { vpsStatus, loadsCount: loads.length };
 }
 
+/** Body for getNearbyLoadsV5 (poll + webRequest refetch). */
 function buildTruckerToolsNearbyPayload() {
-  const today = new Date().toISOString().slice(0, 10);
+  const pickupDateFrom = new Date().toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  });
   return {
     type: 'GET_NEARBY_LOADS',
-    advantageId: TRUCKERTOOLS_ADVANTAGE_ID,
-    authenticated: true,
-    brokerIds: [],
-    destinations: [],
-    origins: [{ type: 'address', country: 'United States', latitude: 37.09024 }],
-    perPage: 750,
-    pickupDateFrom: today,
-    showLTL: false,
     truckTypes: [],
+    advantageId: TRUCKERTOOLS_ADVANTAGE_ID,
+    destinations: [],
+    origins: [
+      {
+        type: 'address',
+        city: null,
+        state: null,
+        country: 'United States',
+        latitude: 37.09024,
+        longitude: -95.7129,
+      },
+    ],
+    perPage: 750,
+    pickupDateFrom,
+    showLTL: false,
+    authenticated: true,
     username: TRUCKERTOOLS_USERNAME,
   };
 }

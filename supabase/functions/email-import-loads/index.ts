@@ -474,10 +474,10 @@ async function extractCenturyPdfWithClaude(
 
 Best-effort rules — extract whatever matches; use 0 or null only if nothing plausible exists.
 
-WEIGHT (US tons = 2000 lb per ton):
+WEIGHT (US tons = 2000 lb per ton) — optional when not on the document:
 - Labels may include: TONS, NET TONS, ESTIMATED TONS, NT, LBS, WEIGHT, GW, or an unlabeled number with "tons" / "lbs" nearby.
 - If the document shows weight in LBS only, set "weight_lbs" to that number and set "weight_tons" to (weight_lbs / 2000). If it shows tons (any label), set "weight_tons" to that number (numeric).
-- You may also use net_tons / estimated_tons mentally; the required output field is still "weight_tons" as the final US tons value.
+- If no reliable weight appears, set "weight_tons" to 0 and "weight_lbs" to null. Per-ton rate is still required when shown.
 
 RATE ($ per ton):
 - Labels may include: RATE, RATE/TON, $/TON, /NT, PER TON, PRICE, LINE HAUL, or a standalone dollar amount tied to per-ton pricing.
@@ -494,7 +494,7 @@ destination_company: consignee / mill / destination company if shown.
 
 contains_bales: true if "BALES" appears anywhere.
 
-Even if ambiguous, return your best numeric guesses for weight_tons and rate_per_ton when any reasonable numbers exist on the page.`,
+Even if ambiguous, return your best numeric guesses for rate_per_ton when any reasonable numbers exist on the page; weight_tons may stay 0 if unknown.`,
           },
         ],
       },
@@ -1454,21 +1454,31 @@ Deno.serve(async (req) => {
 
           const tons = ext.weight_tons;
           const ratePerTon = ext.rate_per_ton;
-          if (!(tons > 0) || !(ratePerTon > 0)) {
+          const pickupOk =
+            String(ext.pickup_city ?? "").trim().length > 0 &&
+            String(ext.pickup_state ?? "").trim().length >= 2;
+          const destOk =
+            String(ext.dest_city ?? "").trim().length > 0 &&
+            String(ext.dest_state ?? "").trim().length >= 2;
+          if (!pickupOk || !destOk || !(ratePerTon > 0)) {
             const rawForLog =
               rawClaudeText.length > 50000
                 ? `${rawClaudeText.slice(0, 50000)}…[truncated]`
                 : rawClaudeText;
             parseErrors.push(
-              `${att.filename ?? `pdf_${idx}`}: missing weight_tons or rate_per_ton | claude_raw=${rawForLog}`,
+              `${att.filename ?? `pdf_${idx}`}: missing pickup/destination or rate_per_ton | claude_raw=${rawForLog}`,
             );
             console.error(
-              "[century] missing weight/rate",
+              "[century] missing locations or rate",
               att.filename,
-              "tons=",
-              tons,
+              "pickupOk=",
+              pickupOk,
+              "destOk=",
+              destOk,
               "rpt=",
               ratePerTon,
+              "tons=",
+              tons,
               "raw_len=",
               rawClaudeText.length,
             );
@@ -1487,12 +1497,17 @@ Deno.serve(async (req) => {
 
           // ship_date: next calendar day from email receipt (never PDF date) — product spec
           const shipDateYmd = centuryPickupDateFromEmailReceived(receivedIso);
-          const weightLbs = Math.round(tons * 2000);
-          const customerInvoiceTotal = Math.round(ratePerTon * tons);
-          const targetPay = Math.round(customerInvoiceTotal * 0.8);
-          const maxPay = Math.round(customerInvoiceTotal * 0.85);
-          const targetCommission = Math.round(customerInvoiceTotal * 0.2);
-          const maxCommission = Math.round(customerInvoiceTotal * 0.15);
+          const tonsPositive = tons > 0;
+          const weightLbs = tonsPositive ? Math.round(tons * 2000) : null;
+          const customerInvoiceTotal = tonsPositive ? Math.round(ratePerTon * tons) : 0;
+          const targetPay = tonsPositive
+            ? Math.round(customerInvoiceTotal * 0.8)
+            : Math.round(Math.max(0, ratePerTon - 10));
+          const maxPay = tonsPositive
+            ? Math.round(customerInvoiceTotal * 0.85)
+            : Math.round(Math.max(0, ratePerTon - 5));
+          const targetCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.2) : 0;
+          const maxCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.15) : 0;
 
           const commodity = ext.contains_bales ? "baled aluminum" : "crushed cars";
           const pickupRaw = ext.pickup_city && ext.pickup_state
@@ -1542,9 +1557,11 @@ Deno.serve(async (req) => {
                   ? `${rawClaudeText.slice(0, 120000)}…[truncated]`
                   : rawClaudeText,
             },
-            load_call_script:
-              `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +
-              `${tons} tons @ $${ratePerTon}/ton (invoice ~$${customerInvoiceTotal}).`,
+            load_call_script: tonsPositive
+              ? `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +
+                `${tons} tons @ $${ratePerTon}/ton (invoice ~$${customerInvoiceTotal}).`
+              : `Load ${loadNum}: ${commodity} from ${pickupRaw ?? "TBD"} to ${destRaw ?? "TBD"}. ` +
+                `Per-ton rate $${ratePerTon}/ton; weight TBD (invoice TBD).`,
           });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);

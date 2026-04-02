@@ -7,6 +7,8 @@ const corsHeaders = {
 };
 
 const CENTURY_AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323";
+/** loads.template_type — must match manual Century imports (not century_pdf). */
+const CENTURY_TEMPLATE_TYPE = "Century";
 /** Senders allowed to hit this Century PDF parser. */
 const PARSE_CENTURY_ALLOWED_SENDERS = new Set<string>([
   "ardell@centuryent.com",
@@ -264,7 +266,7 @@ Deno.serve(async (req) => {
 
       finalRows.push({
         agency_id: CENTURY_AGENCY_ID,
-        template_type: "Century",
+        template_type: CENTURY_TEMPLATE_TYPE,
         load_number: loadNumber,
         customer_name: ext.destination_company || null,
         pickup_city: ext.pickup_city || null,
@@ -295,7 +297,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const centuryTemplate = "Century";
     const byNum = new Map<string, Record<string, unknown>>();
     for (const row of finalRows) {
       byNum.set(String(row.load_number), row);
@@ -307,7 +308,7 @@ Deno.serve(async (req) => {
       .from("loads")
       .select("load_number")
       .eq("agency_id", CENTURY_AGENCY_ID)
-      .eq("template_type", centuryTemplate)
+      .eq("template_type", CENTURY_TEMPLATE_TYPE)
       .in("load_number", nums);
     const existingSet = new Set(
       (existRows ?? []).map((r: { load_number: string }) => String(r.load_number)),
@@ -339,7 +340,7 @@ Deno.serve(async (req) => {
       emailHeaders && typeof emailHeaders === "object" && !Array.isArray(emailHeaders)
         ? { ...(emailHeaders as Record<string, unknown>) }
         : {};
-    mergedHeaders.template_type = centuryTemplate;
+    mergedHeaders.template_type = CENTURY_TEMPLATE_TYPE;
     mergedHeaders.new = newCount;
     mergedHeaders.updated = updatedCount;
     mergedHeaders.dupes_dropped = dupesDropped;
@@ -362,7 +363,7 @@ Deno.serve(async (req) => {
         new: newCount,
         updated: updatedCount,
         dupes_dropped: dupesDropped,
-        template_type: centuryTemplate,
+        template_type: CENTURY_TEMPLATE_TYPE,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

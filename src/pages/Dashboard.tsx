@@ -1004,13 +1004,17 @@ const Dashboard = () => {
         {/* Agent Performance Banner */}
         <AgentPerformanceBanner userId={user.id} agencyId={agencyMember?.agency_id} />
         
-        {/* KPI Cards as view toggles (DAT card + Cost card for admins) */}
+        {/* KPI Cards as view toggles (DAT card + admin Oldcastle sync) */}
         <DashboardStats
           stats={stats}
           activeMode={mode}
           onModeChange={handleModeChange}
           isAdmin={isAdmin}
           newPulseDismissed={newPulseDismissed}
+          onOldcastleSyncSuccess={() => {
+            void refetchLoads();
+            void queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
+          }}
         />
 
         {/* Controls bar */}

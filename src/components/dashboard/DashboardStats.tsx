@@ -1,6 +1,9 @@
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { DATStatusCard } from "./DATStatusCard";
-import { Package, UserCheck, Users, Phone, CheckCircle, Info, Sparkles } from "lucide-react";
+import { Package, UserCheck, Users, Phone, CheckCircle, Info, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
   TooltipContent,
@@ -23,8 +26,12 @@ interface DashboardStatsProps {
   };
   activeMode: DashboardMode;
   onModeChange: (mode: DashboardMode) => void;
+  /** Agency / super admin — shows Oldcastle “Sync Now” next to DAT board. */
+  isAdmin?: boolean;
   /** When true, NEW card does not pulse (user opened NEW; count unchanged until more new loads arrive). */
   newPulseDismissed?: boolean;
+  /** After a successful Oldcastle VPS sync (admin Sync Now). */
+  onOldcastleSyncSuccess?: () => void;
 }
 
 export const DashboardStats = ({
@@ -33,9 +40,54 @@ export const DashboardStats = ({
   onModeChange,
   isAdmin = false,
   newPulseDismissed = false,
-}: DashboardStatsProps & { isAdmin?: boolean }) => {
+  onOldcastleSyncSuccess,
+}: DashboardStatsProps) => {
   const { timezone } = useUserTimezone();
   const timezoneLabel = getTimezoneLabel(timezone);
+  const { toast } = useToast();
+  const [oldcastleSyncInProgress, setOldcastleSyncInProgress] = useState(false);
+  const oldcastleSyncLock = useRef(false);
+
+  const syncOldcastle = useCallback(async () => {
+    if (oldcastleSyncLock.current) return;
+    oldcastleSyncLock.current = true;
+    setOldcastleSyncInProgress(true);
+    try {
+      const response = await fetch("https://axel.podlogix.io/tl/sync-oldcastle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-trigger-key": "tl-trigger-7b747d391801b8e5f55b4542",
+        },
+        body: JSON.stringify({}),
+      });
+      const text = await response.text();
+      let message: string | undefined;
+      try {
+        const j = JSON.parse(text) as { message?: string; error?: string };
+        message = j.message || j.error;
+      } catch {
+        if (text) message = text.slice(0, 200);
+      }
+      if (!response.ok) {
+        throw new Error(message || `Request failed (${response.status})`);
+      }
+      toast({
+        title: "Oldcastle sync completed",
+        description: message,
+      });
+      onOldcastleSyncSuccess?.();
+    } catch (e) {
+      toast({
+        title: "Oldcastle sync failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      oldcastleSyncLock.current = false;
+      setOldcastleSyncInProgress(false);
+    }
+  }, [toast, onOldcastleSyncSuccess]);
 
   const statCards: {
     key: DashboardMode;
@@ -111,7 +163,25 @@ export const DashboardStats = ({
   return (
     <TooltipProvider>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
-        <DATStatusCard />
+        <div className="flex flex-col gap-2 min-w-0">
+          <DATStatusCard />
+          {isAdmin ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full shrink-0"
+              disabled={oldcastleSyncInProgress}
+              onClick={() => void syncOldcastle()}
+              title="Sync Oldcastle loads from Google Sheet (VPS)"
+            >
+              {oldcastleSyncInProgress ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" aria-hidden />
+              ) : null}
+              {oldcastleSyncInProgress ? "Syncing…" : "Sync Now"}
+            </Button>
+          ) : null}
+        </div>
         {statCards.map((stat) => {
           const isActive = activeMode === stat.key;
           const Icon = stat.icon;

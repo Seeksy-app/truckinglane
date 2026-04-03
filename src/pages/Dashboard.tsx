@@ -50,7 +50,6 @@ import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/l
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
-import { RecentSessionsWidget } from "@/components/dashboard/RecentSessionsWidget";
 import { DatPendingReminderBanner } from "@/components/dashboard/DatPendingReminderBanner";
 import { useDatPendingReminder } from "@/hooks/useDatPendingReminder";
 import {
@@ -1072,10 +1071,6 @@ const Dashboard = () => {
             void queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
           }}
         />
-
-        {isAdmin && effectiveAgencyId ? (
-          <RecentSessionsWidget agencyId={effectiveAgencyId} />
-        ) : null}
 
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">

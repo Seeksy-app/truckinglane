@@ -364,8 +364,11 @@ export const LeadsTable = ({
       <Table className={LEADS_TABLE_LOADS_STYLE_CLASS}>
         <TableHeader>
           <TableRow className="border-b border-solid border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F9FAFB] dark:border-border dark:bg-muted/40">
-            <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-center">
+            <TableHead
+              className="w-[40px] text-center align-middle"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="inline-flex w-full justify-center">
                 <Checkbox
                   checked={allVisibleSelected}
                   onCheckedChange={toggleSelectAll}
@@ -373,13 +376,13 @@ export const LeadsTable = ({
                 />
               </div>
             </TableHead>
-            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Date
             </TableHead>
-            <TableHead className="w-[180px] text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="w-[180px] text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Phone
             </TableHead>
-            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Company
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -389,11 +392,11 @@ export const LeadsTable = ({
               Follow-Up
             </TableHead>
             {showClaimedBy && (
-              <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              <TableHead className="text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                 Claimed By
               </TableHead>
             )}
-            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-right align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Intent
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -402,7 +405,7 @@ export const LeadsTable = ({
             <TableHead className="w-[100px] text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Actions
             </TableHead>
-            <TableHead className="w-[40px]" />
+            <TableHead className="w-[40px] text-center align-middle" />
           </TableRow>
         </TableHeader>
         <TableBody onKeyDown={handleKeyDown}>
@@ -438,8 +441,11 @@ export const LeadsTable = ({
                   onClick={() => handleRowClick(lead.id)}
                   onFocus={() => handleRowFocus(index)}
                 >
-                  <TableCell onClick={(e) => e.stopPropagation()} className="w-[40px]">
-                    <div className="flex justify-center">
+                  <TableCell
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-[40px] text-center align-middle"
+                  >
+                    <div className="inline-flex w-full justify-center">
                       <Checkbox
                         checked={selectedIds.has(lead.id)}
                         onCheckedChange={() => toggleSelect(lead.id)}
@@ -447,19 +453,17 @@ export const LeadsTable = ({
                       />
                     </div>
                   </TableCell>
-                  <TableCell className="text-center text-sm text-[#6B7280] tabular-nums dark:text-muted-foreground">
+                  <TableCell className="text-left text-sm text-[#6B7280] tabular-nums dark:text-muted-foreground">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
-                  <TableCell className="w-[180px] text-sm whitespace-nowrap text-center">
-                    <div className="flex justify-center">
-                      <PhoneDisplay
-                        phone={lead.caller_phone}
-                        className="font-semibold text-[0.95rem] whitespace-nowrap"
-                      />
-                    </div>
+                  <TableCell className="w-[180px] text-left text-sm whitespace-nowrap align-middle">
+                    <PhoneDisplay
+                      phone={lead.caller_phone}
+                      className="font-semibold text-[0.95rem] whitespace-nowrap"
+                    />
                   </TableCell>
-                  <TableCell className="min-w-[220px] text-center">
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                  <TableCell className="min-w-[220px] text-left align-middle">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span>{lead.caller_company || "—"}</span>
                       {/* Shipper & Equipment Tags */}
                       {lead.shipper && (
@@ -504,8 +508,8 @@ export const LeadsTable = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-center">
+                  <TableCell className="text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                    <div className="inline-flex w-full flex-wrap justify-center">
                     {(isPending || isClaimed) && (
                       <Badge 
                         className={statusStyles[status]}
@@ -522,9 +526,9 @@ export const LeadsTable = ({
                     </div>
                   </TableCell>
                   {/* Follow-Up Status - Only for claimed leads */}
-                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="text-center align-middle" onClick={(e) => e.stopPropagation()}>
                     {isClaimed ? (
-                      <div className="flex justify-center">
+                      <div className="inline-flex w-full justify-center">
                       <Select
                         value={lead.follow_up_status || "null"}
                         onValueChange={(value) => handleFollowUpChange(lead.id, value)}
@@ -546,16 +550,16 @@ export const LeadsTable = ({
                       </Select>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
+                      <span className="block w-full text-center text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
                   {showClaimedBy && (
-                    <TableCell className="text-sm text-foreground text-center">
+                    <TableCell className="text-left text-sm text-foreground align-middle">
                       {lead.claimed_by ? (profilesMap?.[lead.claimed_by] || "Loading...") : "—"}
                     </TableCell>
                   )}
-                  <TableCell className="text-center">
-                    <div className="flex flex-wrap items-center justify-center gap-1">
+                  <TableCell className="text-right align-middle">
+                    <div className="flex flex-wrap items-center justify-end gap-1">
                       {lead.is_high_intent ? (
                         <Badge variant="outline" className="border-emerald-500 text-emerald-700">
                           High Intent
@@ -600,16 +604,16 @@ export const LeadsTable = ({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center">
+                  <TableCell className="text-center align-middle">
+                    <div className="inline-flex w-full justify-center">
                       <HotLeadTimer 
                         createdAt={lead.created_at} 
                         claimedAt={lead.claimed_at} 
                       />
                     </div>
                   </TableCell>
-                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                  <TableCell className="text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-wrap items-center justify-center gap-1">
                       {/* View Detail Button */}
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -667,13 +671,13 @@ export const LeadsTable = ({
                     </div>
                   </TableCell>
                   <TableCell 
-                    className="cursor-pointer text-center hover:bg-[#F9FAFB] dark:hover:bg-muted/40"
+                    className="cursor-pointer text-center align-middle hover:bg-[#F9FAFB] dark:hover:bg-muted/40"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRowClick(lead.id);
                     }}
                   >
-                    <div className="flex justify-center">
+                    <div className="inline-flex w-full justify-center">
                       <ChevronDown 
                         className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} 
                       />

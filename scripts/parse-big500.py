@@ -41,6 +41,8 @@ for row in reader:
     if not pro_num or not pro_num.isdigit():
         continue
     batch_pro_numbers.add(pro_num)
+    # Column 14 (0-based index 13): Aljex may label board loads "Open" or "Available".
+    # Dashboard only lists dispatch_status = 'open', so treat both as open.
     status = row[13].strip().lower()
 
     rate = parse_num(row[294]) if len(row) > 294 else 0
@@ -68,7 +70,7 @@ for row in reader:
 
     target_pay, max_pay = compute_target_max_pay(is_per_ton, rate, customer_total)
 
-    is_open = status == "open"
+    is_open = status in ("open", "available")
     is_archived_by_status = status in ("covered", "delivered")
     if is_open:
         open_count += 1

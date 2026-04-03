@@ -2783,6 +2783,14 @@ export type Database = {
         Args: { p_load_id: string; p_load_number: string; p_prev_status: string }
         Returns: Json
       }
+      tl_stamp_dat_export_and_log: {
+        Args: {
+          p_agency_id: string
+          p_load_ids: string[]
+          p_user_display_name: string
+        }
+        Returns: number
+      }
       reset_agent_daily_state: {
         Args: { _agency_id: string; _agent_id: string; _timezone?: string }
         Returns: undefined

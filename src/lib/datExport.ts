@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import JSZip from "jszip";
 import { Tables } from "@/integrations/supabase/types";
 import {
@@ -638,7 +638,7 @@ export function getLastDATExportTimestamp(): string | null {
   return readLastDatExportIso();
 }
 
-function triggerBlobDownload(blob: Blob, downloadName: string): void {
+export function triggerDatExportBlobDownload(blob: Blob, downloadName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -649,14 +649,20 @@ function triggerBlobDownload(blob: Blob, downloadName: string): void {
   URL.revokeObjectURL(url);
 }
 
+export type DatExportArtifact = {
+  blob: Blob;
+  downloadName: string;
+  fileCount: number;
+  totalRows: number;
+};
+
 /**
- * Downloads a single CSV (≤ {@link DAT_EXPORT_ROWS_PER_CSV} exportable rows) or a ZIP of
- * `DAT-Export-1.csv`, `DAT-Export-2.csv`, … when over the limit.
+ * Builds CSV or ZIP bytes without starting a download. Exportable rows are filtered the same as download.
  */
-export async function downloadDATExport(
+export async function buildDatExportArtifact(
   loads: Load[],
   filename?: string,
-): Promise<{ fileCount: number; totalRows: number }> {
+): Promise<DatExportArtifact> {
   const exportableLoads = loads.filter(isExportableLoad);
   const totalRows = exportableLoads.length;
   const today = new Date().toISOString().split("T")[0];
@@ -664,8 +670,7 @@ export async function downloadDATExport(
   if (totalRows <= DAT_EXPORT_ROWS_PER_CSV) {
     const csvContent = buildDatCsvString(exportableLoads);
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    triggerBlobDownload(blob, filename || `DAT_Export_${today}.csv`);
-    return { fileCount: 1, totalRows };
+    return { blob, downloadName: filename || `DAT_Export_${today}.csv`, fileCount: 1, totalRows };
   }
 
   const zip = new JSZip();
@@ -676,6 +681,44 @@ export async function downloadDATExport(
     zip.file(`DAT-Export-${partIndex}.csv`, buildDatCsvString(chunk));
   }
   const blob = await zip.generateAsync({ type: "blob" });
-  triggerBlobDownload(blob, `DAT-Export-${today}.zip`);
-  return { fileCount, totalRows };
+  return { blob, downloadName: `DAT-Export-${today}.zip`, fileCount, totalRows };
+}
+
+export function getDatExportUserDisplayName(user: User | null | undefined): string {
+  const meta = user?.user_metadata as { full_name?: unknown } | undefined;
+  const name = typeof meta?.full_name === "string" ? meta.full_name.trim() : "";
+  if (name.length > 0) return name;
+  const local = user?.email?.split("@")[0]?.trim();
+  return local && local.length > 0 ? local : "Agent";
+}
+
+/**
+ * Server-side stamp + session log (SECURITY DEFINER RPC). Deduplicates load IDs before calling.
+ */
+export async function stampDatExportAndLog(
+  client: SupabaseClient,
+  agencyId: string,
+  loadIds: string[],
+  userDisplayName: string,
+): Promise<{ error: Error | null }> {
+  const unique = [...new Set(loadIds)];
+  const { error } = await client.rpc("tl_stamp_dat_export_and_log", {
+    p_agency_id: agencyId,
+    p_load_ids: unique,
+    p_user_display_name: userDisplayName,
+  });
+  return { error: error ? new Error(error.message) : null };
+}
+
+/**
+ * Downloads a single CSV (≤ {@link DAT_EXPORT_ROWS_PER_CSV} exportable rows) or a ZIP of
+ * `DAT-Export-1.csv`, `DAT-Export-2.csv`, … when over the limit.
+ */
+export async function downloadDATExport(
+  loads: Load[],
+  filename?: string,
+): Promise<{ fileCount: number; totalRows: number }> {
+  const artifact = await buildDatExportArtifact(loads, filename);
+  triggerDatExportBlobDownload(artifact.blob, artifact.downloadName);
+  return { fileCount: artifact.fileCount, totalRows: artifact.totalRows };
 }

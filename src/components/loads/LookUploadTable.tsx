@@ -273,20 +273,20 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
         <TableHeader>
           <TableRow className="bg-muted/50 border-b border-border">
             <TableHead className="w-8 px-0.5 text-center align-middle" />
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left align-middle">
               Load #
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center align-middle">
               Client
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left align-middle">
               Ship Date
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left align-middle">
               <button
                 type="button"
                 onClick={() => handleLaneHeaderClick("pickup")}
-                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
+                className="inline-flex w-full items-center justify-start gap-1 hover:text-foreground"
                 aria-label="Sort by pickup state"
               >
                 Pickup
@@ -299,11 +299,11 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                 ) : null}
               </button>
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left align-middle">
               <button
                 type="button"
                 onClick={() => handleLaneHeaderClick("delivery")}
-                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
+                className="inline-flex w-full items-center justify-start gap-1 hover:text-foreground"
                 aria-label="Sort by delivery state"
               >
                 Delivery
@@ -316,16 +316,16 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                 ) : null}
               </button>
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-right align-middle">
               Invoice
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-right align-middle">
               Target Pay
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center align-middle">
               Status
             </TableHead>
-            <TableHead className="w-14 text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="w-14 text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center align-middle">
               Actions
             </TableHead>
           </TableRow>
@@ -342,7 +342,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                     {expandedId === load.id ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                   </span>
                 </TableCell>
-                <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
+                <TableCell className="text-left font-medium tabular-nums text-sm sm:text-base align-middle">
                   {load.load_number || "—"}
                 </TableCell>
                 <TableCell className="text-center align-middle text-sm sm:text-base">
@@ -356,11 +356,11 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                           : "Aljex"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-center tabular-nums text-sm sm:text-base">
+                <TableCell className="text-left tabular-nums text-sm sm:text-base align-middle">
                   {load.ship_date || "—"}
                 </TableCell>
                 <TableCell
-                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
+                  className="text-left max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base align-middle"
                   title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}
                 >
                   {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
@@ -368,14 +368,14 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                     "—"}
                 </TableCell>
                 <TableCell
-                  className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
+                  className="text-left max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base align-middle"
                   title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}
                 >
                   {formatLaneStateCity(load.dest_state, load.dest_city) ??
                     load.dest_location_raw ??
                     "—"}
                 </TableCell>
-                <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
+                <TableCell className="text-right font-medium tabular-nums text-sm sm:text-base align-middle">
                   {(() => {
                     const rate = formatRate(load);
                     return (
@@ -386,7 +386,7 @@ export function OpenLoadsTable({ loads, loading, onRefresh }: OpenLoadsTableProp
                     );
                   })()}
                 </TableCell>
-                <TableCell className="text-center tabular-nums text-sm sm:text-base">
+                <TableCell className="text-right tabular-nums text-sm sm:text-base align-middle">
                   {truckerToolsNoRateRaw(load)
                     ? "—"
                     : load.target_pay && load.target_pay > 0

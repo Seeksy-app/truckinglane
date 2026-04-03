@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Tables } from "@/integrations/supabase/types";
 import {
   Table,
@@ -38,10 +39,17 @@ import { format } from "date-fns";
 import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import {
-  downloadDATExport,
+  buildDatExportArtifact,
   formatDatExportDownloadMessage,
+  getDatExportUserDisplayName,
   isExportableLoad,
+  markDATExportComplete,
+  stampDatExportAndLog,
+  triggerDatExportBlobDownload,
 } from "@/lib/datExport";
 import { truckerToolsNoRateRaw } from "@/lib/truckerToolsLoads";
 import { formatCityState, formatCurrency } from "@/components/loads/LoadNotes";
@@ -166,6 +174,11 @@ export function LoadsTable({
   /** Demo only: rows user "posted" locally (no DB). */
   const [demoDatPostedIds, setDemoDatPostedIds] = useState<Set<string>>(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { agencyId } = useUserRole();
+  const { isImpersonating, impersonatedAgencyId } = useImpersonation();
+  const effectiveAgencyId = isImpersonating ? impersonatedAgencyId : agencyId;
 
   /** Matches dashboard query: no archived dispatch rows in table or Client counts. */
   const loadsExcludingArchived = useMemo(
@@ -306,15 +319,39 @@ export function LoadsTable({
       toast.error("No selected loads have complete destination for DAT export.");
       return;
     }
+    if (!effectiveAgencyId) {
+      toast.error("No agency — cannot export");
+      return;
+    }
     setBulkDatBusy(true);
     try {
       const day = new Date().toISOString().split("T")[0];
-      const { fileCount, totalRows } = await downloadDATExport(
+      const artifact = await buildDatExportArtifact(
         exportable,
         `DAT_Export_Selected_${day}.csv`,
       );
-      toast.success(formatDatExportDownloadMessage(totalRows, fileCount));
+      const { error } = await stampDatExportAndLog(
+        supabase,
+        effectiveAgencyId,
+        exportable.map((l) => l.id),
+        getDatExportUserDisplayName(user),
+      );
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      triggerDatExportBlobDownload(artifact.blob, artifact.downloadName);
+      markDATExportComplete();
+      queryClient.invalidateQueries({ queryKey: ["loads"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-all-active-open-count"] });
+      queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
+      queryClient.invalidateQueries({ queryKey: ["session_logs_full", effectiveAgencyId] });
+      toast.success(formatDatExportDownloadMessage(artifact.totalRows, artifact.fileCount));
       setSelectedIds(new Set());
+      onRefresh();
     } finally {
       setBulkDatBusy(false);
     }
@@ -359,20 +396,35 @@ export function LoadsTable({
       return;
     }
     setDatPostingId(load.id);
-    const nowIso = new Date().toISOString();
     try {
       const name = `DAT_Load_${(load.load_number || load.id).toString().replace(/[^\w.-]+/g, "_")}.csv`;
-      await downloadDATExport([load], name);
+      const artifact = await buildDatExportArtifact([load], name);
       if (isDemo) {
+        triggerDatExportBlobDownload(artifact.blob, artifact.downloadName);
         setDemoDatPostedIds((prev) => new Set(prev).add(load.id));
         toast.success("DAT file downloaded (demo — not saved)");
         return;
       }
-      const { error } = await supabase
-        .from("loads")
-        .update({ dat_posted_at: nowIso })
-        .eq("id", load.id);
+      if (!effectiveAgencyId) {
+        toast.error("No agency — cannot export");
+        return;
+      }
+      const { error } = await stampDatExportAndLog(
+        supabase,
+        effectiveAgencyId,
+        [load.id],
+        getDatExportUserDisplayName(user),
+      );
       if (error) throw error;
+      triggerDatExportBlobDownload(artifact.blob, artifact.downloadName);
+      markDATExportComplete();
+      queryClient.invalidateQueries({ queryKey: ["loads"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
+      queryClient.invalidateQueries({ queryKey: ["dat-all-active-open-count"] });
+      queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
+      queryClient.invalidateQueries({ queryKey: ["session_logs_full", effectiveAgencyId] });
       toast.success("DAT downloaded and load marked posted");
       onRefresh();
     } catch (err) {
@@ -580,7 +632,7 @@ export function LoadsTable({
             LOADS_TABLE_DENSE_CLASS,
             "[&_th.loads-route-head]:!text-left [&_th.loads-route-head]:align-middle",
             "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
-            "[&_td.loads-target-cell]:!text-center",
+            "[&_td.loads-target-cell]:!text-right",
           )}
         >
         <TableHeader>
@@ -604,7 +656,7 @@ export function LoadsTable({
               </TableHead>
             )}
             <TableHead className="w-8 px-0.5 text-center align-middle" />
-            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Load #
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -662,7 +714,7 @@ export function LoadsTable({
                 </div>
               </div>
             </TableHead>
-            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-right align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Target Pay
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -715,7 +767,7 @@ export function LoadsTable({
                       )}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
+                  <TableCell className="text-left font-medium tabular-nums text-sm sm:text-base">
                     {load.load_number || "—"}
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
@@ -743,8 +795,8 @@ export function LoadsTable({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="loads-target-cell py-3 px-2 align-middle">
-                    <div className="flex flex-col items-center justify-center gap-1 text-center">
+                  <TableCell className="loads-target-cell py-3 px-2 align-middle text-right">
+                    <div className="flex flex-col items-end gap-1 text-right">
                       <span className="text-lg sm:text-xl font-bold tabular-nums text-[#111827]">
                         {targetCollapsed}
                       </span>
@@ -760,8 +812,11 @@ export function LoadsTable({
                       <span className={collapsedStatusPillClass(load)}>{collapsedStatusLabel(load)}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm sm:text-base" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-0.5 justify-center">
+                  <TableCell
+                    className="text-center text-sm sm:text-base align-middle"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex flex-wrap items-center gap-0.5 justify-center">
                       {enableOpenLoadActions && (() => {
                         const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
                         const isPosted =

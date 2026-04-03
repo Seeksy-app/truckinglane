@@ -14,7 +14,7 @@ export const DASHBOARD_TABLE_CENTERED_DENSE_CLASS =
  * (table base is still text-[11px] sm:text-xs; body cells override with text-sm sm:text-base in components).
  */
 export const LOADS_TABLE_DENSE_CLASS =
-  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-[3.25rem] [&_th]:!px-1.5 [&_th]:!py-4 [&_th]:!text-center [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:!text-center [&_td]:align-middle [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
+  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-[3.25rem] [&_th]:!px-1.5 [&_th]:!py-4 [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:align-middle [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
 
 /** AI Calls list: left-aligned cells, same row padding and font scale as Loads dense table. */
 export const CALLS_TABLE_DENSE_CLASS =
@@ -24,10 +24,10 @@ export const CALLS_TABLE_DENSE_CLASS =
  * Leads list: same header/cell scale and bottom border language as Open Loads; body cells may wrap.
  */
 export const LEADS_TABLE_LOADS_STYLE_CLASS =
-  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-[3.25rem] [&_th]:!px-1.5 [&_th]:!py-4 [&_th]:align-middle [&_th]:!text-center [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:align-middle [&_td]:!whitespace-normal [&_th]:whitespace-nowrap";
+  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-[3.25rem] [&_th]:!px-1.5 [&_th]:!py-4 [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:align-middle [&_td]:!whitespace-normal [&_th]:whitespace-nowrap";
 
-/** AI Calls list: same rhythm as Leads; all body cells center-aligned. */
-export const CALLS_TABLE_LOADS_STYLE_CLASS = `${LEADS_TABLE_LOADS_STYLE_CLASS} [&_td]:!text-center`;
+/** AI Calls list: same rhythm as Leads; per-cell text-align set in DashboardCallsTable. */
+export const CALLS_TABLE_LOADS_STYLE_CLASS = LEADS_TABLE_LOADS_STYLE_CLASS;
 
 /** Toolbar strip above loads table — same font scale as load row cells (text-sm / sm:text-base). */
 export const LOADS_TABLE_TOOLBAR_CLASS =

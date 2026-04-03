@@ -443,7 +443,11 @@ function scrapeAljexLoads() {
       if (cells.length < 10) continue;
       
       const status = statusCell.className.trim();
-      
+      const tokens = status.toLowerCase().split(/\s+/).filter(Boolean);
+      // Aljex uses OPEN or AVAILABLE for board loads; dashboard only shows dispatch_status === 'open'.
+      const dispatchStatus =
+        tokens.includes('open') || tokens.includes('available') ? 'open' : tokens[0] || 'open';
+
       // Pro# is in oncontextmenu attr: document.domatch.pro.value='1810965'
       const ctxAttr = statusCell.getAttribute('oncontextmenu') || '';
       const proMatch = ctxAttr.match(/pro\.value='(\d+)'/);
@@ -477,7 +481,7 @@ function scrapeAljexLoads() {
         agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
         template_type: 'aljex_big500',
         load_number: proNum,
-        dispatch_status: status.toLowerCase() === 'open' ? 'open' : status.toLowerCase(),
+        dispatch_status: dispatchStatus,
         pickup_city: originCity,
         pickup_state: originState,
         pickup_location_raw: cells[3]?.textContent?.trim() || '',

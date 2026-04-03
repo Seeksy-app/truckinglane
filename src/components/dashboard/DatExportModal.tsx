@@ -23,10 +23,12 @@ import {
   fetchDatPendingLoadsForSourceGroups,
   fetchDatAllActiveOpenLoadsCount,
   fetchDatAllActiveOpenLoadsForExport,
-  downloadDATExport,
+  buildDatExportArtifact,
   formatDatExportDownloadMessage,
   isExportableLoad,
   markDATExportComplete,
+  stampDatExportAndLog,
+  triggerDatExportBlobDownload,
 } from "@/lib/datExport";
 import type { UserRole } from "@/hooks/useUserRole";
 import type { Tables } from "@/integrations/supabase/types";
@@ -140,40 +142,20 @@ export function DatExportModal({
       toast.error("No agency — cannot export");
       return false;
     }
-    const { fileCount, totalRows } = await downloadDATExport(exportableLoads, filename);
-
-    const postedAt = new Date().toISOString();
-    const loadNumbers = [
-      ...new Set(
-        exportableLoads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0),
-      ),
-    ];
-    const chunkSize = 120;
-    if (loadNumbers.length > 0) {
-      for (let i = 0; i < loadNumbers.length; i += chunkSize) {
-        const chunk = loadNumbers.slice(i, i + chunkSize);
-        const { error } = await supabase
-          .from("loads")
-          .update({ dat_posted_at: postedAt })
-          .eq("agency_id", effectiveAgencyId)
-          .in("load_number", chunk);
-        if (error) {
-          toast.error(`Failed to mark loads as posted: ${error.message}`);
-          return false;
-        }
-      }
-    } else {
-      const ids = [...new Set(exportableLoads.map((l) => l.id))];
-      const { error } = await supabase
-        .from("loads")
-        .update({ dat_posted_at: postedAt })
-        .eq("agency_id", effectiveAgencyId)
-        .in("id", ids);
-      if (error) {
-        toast.error(`Failed to mark loads as posted: ${error.message}`);
-        return false;
-      }
+    const artifact = await buildDatExportArtifact(exportableLoads, filename);
+    const { fileCount, totalRows } = artifact;
+    const loadIds = exportableLoads.map((l) => l.id);
+    const { error: stampError } = await stampDatExportAndLog(
+      supabase,
+      effectiveAgencyId,
+      loadIds,
+      agentName,
+    );
+    if (stampError) {
+      toast.error(`Failed to mark loads as posted: ${stampError.message}`);
+      return false;
     }
+    triggerDatExportBlobDownload(artifact.blob, artifact.downloadName);
     const { error: logError } = await supabase.from("email_import_logs").insert({
       agency_id: effectiveAgencyId,
       sender_email: "dat-csv-export@truckinglane.com",
@@ -202,6 +184,7 @@ export function DatExportModal({
     queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
     queryClient.invalidateQueries({ queryKey: ["dat-all-active-open-count"] });
     queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
+    queryClient.invalidateQueries({ queryKey: ["session_logs_full", effectiveAgencyId] });
     toast.success(formatDatExportDownloadMessage(totalRows, fileCount));
     onOpenChange(false);
     return true;

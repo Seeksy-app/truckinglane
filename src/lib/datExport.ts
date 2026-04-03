@@ -168,6 +168,57 @@ export async function fetchDatPendingLoadsForSourceGroups(
   return rows.filter(isExportableLoad);
 }
 
+/**
+ * Count loads for "Export all active": `is_active` and `dispatch_status = 'open'`
+ * (no `dat_posted_at` filter — includes previously uploaded rows).
+ */
+export async function fetchDatAllActiveOpenLoadsCount(
+  supabase: SupabaseClient,
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<number> {
+  let q = supabase
+    .from("loads")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("dispatch_status", "open");
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** All active dispatch-open loads for full DAT re-export (CSV uses exportable subset via `isExportableLoad`). */
+export async function fetchDatAllActiveOpenLoadsForExport(
+  supabase: SupabaseClient,
+  opts: { role: string | null; impersonatedAgencyId: string | null },
+): Promise<Load[]> {
+  let q = supabase
+    .from("loads")
+    .select("*")
+    .eq("is_active", true)
+    .eq("dispatch_status", "open")
+    .order("ship_date", { ascending: true });
+
+  if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
+    q = q.eq("agency_id", opts.impersonatedAgencyId);
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = (data || []) as Load[];
+  rows.sort((a, b) => {
+    const sa = String(a.ship_date ?? "");
+    const sb = String(b.ship_date ?? "");
+    if (sa !== sb) return sa.localeCompare(sb);
+    return String(a.id).localeCompare(String(b.id));
+  });
+  return rows;
+}
+
 export async function fetchDatPendingLoadsForExport(
   supabase: SupabaseClient,
   opts: { role: string | null; impersonatedAgencyId: string | null },

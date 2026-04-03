@@ -21,12 +21,17 @@ import {
 import {
   fetchDatPendingCountsBySource,
   fetchDatPendingLoadsForSourceGroups,
+  fetchDatAllActiveOpenLoadsCount,
+  fetchDatAllActiveOpenLoadsForExport,
   downloadDATExport,
   isExportableLoad,
   markDATExportComplete,
 } from "@/lib/datExport";
 import type { UserRole } from "@/hooks/useUserRole";
+import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+
+type LoadRow = Tables<"loads">;
 
 type Props = {
   open: boolean;
@@ -47,12 +52,25 @@ export function DatExportModal({
 }: Props) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<DatExportSourceGroupId>>(() => new Set());
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"none" | "selected" | "all_active">("none");
 
   const { data: counts = null, isLoading } = useQuery({
     queryKey: ["dat-pending-counts-by-source", role, impersonatedAgencyId],
     queryFn: () =>
       fetchDatPendingCountsBySource(supabase, {
+        role,
+        impersonatedAgencyId,
+      }),
+    enabled: open,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+  });
+
+  const { data: allActiveOpenCount = 0, isLoading: allActiveCountLoading } = useQuery({
+    queryKey: ["dat-all-active-open-count", role, impersonatedAgencyId],
+    queryFn: () =>
+      fetchDatAllActiveOpenLoadsCount(supabase, {
         role,
         impersonatedAgencyId,
       }),
@@ -112,6 +130,81 @@ export function DatExportModal({
     return n;
   }, [counts, selected]);
 
+  const runPostExport = async (
+    exportableLoads: LoadRow[],
+    filename: string,
+    rawHeadersExtras: Record<string, unknown>,
+  ) => {
+    if (!effectiveAgencyId) {
+      toast.error("No agency — cannot export");
+      return false;
+    }
+    downloadDATExport(exportableLoads, filename);
+
+    const postedAt = new Date().toISOString();
+    const loadNumbers = [
+      ...new Set(
+        exportableLoads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0),
+      ),
+    ];
+    const chunkSize = 120;
+    if (loadNumbers.length > 0) {
+      for (let i = 0; i < loadNumbers.length; i += chunkSize) {
+        const chunk = loadNumbers.slice(i, i + chunkSize);
+        const { error } = await supabase
+          .from("loads")
+          .update({ dat_posted_at: postedAt })
+          .eq("agency_id", effectiveAgencyId)
+          .in("load_number", chunk);
+        if (error) {
+          toast.error(`Failed to mark loads as posted: ${error.message}`);
+          return false;
+        }
+      }
+    } else {
+      const ids = [...new Set(exportableLoads.map((l) => l.id))];
+      const { error } = await supabase
+        .from("loads")
+        .update({ dat_posted_at: postedAt })
+        .eq("agency_id", effectiveAgencyId)
+        .in("id", ids);
+      if (error) {
+        toast.error(`Failed to mark loads as posted: ${error.message}`);
+        return false;
+      }
+    }
+    const { error: logError } = await supabase.from("email_import_logs").insert({
+      agency_id: effectiveAgencyId,
+      sender_email: "dat-csv-export@truckinglane.com",
+      subject: null,
+      status: "success",
+      imported_count: exportableLoads.length,
+      raw_headers: {
+        mode: "csv",
+        source: "DAT CSV Export",
+        agent_name: agentName,
+        count: exportableLoads.length,
+        exported: exportableLoads.length,
+        ...rawHeadersExtras,
+      },
+      error_message: null,
+    });
+    if (logError) {
+      console.error("DAT CSV activity log:", logError);
+      toast.warning("Exported CSV, but activity log could not be saved.");
+    }
+    markDATExportComplete();
+    queryClient.invalidateQueries({ queryKey: ["loads"] });
+    queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
+    queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
+    queryClient.invalidateQueries({ queryKey: ["dat-all-active-open-count"] });
+    queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
+    toast.success(`${exportableLoads.length} loads exported to DAT`);
+    onOpenChange(false);
+    return true;
+  };
+
   const handleExport = async () => {
     if (selected.size === 0) {
       toast.error("Select at least one source");
@@ -121,7 +214,7 @@ export function DatExportModal({
       toast.error("No agency — cannot export");
       return;
     }
-    setExporting(true);
+    setExporting("selected");
     try {
       const groupIds = [...selected];
       const loads = await fetchDatPendingLoadsForSourceGroups(supabase, groupIds, {
@@ -134,72 +227,40 @@ export function DatExportModal({
         return;
       }
       const filename = `DAT_Export_${new Date().toISOString().split("T")[0]}.csv`;
-      downloadDATExport(exportableLoads, filename);
-
-      const postedAt = new Date().toISOString();
-      const loadNumbers = [
-        ...new Set(
-          exportableLoads.map((l) => String(l.load_number ?? "").trim()).filter((n) => n.length > 0),
-        ),
-      ];
-      const chunkSize = 120;
-      if (loadNumbers.length > 0) {
-        for (let i = 0; i < loadNumbers.length; i += chunkSize) {
-          const chunk = loadNumbers.slice(i, i + chunkSize);
-          const { error } = await supabase
-            .from("loads")
-            .update({ dat_posted_at: postedAt })
-            .eq("agency_id", effectiveAgencyId)
-            .in("load_number", chunk);
-          if (error) {
-            toast.error(`Failed to mark loads as posted: ${error.message}`);
-            return;
-          }
-        }
-      } else {
-        const ids = [...new Set(exportableLoads.map((l) => l.id))];
-        const { error } = await supabase
-          .from("loads")
-          .update({ dat_posted_at: postedAt })
-          .eq("agency_id", effectiveAgencyId)
-          .in("id", ids);
-        if (error) {
-          toast.error(`Failed to mark loads as posted: ${error.message}`);
-          return;
-        }
-      }
-      const { error: logError } = await supabase.from("email_import_logs").insert({
-        agency_id: effectiveAgencyId,
-        sender_email: "dat-csv-export@truckinglane.com",
-        subject: null,
-        status: "success",
-        imported_count: exportableLoads.length,
-        raw_headers: {
-          mode: "csv",
-          source: "DAT CSV Export",
-          agent_name: agentName,
-          count: exportableLoads.length,
-          exported: exportableLoads.length,
-          sources: groupIds,
-        },
-        error_message: null,
-      });
-      if (logError) {
-        console.error("DAT CSV activity log:", logError);
-        toast.warning("Exported CSV, but activity log could not be saved.");
-      }
-      markDATExportComplete();
-      queryClient.invalidateQueries({ queryKey: ["loads"] });
-      queryClient.invalidateQueries({ queryKey: ["dat-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["dat-pending-nav-badge"] });
-      queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
-      queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-      toast.success(`${exportableLoads.length} loads exported to DAT`);
-      onOpenChange(false);
+      await runPostExport(exportableLoads, filename, { sources: groupIds });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
     } finally {
-      setExporting(false);
+      setExporting("none");
+    }
+  };
+
+  const handleExportAllActive = async () => {
+    if (!effectiveAgencyId) {
+      toast.error("No agency — cannot export");
+      return;
+    }
+    setExporting("all_active");
+    try {
+      const loads = await fetchDatAllActiveOpenLoadsForExport(supabase, {
+        role,
+        impersonatedAgencyId,
+      });
+      const exportableLoads = loads.filter(isExportableLoad);
+      if (exportableLoads.length === 0) {
+        toast.error("No exportable active loads (check missing origin/destination where required)");
+        return;
+      }
+      const day = new Date().toISOString().split("T")[0];
+      const filename = `DAT_Export_AllActive_${day}.csv`;
+      await runPostExport(exportableLoads, filename, {
+        export_mode: "all_active_open",
+        total_active_open: loads.length,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting("none");
     }
   };
 
@@ -295,23 +356,58 @@ export function DatExportModal({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={exporting}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleExport()} disabled={exporting || selected.size === 0}>
-            {exporting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Exporting…
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Export selected{selectedCountTotal > 0 ? ` (${selectedCountTotal} pending)` : ""}
-              </>
-            )}
-          </Button>
+        <DialogFooter className="flex-col gap-3 sm:flex-col sm:space-x-0">
+          <div className="flex w-full flex-row justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={exporting !== "none"}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleExport()} disabled={exporting !== "none" || selected.size === 0}>
+              {exporting === "selected" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export selected{selectedCountTotal > 0 ? ` (${selectedCountTotal} pending)` : ""}
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="w-full space-y-2 border-t border-border pt-3">
+            <p className="text-xs text-muted-foreground">
+              This will re-export all active loads including previously uploaded ones
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-slate-800 text-slate-900 hover:bg-slate-100 dark:border-slate-300 dark:text-slate-100 dark:hover:bg-slate-800"
+              onClick={() => void handleExportAllActive()}
+              disabled={
+                exporting !== "none" ||
+                allActiveCountLoading ||
+                allActiveOpenCount === 0
+              }
+            >
+              {exporting === "all_active" ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export All Active (
+                  {allActiveCountLoading ? "…" : allActiveOpenCount})
+                </>
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

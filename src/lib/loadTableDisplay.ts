@@ -14,7 +14,7 @@ export const DASHBOARD_TABLE_CENTERED_DENSE_CLASS =
  * (table base is still text-[11px] sm:text-xs; body cells override with text-sm sm:text-base in components).
  */
 export const LOADS_TABLE_DENSE_CLASS =
-  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-11 [&_th]:!px-1.5 [&_th]:!py-3 [&_th]:!text-center [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:!text-center [&_td]:align-middle [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
+  "w-full border-collapse text-[11px] leading-tight sm:text-xs [&_th]:!h-auto [&_th]:!min-h-[3.25rem] [&_th]:!px-1.5 [&_th]:!py-4 [&_th]:!text-center [&_th]:align-middle [&_td]:!px-1.5 [&_td]:!py-4 [&_td]:!text-center [&_td]:align-middle [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap";
 
 /** AI Calls list: left-aligned cells, same row padding and font scale as Loads dense table. */
 export const CALLS_TABLE_DENSE_CLASS =

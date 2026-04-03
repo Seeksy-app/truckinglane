@@ -33,6 +33,8 @@ import {
 } from "@/components/ui/dialog";
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
+import { CLIENT_SOURCE_PILLS, countLoadsForPill } from "@/lib/loadBoardSourcePills";
+import { cn } from "@/lib/utils";
 import { AIAssistantDrawer } from "@/components/dashboard/AIAssistantDrawer";
 import { IntelligenceRail } from "@/components/dashboard/IntelligenceRail";
 import { InternalChatRail } from "@/components/dashboard/InternalChatRail";
@@ -108,6 +110,7 @@ const Dashboard = () => {
   const [lanePickupFilter, setLanePickupFilter] = useState("all");
   const [laneDestFilter, setLaneDestFilter] = useState("all");
   const [laneFiltersOpen, setLaneFiltersOpen] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);
   const [highlightedLeadPhone, setHighlightedLeadPhone] = useState<string | null>(null);
@@ -896,6 +899,7 @@ const Dashboard = () => {
     setLanePickupFilter("all");
     setLaneDestFilter("all");
     setLaneFiltersOpen(false);
+    setSourceFilter("all");
   }, [mode]);
 
   const loadsForLaneFilterOptions = useMemo(() => {
@@ -932,6 +936,20 @@ const Dashboard = () => {
     mode === "booked" ||
     mode === "new" ||
     (mode === "claimed" && filteredClaimedLoads.length > 0);
+
+  const loadsForSourcePills = useMemo(() => {
+    const rows =
+      mode === "open"
+        ? filteredOpenLoads
+        : mode === "booked"
+          ? filteredBookedLoads
+          : mode === "new"
+            ? filteredNewLoads
+            : mode === "claimed"
+              ? filteredClaimedLoads
+              : [];
+    return rows.filter((l) => l.dispatch_status !== "archived");
+  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredNewLoads, filteredClaimedLoads]);
 
   const dashboardLaneFilters = showLaneFilters
     ? {
@@ -1202,6 +1220,38 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {showLaneFilters ? (
+          <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+            {CLIENT_SOURCE_PILLS.map((pill) => {
+              const n = countLoadsForPill(loadsForSourcePills, pill.types);
+              const active = sourceFilter === pill.id;
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setSourceFilter(pill.id)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
+                      : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white dark:border-border dark:bg-muted/30 dark:text-foreground",
+                  )}
+                >
+                  <span>{pill.label}</span>
+                  <span
+                    className={cn(
+                      "tabular-nums text-xs font-semibold",
+                      active ? "text-white/90" : "text-[#6B7280] dark:text-muted-foreground",
+                    )}
+                  >
+                    {n}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {/* Single unified table based on mode */}
         {mode === "open" && (
           <LoadsTable
@@ -1210,6 +1260,7 @@ const Dashboard = () => {
             onRefresh={refetchLoads}
             enableOpenLoadActions
             externalLaneFilters={dashboardLaneFilters}
+            controlledSourceFilter={{ value: sourceFilter, onChange: setSourceFilter }}
           />
         )}
 
@@ -1224,6 +1275,7 @@ const Dashboard = () => {
                   loading={loadsLoading}
                   onRefresh={refetchLoads}
                   externalLaneFilters={dashboardLaneFilters}
+                  controlledSourceFilter={{ value: sourceFilter, onChange: setSourceFilter }}
                 />
               </div>
             )}

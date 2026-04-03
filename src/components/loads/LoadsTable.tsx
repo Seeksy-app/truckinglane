@@ -63,30 +63,12 @@ import {
   getLoadBoardClientPrimaryLabel,
 } from "@/lib/aljexLoadBoard";
 import { compareLoadsByStateThenCity, LOADS_TABLE_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { CLIENT_SOURCE_PILLS, countLoadsForPill } from "@/lib/loadBoardSourcePills";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Load = Tables<"loads">;
 
 type LaneHeaderSort = { column: "pickup" | "delivery"; dir: "asc" | "desc" };
-
-/** Broker source pills (order fixed). `types: null` = All. */
-const CLIENT_SOURCE_PILLS: { id: string; label: string; types: string[] | null }[] = [
-  { id: "all", label: "All", types: null },
-  { id: "adelphia_xlsx", label: "Adelphia", types: ["adelphia_xlsx"] },
-  { id: "oldcastle_gsheet", label: "Oldcastle", types: ["oldcastle_gsheet"] },
-  { id: "truckertools", label: "Trucker Tools", types: ["truckertools"] },
-  { id: "__century__", label: "Century", types: ["century_xlsx", "Century"] },
-  { id: "__semco__", label: "SEMCO", types: ["semco_email", "semco_xlsx"] },
-  { id: "aljex_big500", label: "Big 500", types: ["aljex_big500"] },
-  { id: "aljex_spot", label: "Spot Loads", types: ["aljex_spot"] },
-  { id: "vms_email", label: "VMS", types: ["vms_email"] },
-];
-
-function countLoadsForPill(loads: Load[], types: string[] | null): number {
-  if (!types) return loads.length;
-  const set = new Set(types);
-  return loads.filter((l) => l.template_type != null && set.has(l.template_type)).length;
-}
 
 function collapsedRouteTitle(load: Load): string {
   const p = formatCityState(load.pickup_city, load.pickup_state);
@@ -118,6 +100,11 @@ export type ExternalLaneFilters = {
   setDestState: (v: string) => void;
 };
 
+export type ControlledSourceFilter = {
+  value: string;
+  onChange: (id: string) => void;
+};
+
 interface LoadsTableProps {
   loads: Load[];
   loading: boolean;
@@ -127,6 +114,8 @@ interface LoadsTableProps {
   enableOpenLoadActions?: boolean;
   /** When set, pickup/delivery state filters are controlled by the parent (e.g. dashboard search row). */
   externalLaneFilters?: ExternalLaneFilters;
+  /** When set, source pills are rendered by the parent; filtering uses this value. */
+  controlledSourceFilter?: ControlledSourceFilter;
 }
 
 const INITIAL_DISPLAY_COUNT = 25;
@@ -151,6 +140,7 @@ export function LoadsTable({
   onRefresh,
   enableOpenLoadActions = false,
   externalLaneFilters,
+  controlledSourceFilter,
 }: LoadsTableProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -162,7 +152,12 @@ export function LoadsTable({
   const destStateFilter = externalLaneFilters?.destState ?? internalDestStateFilter;
   const setPickupStateFilter = externalLaneFilters?.setPickupState ?? setInternalPickupStateFilter;
   const setDestStateFilter = externalLaneFilters?.setDestState ?? setInternalDestStateFilter;
-  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [internalClientFilter, setInternalClientFilter] = useState<string>("all");
+  const clientFilter = controlledSourceFilter?.value ?? internalClientFilter;
+  const setClientFilter = (id: string) => {
+    if (controlledSourceFilter) controlledSourceFilter.onChange(id);
+    else setInternalClientFilter(id);
+  };
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -437,6 +432,10 @@ export function LoadsTable({
 
   const tableColSpan = enableOpenLoadActions ? 8 : 7;
 
+  const showPillsInTable = !controlledSourceFilter;
+  const showFiltersInTable = !externalLaneFilters;
+  const showLoadsToolbarTopRow = showPillsInTable || showFiltersInTable;
+
   return (
     <>
     <div
@@ -445,129 +444,135 @@ export function LoadsTable({
         enableOpenLoadActions && selectedCount > 0 && "pb-16",
       )}
     >
-      {/* Source pills + advanced lane filters */}
-      <div className="space-y-3 border-b border-[#E5E7EB] bg-white px-4 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {CLIENT_SOURCE_PILLS.map((pill) => {
-              const n = countLoadsForPill(loadsExcludingArchived, pill.types);
-              const active = clientFilter === pill.id;
-              return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  onClick={() => setClientFilter(pill.id)}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
-                      : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white",
-                  )}
-                >
-                  <span>{pill.label}</span>
-                  <span
-                    className={cn(
-                      "tabular-nums text-xs font-semibold",
-                      active ? "text-white/90" : "text-[#6B7280]",
-                    )}
-                  >
-                    {n}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {!externalLaneFilters && (
-            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "h-9 shrink-0 gap-2 border-[#E5E7EB] bg-white text-[#374151] shadow-sm",
-                    (pickupStateFilter !== "all" || destStateFilter !== "all") && "border-[#F97316]/50",
-                  )}
-                >
-                  <Filter className="h-4 w-4" />
-                  Filters
-                  {(pickupStateFilter !== "all" || destStateFilter !== "all") && (
-                    <span className="h-2 w-2 rounded-full bg-[#F97316]" aria-hidden />
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 space-y-4" align="end">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pickup state</p>
-                  <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-                    <SelectTrigger className="h-10 w-full bg-background">
-                      <SelectValue placeholder="All states" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover max-h-[280px]">
-                      <SelectItem value="all">All states</SelectItem>
-                      {pickupStates.map((state) => (
-                        <SelectItem key={state} value={state}>
-                          {state}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+      {/* Source pills + advanced lane filters (omitted when controlled by dashboard) */}
+      {(showLoadsToolbarTopRow || hasActiveFilters) && (
+        <div className="space-y-3 border-b border-[#E5E7EB] bg-white px-4 py-4">
+          {showLoadsToolbarTopRow && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              {showPillsInTable && (
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  {CLIENT_SOURCE_PILLS.map((pill) => {
+                    const n = countLoadsForPill(loadsExcludingArchived, pill.types);
+                    const active = clientFilter === pill.id;
+                    return (
+                      <button
+                        key={pill.id}
+                        type="button"
+                        onClick={() => setClientFilter(pill.id)}
+                        className={cn(
+                          "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                          active
+                            ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
+                            : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white",
+                        )}
+                      >
+                        <span>{pill.label}</span>
+                        <span
+                          className={cn(
+                            "tabular-nums text-xs font-semibold",
+                            active ? "text-white/90" : "text-[#6B7280]",
+                          )}
+                        >
+                          {n}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Delivery state</p>
-                  <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-                    <SelectTrigger className="h-10 w-full bg-background">
-                      <SelectValue placeholder="All states" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover max-h-[280px]">
-                      <SelectItem value="all">All states</SelectItem>
-                      {destStates.map((state) => (
-                        <SelectItem key={state} value={state}>
-                          {state}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-between gap-2 border-t border-border pt-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground"
-                    onClick={() => {
-                      setPickupStateFilter("all");
-                      setDestStateFilter("all");
-                    }}
-                  >
-                    Reset lane filters
-                  </Button>
-                  <Button type="button" size="sm" onClick={() => setFiltersOpen(false)}>
-                    Done
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+              )}
+              {showFiltersInTable && (
+                <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-9 shrink-0 gap-2 border-[#E5E7EB] bg-white text-[#374151] shadow-sm",
+                        (pickupStateFilter !== "all" || destStateFilter !== "all") && "border-[#F97316]/50",
+                      )}
+                    >
+                      <Filter className="h-4 w-4" />
+                      Filters
+                      {(pickupStateFilter !== "all" || destStateFilter !== "all") && (
+                        <span className="h-2 w-2 rounded-full bg-[#F97316]" aria-hidden />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 space-y-4" align="end">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pickup state</p>
+                      <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
+                        <SelectTrigger className="h-10 w-full bg-background">
+                          <SelectValue placeholder="All states" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover max-h-[280px]">
+                          <SelectItem value="all">All states</SelectItem>
+                          {pickupStates.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Delivery state</p>
+                      <Select value={destStateFilter} onValueChange={setDestStateFilter}>
+                        <SelectTrigger className="h-10 w-full bg-background">
+                          <SelectValue placeholder="All states" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover max-h-[280px]">
+                          <SelectItem value="all">All states</SelectItem>
+                          {destStates.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-between gap-2 border-t border-border pt-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={() => {
+                          setPickupStateFilter("all");
+                          setDestStateFilter("all");
+                        }}
+                      >
+                        Reset lane filters
+                      </Button>
+                      <Button type="button" size="sm" onClick={() => setFiltersOpen(false)}>
+                        Done
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[#6B7280]">
+              <span>
+                Showing {filteredAndSortedLoads.length} of {loadsExcludingArchived.length} loads
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-[#F97316] hover:text-[#ea580c]"
+                onClick={clearFilters}
+              >
+                <X className="h-3.5 w-3.5 mr-1" />
+                Clear filters
+              </Button>
+            </div>
           )}
         </div>
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-[#6B7280]">
-            <span>
-              Showing {filteredAndSortedLoads.length} of {loadsExcludingArchived.length} loads
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-[#F97316] hover:text-[#ea580c]"
-              onClick={clearFilters}
-            >
-              <X className="h-3.5 w-3.5 mr-1" />
-              Clear filters
-            </Button>
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="w-full min-w-0 overflow-x-auto">
         <Table
@@ -578,7 +583,7 @@ export function LoadsTable({
           )}
         >
         <TableHeader>
-          <TableRow className="bg-[#F9FAFB] border-b border-[#E5E7EB] hover:bg-[#F9FAFB]">
+          <TableRow className="border-b border-solid border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F9FAFB] dark:border-border dark:bg-muted/40">
             {enableOpenLoadActions && (
               <TableHead className="w-8 px-0.5 text-center align-middle">
                 <Checkbox
@@ -598,72 +603,75 @@ export function LoadsTable({
               </TableHead>
             )}
             <TableHead className="w-8 px-0.5 text-center align-middle" />
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Load #
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Client
             </TableHead>
-            <TableHead className="!text-left align-middle min-w-[12rem] max-w-[min(42rem,55vw)] pl-3">
+            <TableHead className="min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal !text-left align-middle pl-3">
               <div className="flex flex-col items-start gap-1.5">
-                <span className="text-[10px] uppercase tracking-wide font-medium text-[#6B7280]">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                   Route
                 </span>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("pickup")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors",
-                      laneSort?.column === "pickup" ? "text-[#111827]" : "text-[#6B7280] hover:text-[#111827]",
+                      "inline-flex items-center gap-0.5 text-[11px] font-medium transition-colors sm:text-xs",
+                      laneSort?.column === "pickup"
+                        ? "text-[#111827] dark:text-foreground"
+                        : "text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground dark:hover:text-foreground",
                     )}
                     aria-label="Sort by pickup lane"
                   >
                     Pickup
                     {laneSort?.column === "pickup" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       )
                     ) : null}
                   </button>
-                  <span className="text-[#D1D5DB]" aria-hidden>
+                  <span className="text-xs font-normal text-[#D1D5DB] dark:text-border" aria-hidden>
                     |
                   </span>
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("delivery")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors",
-                      laneSort?.column === "delivery" ? "text-[#111827]" : "text-[#6B7280] hover:text-[#111827]",
+                      "inline-flex items-center gap-0.5 text-[11px] font-medium transition-colors sm:text-xs",
+                      laneSort?.column === "delivery"
+                        ? "text-[#111827] dark:text-foreground"
+                        : "text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground dark:hover:text-foreground",
                     )}
                     aria-label="Sort by delivery lane"
                   >
                     Delivery
                     {laneSort?.column === "delivery" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       )
                     ) : null}
                   </button>
                 </div>
               </div>
             </TableHead>
-            <TableHead className="!text-right text-[10px] uppercase tracking-wide font-medium text-[#6B7280] pr-3">
+            <TableHead className="!text-right align-middle pr-3 text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Target Pay
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Status
             </TableHead>
             <TableHead
-              className={
-                enableOpenLoadActions
-                  ? "w-[88px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center"
-                  : "w-14 text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center"
-              }
+              className={cn(
+                "text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90",
+                enableOpenLoadActions ? "w-[88px]" : "w-14",
+              )}
             >
               Actions
             </TableHead>

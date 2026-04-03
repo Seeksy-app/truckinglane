@@ -610,51 +610,51 @@ export function LoadsTable({
               Client
             </TableHead>
             <TableHead className="min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal !text-left align-middle pl-3">
-              <div className="flex flex-col items-start gap-1.5">
+              <div className="flex flex-col items-start gap-0.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                   Route
                 </span>
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="inline-flex flex-wrap items-center gap-x-1 text-[10px] font-medium leading-tight text-[#6B7280] sm:text-[11px] dark:text-muted-foreground">
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("pickup")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 text-[11px] font-medium transition-colors sm:text-xs",
+                      "inline-flex items-center gap-0.5 rounded-sm transition-colors hover:text-[#374151] dark:hover:text-foreground",
                       laneSort?.column === "pickup"
-                        ? "text-[#111827] dark:text-foreground"
-                        : "text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground dark:hover:text-foreground",
+                        ? "font-semibold text-[#374151] dark:text-foreground"
+                        : "",
                     )}
                     aria-label="Sort by pickup lane"
                   >
                     Pickup
                     {laneSort?.column === "pickup" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
                       )
                     ) : null}
                   </button>
-                  <span className="text-xs font-normal text-[#D1D5DB] dark:text-border" aria-hidden>
-                    |
+                  <span className="font-normal text-[#9CA3AF] dark:text-muted-foreground/80" aria-hidden>
+                    →
                   </span>
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("delivery")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 text-[11px] font-medium transition-colors sm:text-xs",
+                      "inline-flex items-center gap-0.5 rounded-sm transition-colors hover:text-[#374151] dark:hover:text-foreground",
                       laneSort?.column === "delivery"
-                        ? "text-[#111827] dark:text-foreground"
-                        : "text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground dark:hover:text-foreground",
+                        ? "font-semibold text-[#374151] dark:text-foreground"
+                        : "",
                     )}
                     aria-label="Sort by delivery lane"
                   >
                     Delivery
                     {laneSort?.column === "delivery" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
                       )
                     ) : null}
                   </button>

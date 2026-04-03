@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -32,8 +31,8 @@ import { LeadExpandedRow } from "./LeadExpandedRow";
 import { LeadResolvePanel } from "./LeadResolvePanel";
 import { HotLeadTimer } from "./HotLeadTimer";
 import { PhoneDisplay } from "@/components/ui/phone-display";
-import { formatPhone } from "@/lib/utils";
-import { DASHBOARD_TABLE_CENTERED_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { formatPhone, cn } from "@/lib/utils";
+import { LEADS_TABLE_LOADS_STYLE_CLASS } from "@/lib/loadTableDisplay";
 import { toast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -304,17 +303,17 @@ export const LeadsTable = ({
 
   if (isLoading) {
     return (
-      <Card className="p-8">
+      <div className="rounded-lg border border-[#E5E7EB] bg-white p-8 shadow-sm dark:border-border dark:bg-card">
         <div className="flex items-center justify-center text-muted-foreground">
           <div className="animate-pulse">Loading leads...</div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-12 text-center">
+      <div className="rounded-lg border border-[#E5E7EB] bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card">
         <p className="text-lg font-medium text-foreground">No leads found</p>
         <p className="text-sm text-muted-foreground mt-1">AI-generated leads will appear here</p>
       </div>
@@ -337,34 +336,34 @@ export const LeadsTable = ({
 
       {/* Delete selected bar */}
       {someSelected && (
-        <div className="flex items-center gap-3 px-2 py-2 bg-destructive/10 border-b border-border">
-          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-2.5 dark:border-border dark:bg-muted/40">
+          <span className="text-sm font-medium text-[#374151] dark:text-foreground">{selectedIds.size} selected</span>
           <Button
             variant="destructive"
             size="sm"
             onClick={handleDeleteSelected}
             disabled={deleteLeadsMutation.isPending}
-            className="gap-1.5 h-7 text-xs"
+            className="h-8 gap-1.5 px-3 text-xs font-semibold shadow-sm"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {deleteLeadsMutation.isPending ? "Deleting..." : "Delete Selected"}
           </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setSelectedIds(new Set())}
-            className="h-7 text-xs"
+            className="h-8 border-[#E5E7EB] bg-white text-xs font-medium dark:border-border dark:bg-background"
           >
             Clear
           </Button>
         </div>
       )}
 
-      <div className="w-full rounded-lg border border-border bg-card overflow-hidden">
+      <div className="w-full overflow-hidden rounded-lg border border-[#E5E7EB] bg-white dark:border-border dark:bg-card">
       <div className="w-full min-w-0 overflow-x-auto">
-      <Table className={DASHBOARD_TABLE_CENTERED_DENSE_CLASS}>
+      <Table className={LEADS_TABLE_LOADS_STYLE_CLASS}>
         <TableHeader>
-          <TableRow className="bg-muted/50 border-b border-border">
+          <TableRow className="border-b border-solid border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F9FAFB] dark:border-border dark:bg-muted/40">
             <TableHead className="w-[40px]" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-center">
                 <Checkbox
@@ -374,17 +373,35 @@ export const LeadsTable = ({
                 />
               </div>
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Date</TableHead>
-            <TableHead className="w-[180px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Phone</TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Company</TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Status</TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Follow-Up</TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Date
+            </TableHead>
+            <TableHead className="w-[180px] text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Phone
+            </TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Company
+            </TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Status
+            </TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Follow-Up
+            </TableHead>
             {showClaimedBy && (
-              <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Claimed By</TableHead>
+              <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                Claimed By
+              </TableHead>
             )}
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Intent</TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Timer</TableHead>
-            <TableHead className="w-[100px] text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">Actions</TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Intent
+            </TableHead>
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Timer
+            </TableHead>
+            <TableHead className="w-[100px] text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+              Actions
+            </TableHead>
             <TableHead className="w-[40px]" />
           </TableRow>
         </TableHeader>
@@ -399,11 +416,6 @@ export const LeadsTable = ({
             const isExpanded = expandedLeadId === lead.id;
             const isFocused = focusedIndex === index;
 
-            // Lead rows (status=pending) get highlight
-            const leadHighlight = isPending 
-              ? "bg-[hsl(38,92%,50%)]/5 hover:bg-[hsl(38,92%,50%)]/10" 
-              : "";
-
             // Deep-link highlight animation
             const isHighlighted = highlightedLeadId === lead.id;
 
@@ -415,7 +427,14 @@ export const LeadsTable = ({
                   role="row"
                   aria-selected={isFocused}
                   aria-expanded={isExpanded}
-                  className={`cursor-pointer outline-none focus:ring-2 focus:ring-primary focus:ring-inset ${leadHighlight} ${isExpanded ? "bg-muted/20" : ""} ${isFocused && !isPending ? "bg-muted/10 hover:bg-muted/30" : ""} ${!isPending && !isExpanded && !isFocused ? "hover:bg-muted/30" : ""} ${isHighlighted ? "animate-pulse ring-2 ring-[hsl(35,92%,50%)] ring-inset bg-[hsl(35,92%,50%)]/10" : ""}`}
+                  className={cn(
+                    "cursor-pointer border-b border-[#E5E7EB] bg-white outline-none transition-shadow transition-colors",
+                    "hover:shadow-[0_2px_10px_rgba(0,0,0,0.07)] hover:bg-white",
+                    "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset dark:border-border dark:bg-card",
+                    isExpanded && "bg-[#F9FAFB] dark:bg-muted/30",
+                    isFocused && !isExpanded && "ring-1 ring-inset ring-[#E5E7EB] dark:ring-border",
+                    isHighlighted && "animate-pulse ring-2 ring-[hsl(35,92%,50%)] ring-inset bg-[hsl(35,92%,50%)]/10",
+                  )}
                   onClick={() => handleRowClick(lead.id)}
                   onFocus={() => handleRowFocus(index)}
                 >
@@ -428,7 +447,7 @@ export const LeadsTable = ({
                       />
                     </div>
                   </TableCell>
-                  <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
+                  <TableCell className="text-center text-sm text-[#6B7280] tabular-nums dark:text-muted-foreground">
                     {format(new Date(lead.created_at), "MMM d, yyyy, h:mm a")}
                   </TableCell>
                   <TableCell className="w-[180px] text-sm whitespace-nowrap text-center">
@@ -510,7 +529,7 @@ export const LeadsTable = ({
                         value={lead.follow_up_status || "null"}
                         onValueChange={(value) => handleFollowUpChange(lead.id, value)}
                       >
-                        <SelectTrigger className="h-7 text-xs w-[140px] mx-auto">
+                        <SelectTrigger className="mx-auto h-8 w-[140px] border-[#E5E7EB] text-xs dark:border-border">
                           <SelectValue placeholder="Not Set" />
                         </SelectTrigger>
                         <SelectContent>
@@ -598,9 +617,9 @@ export const LeadsTable = ({
                             variant="ghost" 
                             size="sm" 
                             onClick={(e) => handleNavigateToDetail(lead.id, e)}
-                            className="h-7 w-7 p-0"
+                            className="h-8 w-8 shrink-0 p-0"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>View Details</TooltipContent>
@@ -609,10 +628,11 @@ export const LeadsTable = ({
                       {/* Lead (pending): Claim */}
                       {isPending && (
                         <Button 
-                          variant="outline" 
+                          type="button"
+                          variant="outline"
                           size="sm" 
                           onClick={() => onClaimLead(lead.id)}
-                          className="gap-1.5 h-7 text-xs"
+                          className="h-8 gap-1.5 border-[#1F2937] bg-[#1F2937] px-2 text-xs font-semibold text-white shadow-none hover:bg-[#111827] hover:text-white sm:text-sm"
                         >
                           <UserPlus className="h-3.5 w-3.5" />
                           Claim
@@ -622,10 +642,10 @@ export const LeadsTable = ({
                       {/* Claimed by me: Release Claim */}
                       {isClaimed && isClaimedByMe && (
                         <Button 
-                          variant="ghost" 
+                          variant="outline" 
                           size="sm" 
                           onClick={() => onUpdateStatus(lead.id, "pending", "release")}
-                          className="gap-1.5 h-7 text-xs text-muted-foreground hover:text-foreground"
+                          className="h-8 gap-1.5 border-[#E5E7EB] bg-white px-2 text-xs font-medium text-[#374151] hover:bg-[#F9FAFB] dark:border-border dark:bg-background dark:text-foreground"
                         >
                           <XCircle className="h-3.5 w-3.5" />
                           Release
@@ -635,10 +655,10 @@ export const LeadsTable = ({
                       {/* Booked/Closed: Reopen */}
                       {(isBooked || isClosed) && (
                         <Button 
-                          variant="ghost" 
+                          variant="outline" 
                           size="sm" 
                           onClick={() => onUpdateStatus(lead.id, "pending", "reopen")}
-                          className="gap-1.5 h-7 text-xs text-muted-foreground hover:text-foreground"
+                          className="h-8 gap-1.5 border-[#E5E7EB] bg-white px-2 text-xs font-medium text-[#374151] hover:bg-[#F9FAFB] dark:border-border dark:bg-background dark:text-foreground"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           Reopen
@@ -647,7 +667,7 @@ export const LeadsTable = ({
                     </div>
                   </TableCell>
                   <TableCell 
-                    className="cursor-pointer hover:bg-muted/50 text-center"
+                    className="cursor-pointer text-center hover:bg-[#F9FAFB] dark:hover:bg-muted/40"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRowClick(lead.id);
@@ -682,11 +702,12 @@ export const LeadsTable = ({
       
       {/* Load More / Show All */}
       {leads.length > displayCount && (
-        <div className="flex items-center justify-center gap-3 py-4 border-t border-border">
+        <div className="flex flex-wrap items-center justify-center gap-3 border-t border-[#E5E7EB] py-4 dark:border-border">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setDisplayCount((prev) => prev + 25)}
+            className="border-[#E5E7EB] bg-white font-medium dark:border-border dark:bg-background"
           >
             Load More ({leads.length - displayCount} remaining)
           </Button>
@@ -694,6 +715,7 @@ export const LeadsTable = ({
             variant="ghost"
             size="sm"
             onClick={() => setDisplayCount(leads.length)}
+            className="font-medium text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground"
           >
             Show All ({leads.length})
           </Button>

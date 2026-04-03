@@ -101,7 +101,7 @@ const Dashboard = () => {
     impersonatedAgencyId: isImpersonating ? impersonatedAgencyId ?? null : null,
   });
   const [searchParams, setSearchParams] = useSearchParams();
-  const [mode, setMode] = useState<DashboardMode>("pending");
+  const [mode, setMode] = useState<DashboardMode>("open");
   const [searchQuery, setSearchQuery] = useState("");
   /** After user opens NEW, stop pulsing until the count increases (new loads arrived). */
   const [newPulseDismissed, setNewPulseDismissed] = useState(false);

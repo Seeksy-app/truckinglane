@@ -1200,7 +1200,8 @@ const Dashboard = () => {
               {(searchQuery ||
                 ownerFilter !== "all" ||
                 lanePickupFilter !== "all" ||
-                laneDestFilter !== "all") && (
+                laneDestFilter !== "all" ||
+                sourceFilter !== "all") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1209,6 +1210,7 @@ const Dashboard = () => {
                     setOwnerFilter("all");
                     setLanePickupFilter("all");
                     setLaneDestFilter("all");
+                    setSourceFilter("all");
                   }}
                   className="text-muted-foreground hover:text-foreground"
                 >

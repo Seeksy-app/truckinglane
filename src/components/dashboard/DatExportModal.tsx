@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -46,7 +46,6 @@ export function DatExportModal({
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<DatExportSourceGroupId>>(() => new Set());
   const [exporting, setExporting] = useState(false);
-  const initSelectionForOpenRef = useRef(false);
 
   const { data: counts = null, isLoading } = useQuery({
     queryKey: ["dat-pending-counts-by-source", role, impersonatedAgencyId],
@@ -73,16 +72,12 @@ export function DatExportModal({
     return DAT_EXPORT_SOURCE_GROUPS.filter((g) => (counts[g.id] ?? 0) > 0).map((g) => g.id);
   }, [counts]);
 
+  /** Nothing pre-selected — broker chooses sources each time the modal opens. */
   useEffect(() => {
-    if (!open) {
-      initSelectionForOpenRef.current = false;
-      return;
+    if (open) {
+      setSelected(new Set());
     }
-    if (counts != null && !initSelectionForOpenRef.current) {
-      initSelectionForOpenRef.current = true;
-      setSelected(new Set(idsWithPending));
-    }
-  }, [open, counts, idsWithPending]);
+  }, [open]);
 
   const allSelected = idsWithPending.length > 0 && idsWithPending.every((id) => selected.has(id));
   const somePendingSelected = idsWithPending.some((id) => selected.has(id));
@@ -96,7 +91,8 @@ export function DatExportModal({
     setSelected(checked ? new Set(idsWithPending) : new Set());
   };
 
-  const toggleOne = (id: DatExportSourceGroupId, checked: boolean) => {
+  const toggleOne = (id: DatExportSourceGroupId, checked: boolean, pendingCount: number) => {
+    if (pendingCount <= 0) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -214,8 +210,9 @@ export function DatExportModal({
             Export to DAT
           </DialogTitle>
           <DialogDescription>
-            Choose sources. Counts are active loads (<code className="text-xs">is_active</code>) with no DAT upload yet (
-            <code className="text-xs">dat_posted_at</code> empty), grouped by source. Only Adelphia, Oldcastle, Big 500,
+            Select which sources to include — nothing is pre-checked. Sources with pending loads are highlighted; sources
+            with zero pending cannot be selected. Counts are active loads (<code className="text-xs">is_active</code>) with
+            no DAT upload yet (<code className="text-xs">dat_posted_at</code> empty). Only Adelphia, Oldcastle, Big 500,
             VMS, and Spot Loads require complete origin and destination for export; other sources (including Trucker Tools
             and Century) can export with partial locations.
           </DialogDescription>
@@ -226,10 +223,17 @@ export function DatExportModal({
             <Checkbox
               id="dat-export-all"
               checked={allSelected}
+              disabled={idsWithPending.length === 0}
               onCheckedChange={(v) => toggleAll(v === true)}
             />
-            <Label htmlFor="dat-export-all" className="font-medium cursor-pointer">
-              Select all
+            <Label
+              htmlFor="dat-export-all"
+              className={cn(
+                "font-medium",
+                idsWithPending.length === 0 ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer",
+              )}
+            >
+              Select all with pending
             </Label>
           </div>
 
@@ -243,25 +247,40 @@ export function DatExportModal({
               {DAT_EXPORT_SOURCE_GROUPS.map((g) => {
                 const n = counts[g.id] ?? 0;
                 const noPending = n === 0;
+                const hasPending = n > 0;
                 return (
                   <li
                     key={g.id}
                     className={cn(
-                      "flex items-center justify-between gap-3 rounded-md transition-colors",
-                      noPending && "opacity-60 text-muted-foreground",
+                      "flex items-center justify-between gap-3 rounded-md border border-transparent px-1 py-0.5 -mx-1 transition-colors",
+                      hasPending && "border-primary/25 bg-primary/5",
+                      noPending && "opacity-50 text-muted-foreground",
                     )}
                   >
                     <div className="flex items-center space-x-2 min-w-0">
                       <Checkbox
                         id={`dat-src-${g.id}`}
                         checked={selected.has(g.id)}
-                        onCheckedChange={(v) => toggleOne(g.id, v === true)}
+                        disabled={noPending}
+                        onCheckedChange={(v) => toggleOne(g.id, v === true, n)}
                       />
-                      <Label htmlFor={`dat-src-${g.id}`} className="cursor-pointer truncate">
+                      <Label
+                        htmlFor={`dat-src-${g.id}`}
+                        className={cn(
+                          "truncate",
+                          noPending ? "cursor-not-allowed" : "cursor-pointer",
+                          hasPending && "font-semibold text-foreground",
+                        )}
+                      >
                         {g.label}
                       </Label>
                     </div>
-                    <span className="text-sm tabular-nums shrink-0 text-muted-foreground">
+                    <span
+                      className={cn(
+                        "text-sm tabular-nums shrink-0",
+                        hasPending ? "font-semibold text-primary" : "text-muted-foreground",
+                      )}
+                    >
                       ({n} pending)
                     </span>
                   </li>

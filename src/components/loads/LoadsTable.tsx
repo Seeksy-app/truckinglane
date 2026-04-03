@@ -662,17 +662,17 @@ export function LoadsTable({
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Client
             </TableHead>
-            <TableHead className="loads-route-head min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal !text-left align-middle pl-3">
-              <div className="flex flex-col items-start gap-0.5">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="loads-route-head min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal text-left align-middle pl-3">
+              <div className="text-left">
+                <div className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                   Route
-                </span>
-                <div className="inline-flex flex-wrap items-center gap-x-1 text-[10px] font-medium leading-tight text-[#6B7280] sm:text-[11px] dark:text-muted-foreground">
+                </div>
+                <div className="mt-0.5 text-left text-[10px] font-medium leading-tight text-[#6B7280] sm:text-[11px] dark:text-muted-foreground">
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("pickup")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 rounded-sm transition-colors hover:text-[#374151] dark:hover:text-foreground",
+                      "rounded-sm align-middle transition-colors hover:text-[#374151] dark:hover:text-foreground",
                       laneSort?.column === "pickup"
                         ? "font-semibold text-[#374151] dark:text-foreground"
                         : "",
@@ -682,20 +682,20 @@ export function LoadsTable({
                     Pickup
                     {laneSort?.column === "pickup" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowUp className="ml-0.5 inline-block h-3 w-3 align-middle" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowDown className="ml-0.5 inline-block h-3 w-3 align-middle" aria-hidden />
                       )
                     ) : null}
                   </button>
-                  <span className="font-normal text-[#9CA3AF] dark:text-muted-foreground/80" aria-hidden>
+                  <span className="mx-1 font-normal text-[#9CA3AF] dark:text-muted-foreground/80" aria-hidden>
                     →
                   </span>
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("delivery")}
                     className={cn(
-                      "inline-flex items-center gap-0.5 rounded-sm transition-colors hover:text-[#374151] dark:hover:text-foreground",
+                      "rounded-sm align-middle transition-colors hover:text-[#374151] dark:hover:text-foreground",
                       laneSort?.column === "delivery"
                         ? "font-semibold text-[#374151] dark:text-foreground"
                         : "",
@@ -705,9 +705,9 @@ export function LoadsTable({
                     Delivery
                     {laneSort?.column === "delivery" ? (
                       laneSort.dir === "asc" ? (
-                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowUp className="ml-0.5 inline-block h-3 w-3 align-middle" aria-hidden />
                       ) : (
-                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                        <ArrowDown className="ml-0.5 inline-block h-3 w-3 align-middle" aria-hidden />
                       )
                     ) : null}
                   </button>
@@ -759,64 +759,52 @@ export function LoadsTable({
                     </TableCell>
                   )}
                   <TableCell className="w-8 px-0.5 text-center align-middle text-sm sm:text-base">
-                    <span className="inline-flex justify-center">
-                      {expandedId === load.id ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </span>
+                    {expandedId === load.id ? (
+                      <ChevronDown className="inline-block h-4 w-4 align-middle" />
+                    ) : (
+                      <ChevronRight className="inline-block h-4 w-4 align-middle" />
+                    )}
                   </TableCell>
-                  <TableCell className="text-left font-medium tabular-nums text-sm sm:text-base">
+                  <TableCell className="text-left align-middle font-medium tabular-nums text-sm sm:text-base">
                     {load.load_number || "—"}
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
-                    <div className="flex flex-nowrap items-center justify-center gap-0.5 min-w-0">
-                      <Badge variant="outline" className="text-xs sm:text-sm font-medium h-6 px-1.5 shrink-0">
-                        {getLoadBoardClientPrimaryLabel(load.template_type)}
+                    <Badge variant="outline" className="inline-block align-middle text-xs sm:text-sm font-medium h-6 px-1.5">
+                      {getLoadBoardClientPrimaryLabel(load.template_type)}
+                    </Badge>
+                    {aljexTemplateBadge ? (
+                      <Badge
+                        variant="secondary"
+                        className="ml-0.5 inline-block align-middle h-6 px-1.5 py-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                      >
+                        {aljexTemplateBadge}
                       </Badge>
-                      {aljexTemplateBadge ? (
-                        <Badge
-                          variant="secondary"
-                          className="h-6 px-1.5 py-0 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground shrink-0"
-                        >
-                          {aljexTemplateBadge}
-                        </Badge>
-                      ) : null}
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-left align-middle text-sm sm:text-base">
+                    <div className="font-bold leading-snug text-[#1A1A1A]">{collapsedRouteTitle(load)}</div>
+                    <div className="mt-1 text-xs leading-snug text-[#6B7280] sm:text-sm">
+                      {collapsedMetaLine(load)}
                     </div>
                   </TableCell>
-                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-left text-sm sm:text-base">
-                    <div className="flex min-w-0 flex-col items-start gap-1 text-left">
-                      <div className="font-bold text-[#1A1A1A] leading-snug">
-                        {collapsedRouteTitle(load)}
-                      </div>
-                      <div className="text-xs sm:text-sm text-[#6B7280] leading-snug">
-                        {collapsedMetaLine(load)}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="loads-target-cell py-3 px-2 align-middle text-right">
-                    <div className="flex flex-col items-end gap-1 text-right">
-                      <span className="text-lg sm:text-xl font-bold tabular-nums text-[#111827]">
-                        {targetCollapsed}
+                  <TableCell className="loads-target-cell py-3 px-2 text-right align-middle text-sm sm:text-base">
+                    <span className="block text-lg font-bold tabular-nums text-[#111827] sm:text-xl">
+                      {targetCollapsed}
+                    </span>
+                    {load.is_per_ton ? (
+                      <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-[#6B7280]">
+                        Per-ton
                       </span>
-                      {load.is_per_ton ? (
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-[#6B7280]">
-                          Per-ton
-                        </span>
-                      ) : null}
-                    </div>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
-                    <div className="flex justify-center">
-                      <span className={collapsedStatusPillClass(load)}>{collapsedStatusLabel(load)}</span>
-                    </div>
+                    <span className={collapsedStatusPillClass(load)}>{collapsedStatusLabel(load)}</span>
                   </TableCell>
                   <TableCell
-                    className="text-center text-sm sm:text-base align-middle"
+                    className="text-center align-middle text-sm sm:text-base"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex flex-wrap items-center gap-0.5 justify-center">
+                    <span className="inline-block align-middle">
                       {enableOpenLoadActions && (() => {
                         const serverPosted = (load as { dat_posted_at?: string | null }).dat_posted_at;
                         const isPosted =
@@ -859,6 +847,8 @@ export function LoadsTable({
                           </Tooltip>
                         );
                       })()}
+                    </span>
+                    <span className="ml-0.5 inline-block align-middle">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -872,7 +862,7 @@ export function LoadsTable({
                         </TooltipTrigger>
                         <TooltipContent>View Details</TooltipContent>
                       </Tooltip>
-                    </div>
+                    </span>
                   </TableCell>
                 </TableRow>
                 {expandedId === load.id && (

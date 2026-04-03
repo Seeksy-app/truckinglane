@@ -34,6 +34,7 @@ import {
 import { SmartSearchInput } from "@/components/dashboard/SmartSearchInput";
 import { normalizeStateSearch } from "@/lib/stateMapping";
 import { CLIENT_SOURCE_PILLS, countLoadsForPill } from "@/lib/loadBoardSourcePills";
+import { cn } from "@/lib/utils";
 import { AIAssistantDrawer } from "@/components/dashboard/AIAssistantDrawer";
 import { IntelligenceRail } from "@/components/dashboard/IntelligenceRail";
 import { InternalChatRail } from "@/components/dashboard/InternalChatRail";
@@ -46,7 +47,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { isOpenLoadForNewCard } from "@/lib/newLoadsFromImport";
-import { cn, getErrorMessage, isoTimestampNow } from "@/lib/utils";
+import { getErrorMessage, isoTimestampNow } from "@/lib/utils";
 import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
@@ -1199,8 +1200,7 @@ const Dashboard = () => {
               {(searchQuery ||
                 ownerFilter !== "all" ||
                 lanePickupFilter !== "all" ||
-                laneDestFilter !== "all" ||
-                sourceFilter !== "all") && (
+                laneDestFilter !== "all") && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1209,7 +1209,6 @@ const Dashboard = () => {
                     setOwnerFilter("all");
                     setLanePickupFilter("all");
                     setLaneDestFilter("all");
-                    setSourceFilter("all");
                   }}
                   className="text-muted-foreground hover:text-foreground"
                 >
@@ -1331,7 +1330,6 @@ const Dashboard = () => {
             loading={loadsLoading}
             onRefresh={refetchLoads}
             externalLaneFilters={dashboardLaneFilters}
-            controlledSourceFilter={{ value: sourceFilter, onChange: setSourceFilter }}
           />
         )}
 
@@ -1341,7 +1339,6 @@ const Dashboard = () => {
             loading={loadsLoading}
             onRefresh={refetchLoads}
             externalLaneFilters={dashboardLaneFilters}
-            controlledSourceFilter={{ value: sourceFilter, onChange: setSourceFilter }}
           />
         )}
       </div>

@@ -578,6 +578,7 @@ export function LoadsTable({
         <Table
           className={cn(
             LOADS_TABLE_DENSE_CLASS,
+            "[&_th.loads-route-head]:!text-left [&_th.loads-route-head]:align-middle",
             "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
             "[&_td.loads-target-cell]:!text-center",
           )}
@@ -609,7 +610,7 @@ export function LoadsTable({
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Client
             </TableHead>
-            <TableHead className="min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal !text-left align-middle pl-3">
+            <TableHead className="loads-route-head min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal !text-left align-middle pl-3">
               <div className="flex flex-col items-start gap-0.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                   Route
@@ -732,8 +733,8 @@ export function LoadsTable({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-sm sm:text-base">
-                    <div className="flex flex-col gap-1 min-w-0 text-left">
+                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-left text-sm sm:text-base">
+                    <div className="flex min-w-0 flex-col items-start gap-1 text-left">
                       <div className="font-bold text-[#1A1A1A] leading-snug">
                         {collapsedRouteTitle(load)}
                       </div>

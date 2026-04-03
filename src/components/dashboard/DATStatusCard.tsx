@@ -62,14 +62,14 @@ export function DATStatusCard() {
       const { count: uploaded, error: uploadedErr } = await uploadedQ;
       if (uploadedErr) throw uploadedErr;
 
-      // Need destination: same as pending + any of pickup/dest zip or city NULL
+      // Need destination: same as pending + missing pickup or destination city (zip not required for DAT bulk template)
       let needDestQ = supabase
         .from("loads")
         .select("*", { count: "exact", head: true })
         .eq("is_active", true)
         .is("dat_posted_at", null)
         .eq("dispatch_status", "open")
-        .or("pickup_zip.is.null,pickup_city.is.null,dest_zip.is.null,dest_city.is.null");
+        .or("pickup_city.is.null,dest_city.is.null");
       needDestQ = applyAgency(needDestQ);
       const { count: needDestination, error: needDestErr } = await needDestQ;
       if (needDestErr) throw needDestErr;
@@ -82,7 +82,7 @@ export function DATStatusCard() {
         .eq("is_active", true)
         .is("dat_posted_at", null)
         .eq("dispatch_status", "open")
-        .or("pickup_zip.is.null,pickup_city.is.null,dest_zip.is.null,dest_city.is.null");
+        .or("pickup_city.is.null,dest_city.is.null");
       failedListQ = applyAgency(failedListQ);
       const { data: failedRows, error: failedListErr } = await failedListQ;
       if (failedListErr) throw failedListErr;
@@ -173,8 +173,8 @@ export function DATStatusCard() {
           <TooltipContent>
             <p>
               {pending} pending (<code className="text-xs">dat_posted_at</code> null, open, active) · {uploaded} uploaded (
-              <code className="text-xs">dat_posted_at</code> set, active) · {failed} need destination (missing zip/city on
-              pickup or dest)
+              <code className="text-xs">dat_posted_at</code> set, active) · {failed} need destination (missing{" "}
+              <code className="text-xs">pickup_city</code> or <code className="text-xs">dest_city</code>; zip optional)
             </p>
           </TooltipContent>
         </Tooltip>
@@ -201,7 +201,14 @@ export function DATStatusCard() {
                     <div className="font-medium text-sm">{load.load_number}</div>
                     <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <MapPin className="h-3 w-3" />
-                      {load.pickup_city || "?"}, {load.pickup_state || "?"} →{" "}
+                      {load.pickup_city ? (
+                        <>
+                          {load.pickup_city}, {load.pickup_state || "?"}
+                        </>
+                      ) : (
+                        <span className="text-amber-500 font-medium">Missing pickup city</span>
+                      )}{" "}
+                      →{" "}
                       {load.dest_city ? (
                         <>
                           {load.dest_city}, {load.dest_state}

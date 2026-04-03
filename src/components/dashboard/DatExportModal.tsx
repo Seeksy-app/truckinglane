@@ -24,6 +24,7 @@ import {
   fetchDatAllActiveOpenLoadsCount,
   fetchDatAllActiveOpenLoadsForExport,
   downloadDATExport,
+  formatDatExportDownloadMessage,
   isExportableLoad,
   markDATExportComplete,
 } from "@/lib/datExport";
@@ -139,7 +140,7 @@ export function DatExportModal({
       toast.error("No agency — cannot export");
       return false;
     }
-    downloadDATExport(exportableLoads, filename);
+    const { fileCount, totalRows } = await downloadDATExport(exportableLoads, filename);
 
     const postedAt = new Date().toISOString();
     const loadNumbers = [
@@ -178,14 +179,15 @@ export function DatExportModal({
       sender_email: "dat-csv-export@truckinglane.com",
       subject: null,
       status: "success",
-      imported_count: exportableLoads.length,
+      imported_count: totalRows,
       raw_headers: {
         mode: "csv",
         source: "DAT CSV Export",
         agent_name: agentName,
-        count: exportableLoads.length,
-        exported: exportableLoads.length,
+        count: totalRows,
+        exported: totalRows,
         ...rawHeadersExtras,
+        ...(fileCount > 1 ? { zip_csv_parts: fileCount } : {}),
       },
       error_message: null,
     });
@@ -200,7 +202,7 @@ export function DatExportModal({
     queryClient.invalidateQueries({ queryKey: ["dat-pending-counts-by-source"] });
     queryClient.invalidateQueries({ queryKey: ["dat-all-active-open-count"] });
     queryClient.invalidateQueries({ queryKey: ["load_activity_logs"] });
-    toast.success(`${exportableLoads.length} loads exported to DAT`);
+    toast.success(formatDatExportDownloadMessage(totalRows, fileCount));
     onOpenChange(false);
     return true;
   };

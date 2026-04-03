@@ -38,7 +38,11 @@ import { format } from "date-fns";
 import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { downloadDATExport, isExportableLoad } from "@/lib/datExport";
+import {
+  downloadDATExport,
+  formatDatExportDownloadMessage,
+  isExportableLoad,
+} from "@/lib/datExport";
 import { truckerToolsNoRateRaw } from "@/lib/truckerToolsLoads";
 import { formatCityState, formatCurrency } from "@/components/loads/LoadNotes";
 import { cn } from "@/lib/utils";
@@ -301,7 +305,7 @@ export function LoadsTable({
     }
   };
 
-  const handleBulkPostToDat = () => {
+  const handleBulkPostToDat = async () => {
     const exportable = selectedInView.filter(isExportableLoad);
     if (exportable.length === 0) {
       toast.error("No selected loads have complete destination for DAT export.");
@@ -310,8 +314,11 @@ export function LoadsTable({
     setBulkDatBusy(true);
     try {
       const day = new Date().toISOString().split("T")[0];
-      downloadDATExport(exportable, `DAT_Export_Selected_${day}.csv`);
-      toast.success(`Exported ${exportable.length} load${exportable.length === 1 ? "" : "s"} to DAT CSV`);
+      const { fileCount, totalRows } = await downloadDATExport(
+        exportable,
+        `DAT_Export_Selected_${day}.csv`,
+      );
+      toast.success(formatDatExportDownloadMessage(totalRows, fileCount));
       setSelectedIds(new Set());
     } finally {
       setBulkDatBusy(false);
@@ -360,7 +367,7 @@ export function LoadsTable({
     const nowIso = new Date().toISOString();
     try {
       const name = `DAT_Load_${(load.load_number || load.id).toString().replace(/[^\w.-]+/g, "_")}.csv`;
-      downloadDATExport([load], name);
+      await downloadDATExport([load], name);
       if (isDemo) {
         setDemoDatPostedIds((prev) => new Set(prev).add(load.id));
         toast.success("DAT file downloaded (demo — not saved)");

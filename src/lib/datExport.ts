@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import JSZip from "jszip";
 import { Tables } from "@/integrations/supabase/types";
 import {
   DAT_EXPORT_SOURCE_GROUPS,
@@ -509,17 +510,32 @@ function escapeField(field: string): string {
   return field;
 }
 
+/** DAT bulk upload allows at most this many data rows per CSV file. */
+export const DAT_EXPORT_ROWS_PER_CSV = 500;
+
+/** CSV string for loads already known to be exportable (one header + rows). */
+function buildDatCsvString(exportableLoads: Load[]): string {
+  const headerLine = DAT_COLUMNS.map(escapeField).join(",");
+  const dataLines = exportableLoads.map((load) => {
+    const row = mapLoadToDAT(load);
+    return DAT_COLUMNS.map((col) => escapeField(row[col] || "")).join(",");
+  });
+  return [headerLine, ...dataLines].join("\n");
+}
+
 // Generate CSV string from loads (filters out invalid/note rows)
 export function generateDATCsv(loads: Load[]): string {
-  const exportableLoads = loads.filter(isExportableLoad);
-  const headerLine = DAT_COLUMNS.map(escapeField).join(",");
-  
-  const dataLines = exportableLoads.map(load => {
-    const row = mapLoadToDAT(load);
-    return DAT_COLUMNS.map(col => escapeField(row[col] || "")).join(",");
-  });
+  return buildDatCsvString(loads.filter(isExportableLoad));
+}
 
-  return [headerLine, ...dataLines].join("\n");
+/** User-facing toast after a DAT CSV / ZIP download is triggered. */
+export function formatDatExportDownloadMessage(totalRows: number, fileCount: number): string {
+  const loadWord = totalRows === 1 ? "load" : "loads";
+  if (fileCount <= 1) {
+    return `${totalRows} ${loadWord} exported — download will start automatically`;
+  }
+  const fileWord = fileCount === 1 ? "file" : "files";
+  return `${totalRows} loads exported across ${fileCount} ${fileWord} — download will start automatically`;
 }
 
 /** Primary key for last DAT export time (also migrates legacy `dat_last_export_timestamp`). */
@@ -622,19 +638,44 @@ export function getLastDATExportTimestamp(): string | null {
   return readLastDatExportIso();
 }
 
-// Download the CSV file
-export function downloadDATExport(loads: Load[], filename?: string): void {
-  const csvContent = generateDATCsv(loads);
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+function triggerBlobDownload(blob: Blob, downloadName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  
-  const today = new Date().toISOString().split("T")[0];
-  link.download = filename || `DAT_Export_${today}.csv`;
-  
+  link.download = downloadName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads a single CSV (≤ {@link DAT_EXPORT_ROWS_PER_CSV} exportable rows) or a ZIP of
+ * `DAT-Export-1.csv`, `DAT-Export-2.csv`, … when over the limit.
+ */
+export async function downloadDATExport(
+  loads: Load[],
+  filename?: string,
+): Promise<{ fileCount: number; totalRows: number }> {
+  const exportableLoads = loads.filter(isExportableLoad);
+  const totalRows = exportableLoads.length;
+  const today = new Date().toISOString().split("T")[0];
+
+  if (totalRows <= DAT_EXPORT_ROWS_PER_CSV) {
+    const csvContent = buildDatCsvString(exportableLoads);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    triggerBlobDownload(blob, filename || `DAT_Export_${today}.csv`);
+    return { fileCount: 1, totalRows };
+  }
+
+  const zip = new JSZip();
+  const fileCount = Math.ceil(totalRows / DAT_EXPORT_ROWS_PER_CSV);
+  for (let i = 0; i < totalRows; i += DAT_EXPORT_ROWS_PER_CSV) {
+    const chunk = exportableLoads.slice(i, i + DAT_EXPORT_ROWS_PER_CSV);
+    const partIndex = i / DAT_EXPORT_ROWS_PER_CSV + 1;
+    zip.file(`DAT-Export-${partIndex}.csv`, buildDatCsvString(chunk));
+  }
+  const blob = await zip.generateAsync({ type: "blob" });
+  triggerBlobDownload(blob, `DAT-Export-${today}.zip`);
+  return { fileCount, totalRows };
 }

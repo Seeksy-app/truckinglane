@@ -21,6 +21,7 @@ import { toast } from "@/hooks/use-toast";
 import { ResolveLeadModal } from "./ResolveLeadModal";
 import type { Tables, Json } from "@/integrations/supabase/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_STYLES } from "@/lib/leadStatusDisplay";
+import { isRateAgreedCallOutcome } from "@/lib/leadCallOutcome";
 import { cn } from "@/lib/utils";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import {
@@ -207,6 +208,35 @@ export const LeadExpandedRow = ({
     enabled: true, // Always try to fetch - we have multiple fallbacks
   });
 
+  const { data: linkedAiCallOutcome } = useQuery({
+    queryKey: ["lead-expanded-ai-outcome", lead.id, lead.conversation_id, lead.caller_phone, agencyId],
+    queryFn: async () => {
+      if (lead.conversation_id) {
+        const { data, error } = await supabase
+          .from("ai_call_summaries")
+          .select("call_outcome")
+          .eq("conversation_id", lead.conversation_id)
+          .maybeSingle();
+        if (error) throw error;
+        if (data?.call_outcome) return data.call_outcome as string;
+      }
+      if (lead.caller_phone?.trim() && agencyId) {
+        const { data, error } = await supabase
+          .from("ai_call_summaries")
+          .select("call_outcome")
+          .eq("external_number", lead.caller_phone.trim())
+          .eq("agency_id", agencyId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        return (data?.call_outcome as string) ?? null;
+      }
+      return null;
+    },
+    enabled: !!(lead.conversation_id || (lead.caller_phone?.trim() && agencyId)),
+  });
+
   // Fetch attached load data
   const { data: attachedLoad } = useQuery({
     queryKey: ["lead-attached-load", lead.load_id],
@@ -350,6 +380,12 @@ export const LeadExpandedRow = ({
   const isClosed = status === "closed";
   const isHighIntent = lead.is_high_intent;
   const canResolve = (isPending || isClaimed) && currentUserId;
+
+  const outcomeForRateBadge =
+    conversation?.source === "ai_call_summaries" && "outcome" in conversation && conversation.outcome
+      ? String(conversation.outcome)
+      : linkedAiCallOutcome;
+  const showRateAgreedExpanded = isRateAgreedCallOutcome(outcomeForRateBadge);
 
   const summaryText = conversation?.summary || lead.notes || null;
   const hasTranscript = !!conversation?.transcript;
@@ -569,6 +605,11 @@ export const LeadExpandedRow = ({
               <Badge className={statusStyles[status]}>
                 {statusLabels[status]}
               </Badge>
+              {showRateAgreedExpanded && (
+                <Badge className="border-0 bg-emerald-500 px-2 py-0.5 text-xs font-bold text-white shadow-md ring-1 ring-emerald-600/40">
+                  🔥 Rate Agreed
+                </Badge>
+              )}
               {isHighIntent && (
                 <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30 gap-1">
                   <Flame className="h-3 w-3" />

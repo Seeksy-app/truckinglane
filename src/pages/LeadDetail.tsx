@@ -21,6 +21,7 @@ import { TranscriptTurnsList } from "@/lib/callTranscript";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Tables } from "@/integrations/supabase/types";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { isRateAgreedCallOutcome } from "@/lib/leadCallOutcome";
 
 type Lead = Tables<"leads">;
 type LeadSmsMessage = Tables<"lead_sms_messages">;
@@ -334,6 +335,40 @@ function LeadDetailContent() {
     enabled: !!user && !!lead?.conversation_id && !!lead?.agency_id,
   });
 
+  const { data: aiCallOutcome } = useQuery({
+    queryKey: ["lead-detail-ai-outcome", id, lead?.conversation_id, lead?.caller_phone, lead?.agency_id],
+    queryFn: async () => {
+      const L = lead!;
+      if (L.conversation_id) {
+        const { data, error } = await supabase
+          .from("ai_call_summaries")
+          .select("call_outcome")
+          .eq("conversation_id", L.conversation_id)
+          .maybeSingle();
+        if (error) throw error;
+        if (data?.call_outcome) return data.call_outcome as string;
+      }
+      if (L.caller_phone?.trim() && L.agency_id) {
+        const { data, error } = await supabase
+          .from("ai_call_summaries")
+          .select("call_outcome")
+          .eq("external_number", L.caller_phone.trim())
+          .eq("agency_id", L.agency_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        return (data?.call_outcome as string) ?? null;
+      }
+      return null;
+    },
+    enabled:
+      !!user &&
+      !!id &&
+      !!lead &&
+      (!!lead.conversation_id || (!!lead.caller_phone?.trim() && !!lead.agency_id)),
+  });
+
   const claimMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -456,6 +491,8 @@ function LeadDetailContent() {
   const hasCallTranscriptColumn = hasConversationBlock || showElevenLabsCard;
   const transcriptAndSmsSideBySide = hasSmsThread && hasCallTranscriptColumn;
 
+  const showRateAgreedDetail = isRateAgreedCallOutcome(aiCallOutcome);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Debug banner (dev only) */}
@@ -477,11 +514,18 @@ function LeadDetailContent() {
 
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="font-serif text-3xl font-medium text-foreground">
-                {lead.caller_name || "Unknown Caller"}
-              </h1>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="font-serif text-3xl font-medium text-foreground">
+                  {lead.caller_name || "Unknown Caller"}
+                </h1>
+                {showRateAgreedDetail && (
+                  <Badge className="border-0 bg-emerald-500 px-2.5 py-1 text-sm font-bold text-white shadow-md ring-1 ring-emerald-600/40 shrink-0">
+                    🔥 Rate Agreed
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground mt-1">
                 Created {format(new Date(lead.created_at), "MMMM d, yyyy 'at' h:mm a")}
               </p>

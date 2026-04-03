@@ -124,6 +124,8 @@ interface LoadsTableProps {
   externalLaneFilters?: ExternalLaneFilters;
   /** When set, source pills are rendered by the parent; filtering uses this value. */
   controlledSourceFilter?: ControlledSourceFilter;
+  /** Dashboard Open Loads only: center column headers and row content (detail page / other views unchanged). */
+  centerListColumns?: boolean;
 }
 
 const INITIAL_DISPLAY_COUNT = 25;
@@ -149,6 +151,7 @@ export function LoadsTable({
   enableOpenLoadActions = false,
   externalLaneFilters,
   controlledSourceFilter,
+  centerListColumns = false,
 }: LoadsTableProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -630,9 +633,17 @@ export function LoadsTable({
         <Table
           className={cn(
             LOADS_TABLE_DENSE_CLASS,
-            "[&_th.loads-route-head]:!text-left [&_th.loads-route-head]:align-middle",
-            "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
-            "[&_td.loads-target-cell]:!text-right",
+            centerListColumns
+              ? [
+                  "[&_th.loads-route-head]:!text-center [&_th.loads-route-head]:align-middle",
+                  "[&_td.loads-route-cell]:!text-center [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
+                  "[&_td.loads-target-cell]:!text-center",
+                ]
+              : [
+                  "[&_th.loads-route-head]:!text-left [&_th.loads-route-head]:align-middle",
+                  "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
+                  "[&_td.loads-target-cell]:!text-right",
+                ],
           )}
         >
         <TableHeader>
@@ -656,18 +667,33 @@ export function LoadsTable({
               </TableHead>
             )}
             <TableHead className="w-8 px-0.5 text-center align-middle" />
-            <TableHead className="text-left align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead
+              className={cn(
+                "align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90",
+                centerListColumns ? "text-center" : "text-left",
+              )}
+            >
               Load #
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Client
             </TableHead>
-            <TableHead className="loads-route-head min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal text-left align-middle pl-3">
-              <div className="text-left">
+            <TableHead
+              className={cn(
+                "loads-route-head min-w-[12rem] max-w-[min(42rem,55vw)] !whitespace-normal align-middle",
+                centerListColumns ? "px-3 text-center" : "pl-3 text-left",
+              )}
+            >
+              <div className={cn(centerListColumns ? "text-center" : "text-left")}>
                 <div className="text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
                   Route
                 </div>
-                <div className="mt-0.5 text-left text-[10px] font-medium leading-tight text-[#6B7280] sm:text-[11px] dark:text-muted-foreground">
+                <div
+                  className={cn(
+                    "mt-0.5 text-[10px] font-medium leading-tight text-[#6B7280] sm:text-[11px] dark:text-muted-foreground",
+                    centerListColumns ? "text-center" : "text-left",
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => handleLaneHeaderClick("pickup")}
@@ -714,7 +740,12 @@ export function LoadsTable({
                 </div>
               </div>
             </TableHead>
-            <TableHead className="text-right align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead
+              className={cn(
+                "align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90",
+                centerListColumns ? "text-center" : "text-right",
+              )}
+            >
               Target Pay
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -765,7 +796,12 @@ export function LoadsTable({
                       <ChevronRight className="inline-block h-4 w-4 align-middle" />
                     )}
                   </TableCell>
-                  <TableCell className="text-left align-middle font-medium tabular-nums text-sm sm:text-base">
+                  <TableCell
+                    className={cn(
+                      "align-middle font-medium tabular-nums text-sm sm:text-base",
+                      centerListColumns ? "text-center" : "text-left",
+                    )}
+                  >
                     {load.load_number || "—"}
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
@@ -781,13 +817,23 @@ export function LoadsTable({
                       </Badge>
                     ) : null}
                   </TableCell>
-                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-left align-middle text-sm sm:text-base">
+                  <TableCell
+                    className={cn(
+                      "loads-route-cell py-3 align-middle text-sm sm:text-base",
+                      centerListColumns ? "px-3 text-center" : "pl-3 pr-2 text-left",
+                    )}
+                  >
                     <div className="font-bold leading-snug text-[#1A1A1A]">{collapsedRouteTitle(load)}</div>
                     <div className="mt-1 text-xs leading-snug text-[#6B7280] sm:text-sm">
                       {collapsedMetaLine(load)}
                     </div>
                   </TableCell>
-                  <TableCell className="loads-target-cell py-3 px-2 text-right align-middle text-sm sm:text-base">
+                  <TableCell
+                    className={cn(
+                      "loads-target-cell py-3 px-2 align-middle text-sm sm:text-base",
+                      centerListColumns ? "text-center" : "text-right",
+                    )}
+                  >
                     <span className="block text-lg font-bold tabular-nums text-[#111827] sm:text-xl">
                       {targetCollapsed}
                     </span>

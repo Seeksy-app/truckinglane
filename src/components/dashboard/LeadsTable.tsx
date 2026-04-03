@@ -49,6 +49,10 @@ interface LeadsTableProps {
   highlightPhone?: string | null;
   onHighlightConsumed?: () => void;
   showClaimedBy?: boolean;
+  /** conversation_ids present in recent AI summaries with rate-agreed / booked outcome (from dashboard). */
+  rateAgreedConversationIds?: ReadonlySet<string>;
+  /** Normalized caller phones (digits only) for the same, when conversation_id is missing on the lead. */
+  rateAgreedCallerPhones?: ReadonlySet<string>;
 }
 
 import { LEAD_STATUS_STYLES, LEAD_STATUS_LABELS } from "@/lib/leadStatusDisplay";
@@ -88,7 +92,9 @@ export const LeadsTable = ({
   onUpdateStatus,
   highlightPhone,
   onHighlightConsumed,
-  showClaimedBy = false
+  showClaimedBy = false,
+  rateAgreedConversationIds,
+  rateAgreedCallerPhones,
 }: LeadsTableProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -421,6 +427,10 @@ export const LeadsTable = ({
 
             // Deep-link highlight animation
             const isHighlighted = highlightedLeadId === lead.id;
+            const phoneDigits = (lead.caller_phone || "").replace(/\D/g, "");
+            const showRateAgreedBadge =
+              (lead.conversation_id && rateAgreedConversationIds?.has(lead.conversation_id)) ||
+              (!!phoneDigits && rateAgreedCallerPhones?.has(phoneDigits));
 
             return (
               <React.Fragment key={lead.id}>
@@ -560,6 +570,14 @@ export const LeadsTable = ({
                   )}
                   <TableCell className="text-right align-middle">
                     <div className="flex flex-wrap items-center justify-end gap-1">
+                      {showRateAgreedBadge && (
+                        <Badge
+                          className="border-0 bg-emerald-500 px-2 py-0.5 text-xs font-bold text-white shadow-md ring-1 ring-emerald-600/40"
+                          title="AI call: rate agreed or booking intent"
+                        >
+                          🔥 Rate Agreed
+                        </Badge>
+                      )}
                       {lead.is_high_intent ? (
                         <Badge variant="outline" className="border-emerald-500 text-emerald-700">
                           High Intent

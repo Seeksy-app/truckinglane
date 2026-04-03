@@ -47,6 +47,7 @@ import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserTimezone } from "@/hooks/useUserTimezone";
 import { getDateWindow, getTodayDateString } from "@/lib/dateWindows";
 import { isOpenLoadForNewCard } from "@/lib/newLoadsFromImport";
+import { isRateAgreedCallOutcome } from "@/lib/leadCallOutcome";
 import { getErrorMessage, isoTimestampNow } from "@/lib/utils";
 import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/lib/leadNotificationSound";
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
@@ -105,6 +106,8 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   /** After user opens NEW, stop pulsing until the count increases (new loads arrived). */
   const [newPulseDismissed, setNewPulseDismissed] = useState(false);
+  /** Open Loads filtered to NEW-card loads; counter clears only after user leaves this view or shows all. */
+  const [openLoadsNewOnly, setOpenLoadsNewOnly] = useState(false);
   const prevNewLoadsCountRef = useRef<number | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
   const [lanePickupFilter, setLanePickupFilter] = useState("all");
@@ -399,6 +402,27 @@ const Dashboard = () => {
     }
     return m;
   }, [epcRows]);
+
+  /** conversation_ids whose latest AI call outcome is rate agreed / booked (dashboard calls list window). */
+  const rateAgreedConversationIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of rawCalls) {
+      if (c.conversation_id && isRateAgreedCallOutcome(c.call_outcome)) {
+        s.add(c.conversation_id);
+      }
+    }
+    return s;
+  }, [rawCalls]);
+
+  const rateAgreedPhones = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of rawCalls) {
+      if (!isRateAgreedCallOutcome(c.call_outcome)) continue;
+      const d = (c.external_number || "").replace(/\D/g, "");
+      if (d) s.add(d);
+    }
+    return s;
+  }, [rawCalls]);
 
   // Build a map of phone -> lead status for enriching calls
   const phoneToLeadStatus = useMemo(() => {
@@ -714,6 +738,9 @@ const Dashboard = () => {
   // Filtered data for each mode
   const filteredOpenLoads = useMemo(() => {
     let result = loads.filter((l) => l.status === "open" && l.is_active);
+    if (openLoadsNewOnly) {
+      result = result.filter((l) => isOpenLoadForNewCard(l, newLoadsCutoffIso));
+    }
     if (ownerFilter === "my" && user) {
       result = result.filter((l) => l.booked_by === user.id);
     }
@@ -742,7 +769,7 @@ const Dashboard = () => {
       });
     }
     return result;
-  }, [loads, ownerFilter, searchQuery, user]);
+  }, [loads, openLoadsNewOnly, newLoadsCutoffIso, ownerFilter, searchQuery, user]);
 
   const filteredClaimedLoads = useMemo(() => {
     let result = loads.filter((l) => l.status === "claimed" && l.is_active);
@@ -875,26 +902,6 @@ const Dashboard = () => {
   }, [loads, todayWindow, ownerFilter, searchQuery, user]);
 
   // New loads filtered: same rules as NEW stat (per-agent cutoff + dispatch open)
-  const filteredNewLoads = useMemo(() => {
-    let result = loads.filter((l) => isOpenLoadForNewCard(l, newLoadsCutoffIso));
-    if (searchQuery.trim()) {
-      const searchTerms = normalizeStateSearch(searchQuery);
-      const isStateAbbr = searchQuery.trim().length === 2 && /^[a-zA-Z]{2}$/.test(searchQuery.trim());
-      result = result.filter((l) => {
-        const loadNumber = l.load_number?.toLowerCase() || "";
-        const pickupState = l.pickup_state?.toLowerCase().trim() || "";
-        const destState = l.dest_state?.toLowerCase().trim() || "";
-        const pickupCity = l.pickup_city?.toLowerCase().trim() || "";
-        const destCity = l.dest_city?.toLowerCase().trim() || "";
-        return searchTerms.some((term) => {
-          if (isStateAbbr && term.length === 2) return pickupState === term || destState === term;
-          return loadNumber.includes(term) || pickupCity.includes(term) || pickupState.includes(term) || destCity.includes(term) || destState.includes(term);
-        });
-      });
-    }
-    return result;
-  }, [loads, searchQuery, newLoadsCutoffIso]);
-
   useEffect(() => {
     setLanePickupFilter("all");
     setLaneDestFilter("all");
@@ -908,14 +915,12 @@ const Dashboard = () => {
         return filteredOpenLoads;
       case "booked":
         return filteredBookedLoads;
-      case "new":
-        return filteredNewLoads;
       case "claimed":
         return filteredClaimedLoads;
       default:
         return [];
     }
-  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredNewLoads, filteredClaimedLoads]);
+  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredClaimedLoads]);
 
   const { lanePickupStates, laneDestStates } = useMemo(() => {
     const rows = loadsForLaneFilterOptions.filter((l) => l.dispatch_status !== "archived");
@@ -934,7 +939,6 @@ const Dashboard = () => {
   const showLaneFilters =
     mode === "open" ||
     mode === "booked" ||
-    mode === "new" ||
     (mode === "claimed" && filteredClaimedLoads.length > 0);
 
   const loadsForSourcePills = useMemo(() => {
@@ -943,13 +947,11 @@ const Dashboard = () => {
         ? filteredOpenLoads
         : mode === "booked"
           ? filteredBookedLoads
-          : mode === "new"
-            ? filteredNewLoads
-            : mode === "claimed"
-              ? filteredClaimedLoads
-              : [];
+          : mode === "claimed"
+            ? filteredClaimedLoads
+            : [];
     return rows.filter((l) => l.dispatch_status !== "archived");
-  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredNewLoads, filteredClaimedLoads]);
+  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredClaimedLoads]);
 
   const dashboardLaneFilters = showLaneFilters
     ? {
@@ -974,16 +976,30 @@ const Dashboard = () => {
   const handleModeChange = (next: DashboardMode) => {
     if (next === "new") {
       setNewPulseDismissed(true);
-      markNewLoadsViewedMutation.mutate(undefined, {
-        onError: (e) => {
-          toast({
-            title: "Could not save NEW view",
-            description: getErrorMessage(e),
-            variant: "destructive",
-          });
-        },
-      });
+      setOpenLoadsNewOnly(true);
+      if (mode !== "open") {
+        setMode("open");
+      }
+      return;
     }
+
+    if (openLoadsNewOnly) {
+      const leavingOpenTab = mode === "open" && next !== "open";
+      const showAllOpenSameTab = next === "open" && mode === "open";
+      if (leavingOpenTab || showAllOpenSameTab) {
+        markNewLoadsViewedMutation.mutate(undefined, {
+          onError: (e) => {
+            toast({
+              title: "Could not save NEW view",
+              description: getErrorMessage(e),
+              variant: "destructive",
+            });
+          },
+        });
+        setOpenLoadsNewOnly(false);
+      }
+    }
+
     setMode(next);
   };
 
@@ -995,7 +1011,8 @@ const Dashboard = () => {
       case "pending": return filteredPendingLeads;
       case "calls": return filteredCalls;
       case "booked": return filteredBookedLoads;
-      case "new": return filteredNewLoads;
+      case "new":
+        return [];
     }
   };
 
@@ -1235,11 +1252,24 @@ const Dashboard = () => {
               ownerFilter !== "all" ||
               lanePickupFilter !== "all" ||
               laneDestFilter !== "all" ||
-              sourceFilter !== "all") && (
+              sourceFilter !== "all" ||
+              openLoadsNewOnly) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
+                  if (openLoadsNewOnly) {
+                    markNewLoadsViewedMutation.mutate(undefined, {
+                      onError: (e) => {
+                        toast({
+                          title: "Could not save NEW view",
+                          description: getErrorMessage(e),
+                          variant: "destructive",
+                        });
+                      },
+                    });
+                    setOpenLoadsNewOnly(false);
+                  }
                   setSearchQuery("");
                   setOwnerFilter("all");
                   setLanePickupFilter("all");
@@ -1255,6 +1285,34 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {mode === "open" && openLoadsNewOnly && (
+          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-[hsl(280,70%,50%)]/30 bg-[hsl(280,70%,50%)]/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-foreground">
+              Showing new loads since your last visit. Clear this filter when you&apos;re done — then the NEW counter resets.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 border-[hsl(280,70%,42%)] text-foreground hover:bg-[hsl(280,70%,50%)]/10"
+              onClick={() => {
+                markNewLoadsViewedMutation.mutate(undefined, {
+                  onError: (e) => {
+                    toast({
+                      title: "Could not save NEW view",
+                      description: getErrorMessage(e),
+                      variant: "destructive",
+                    });
+                  },
+                });
+                setOpenLoadsNewOnly(false);
+              }}
+            >
+              Show all open loads
+            </Button>
+          </div>
+        )}
+
         {/* Single unified table based on mode */}
         {mode === "open" && (
           <LoadsTable
@@ -1264,6 +1322,7 @@ const Dashboard = () => {
             enableOpenLoadActions
             externalLaneFilters={dashboardLaneFilters}
             controlledSourceFilter={{ value: sourceFilter, onChange: setSourceFilter }}
+            centerListColumns
           />
         )}
 
@@ -1295,6 +1354,8 @@ const Dashboard = () => {
                   onClaimLead={(id) => claimMutation.mutate(id)}
                   onUpdateStatus={(id, status, action) => updateStatusMutation.mutate({ leadId: id, status, action })}
                   showClaimedBy
+                  rateAgreedConversationIds={rateAgreedConversationIds}
+                  rateAgreedCallerPhones={rateAgreedPhones}
                 />
               </div>
             )}
@@ -1320,6 +1381,8 @@ const Dashboard = () => {
             onUpdateStatus={(id, status, action) => updateStatusMutation.mutate({ leadId: id, status, action })}
             highlightPhone={highlightedLeadPhone}
             onHighlightConsumed={() => setHighlightedLeadPhone(null)}
+            rateAgreedConversationIds={rateAgreedConversationIds}
+            rateAgreedCallerPhones={rateAgreedPhones}
           />
         )}
 
@@ -1336,14 +1399,6 @@ const Dashboard = () => {
           />
         )}
 
-        {mode === "new" && (
-          <LoadsTable
-            loads={filteredNewLoads}
-            loading={loadsLoading}
-            onRefresh={refetchLoads}
-            externalLaneFilters={dashboardLaneFilters}
-          />
-        )}
       </div>
 
       {/* Only render rails after hydration to prevent flicker */}

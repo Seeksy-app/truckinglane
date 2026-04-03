@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationSettings } from "@/hooks/useNotifications";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { playLeadNotificationDing } from "@/lib/leadNotificationSound";
 import { formatPhone } from "@/lib/utils";
 
@@ -82,18 +83,23 @@ export function useLeadNotifications({ agencyId, soundMuted }: LeadNotificationO
               : newLead.is_high_intent
                 ? "High intent"
                 : null;
-          const clickToLead = () => {
-            window.location.href = `/leads/${newLead.id}`;
-          };
-
           toast({
             title: "New lead incoming!",
             description: [formattedPhone, intentLine, equipment ? `Equipment: ${equipment}` : null]
               .filter(Boolean)
               .join(" • "),
             duration: 6000,
-            className: "cursor-pointer hover:bg-muted/40 transition-colors",
-            onClick: clickToLead,
+            action: (
+              <ToastAction
+                altText="View lead"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => {
+                  window.location.href = `/leads/${newLead.id}`;
+                }}
+              >
+                View Lead →
+              </ToastAction>
+            ),
           });
 
           if (!soundMuted && audioCtxRef.current) {

@@ -1,8 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Phone,
   ChevronDown,
   ChevronRight,
   Flame,
@@ -25,7 +23,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { PhoneDisplay } from "@/components/ui/phone-display";
 import { TranscriptTwoColumnList } from "@/lib/callTranscript";
-import { CALLS_TABLE_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { CALLS_TABLE_LOADS_STYLE_CLASS } from "@/lib/loadTableDisplay";
+import { cn } from "@/lib/utils";
 import { CallAISummaryBullets } from "@/components/calls/CallAISummaryBullets";
 import { extractTranscriptFromElevenlabsPayload } from "@/lib/elevenlabsPayload";
 import type { Json } from "@/integrations/supabase/types";
@@ -126,7 +125,7 @@ const getHighIntentReasons = (call: AICallSummary): string[] => {
 const INITIAL_DISPLAY_COUNT = 25;
 
 const CALL_ROW_CELL_CLASS =
-  "text-left align-middle text-sm sm:text-base tabular-nums";
+  "text-center align-middle text-sm sm:text-base tabular-nums";
 
 export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -184,61 +183,49 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground animate-pulse">
-          Loading calls...
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border border-[#E5E7EB] bg-white p-8 shadow-sm dark:border-border dark:bg-card">
+        <div className="text-center text-muted-foreground animate-pulse">Loading calls...</div>
+      </div>
     );
   }
 
   if (calls.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <p className="text-lg font-medium text-foreground">No calls today</p>
-          <p className="text-sm text-muted-foreground mt-1">AI calls will appear here as they come in</p>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border border-[#E5E7EB] bg-white p-12 text-center shadow-sm dark:border-border dark:bg-card">
+        <p className="text-lg font-medium text-foreground">No calls today</p>
+        <p className="text-sm text-muted-foreground mt-1">AI calls will appear here as they come in</p>
+      </div>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-serif flex items-center gap-2">
-            <Phone className="h-5 w-5" />
-            Recent AI Calls
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="rounded-lg border border-border overflow-hidden">
-            <div className="w-full min-w-0 overflow-x-auto">
-            <Table className={CALLS_TABLE_DENSE_CLASS}>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-8 px-0.5 text-left align-middle" />
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Time
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Phone
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Duration
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Call Status
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Lead Status
-                  </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-left">
-                    Title
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
+      <div className="w-full overflow-hidden rounded-lg border border-[#E5E7EB] bg-white dark:border-border dark:bg-card">
+        <div className="w-full min-w-0 overflow-x-auto">
+          <Table className={CALLS_TABLE_LOADS_STYLE_CLASS}>
+            <TableHeader>
+              <TableRow className="border-b border-solid border-[#E5E7EB] bg-[#F9FAFB] hover:bg-[#F9FAFB] dark:border-border dark:bg-muted/40">
+                <TableHead className="w-8 px-0.5 text-center align-middle" />
+                <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Time
+                </TableHead>
+                <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Phone
+                </TableHead>
+                <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Duration
+                </TableHead>
+                <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Call Status
+                </TableHead>
+                <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Lead Status
+                </TableHead>
+                <TableHead className="min-w-[10rem] text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+                  Title
+                </TableHead>
+              </TableRow>
+            </TableHeader>
               <TableBody>
                 {calls.slice(0, displayCount).map((call) => {
                   const highIntent = checkHighIntent(call);
@@ -262,15 +249,18 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                   return (
                     <Fragment key={call.id}>
                       <TableRow
-                        className={`cursor-pointer transition-colors hover:bg-muted/50 ${highIntent ? "bg-amber-500/5" : ""}`}
+                        className={cn(
+                          "cursor-pointer border-b border-[#E5E7EB] bg-white transition-shadow transition-colors dark:border-border dark:bg-card",
+                          "hover:shadow-[0_2px_10px_rgba(0,0,0,0.07)] hover:bg-white dark:hover:bg-card",
+                        )}
                         onClick={() => toggleExpand(call.id)}
                       >
-                        <TableCell className="w-8 px-0.5 text-left align-middle text-sm sm:text-base">
-                          <span className="inline-flex justify-start">
+                        <TableCell className="w-8 px-0.5 text-center align-middle text-sm sm:text-base">
+                          <span className="inline-flex justify-center">
                             {expandedId === call.id ? (
-                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             ) : (
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
                             )}
                           </span>
                         </TableCell>
@@ -278,29 +268,35 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                           {format(parseISO(call.created_at), "MMM d, h:mm a")}
                         </TableCell>
                         <TableCell className={`${CALL_ROW_CELL_CLASS} font-medium`}>
-                          <PhoneDisplay phone={phoneNumber} className="font-semibold" />
+                          <div className="flex justify-center">
+                            <PhoneDisplay phone={phoneNumber} className="font-semibold" />
+                          </div>
                         </TableCell>
                         <TableCell className={CALL_ROW_CELL_CLASS}>
                           {call.duration_secs ? `${call.duration_secs}s` : "—"}
                         </TableCell>
-                        <TableCell className="text-left align-middle text-sm sm:text-base">
-                          <Badge
-                            className={
-                              outcomeStyles[call.call_outcome || "unknown"] || outcomeStyles.unknown
-                            }
-                          >
-                            {call.call_outcome || "unknown"}
-                          </Badge>
+                        <TableCell className="text-center align-middle text-sm sm:text-base">
+                          <div className="flex justify-center">
+                            <Badge
+                              className={
+                                outcomeStyles[call.call_outcome || "unknown"] || outcomeStyles.unknown
+                              }
+                            >
+                              {call.call_outcome || "unknown"}
+                            </Badge>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-left align-middle text-sm sm:text-base">
-                          {(() => {
-                            const status = call.lead_status || "none";
-                            const config = leadStatusConfig[status] || leadStatusConfig.none;
-                            return <Badge className={config.className}>{config.label}</Badge>;
-                          })()}
+                        <TableCell className="text-center align-middle text-sm sm:text-base">
+                          <div className="flex justify-center">
+                            {(() => {
+                              const status = call.lead_status || "none";
+                              const config = leadStatusConfig[status] || leadStatusConfig.none;
+                              return <Badge className={config.className}>{config.label}</Badge>;
+                            })()}
+                          </div>
                         </TableCell>
-                        <TableCell className="max-w-[min(14rem,40vw)] text-left align-middle text-sm sm:text-base min-w-0">
-                          <div className="flex items-center justify-start gap-2 min-w-0">
+                        <TableCell className="max-w-[min(14rem,40vw)] min-w-0 text-center align-middle text-sm sm:text-base">
+                          <div className="flex items-center justify-center gap-2 min-w-0">
                             {highIntent && (
                               <Flame className="h-4 w-4 text-amber-500 shrink-0" />
                             )}
@@ -326,8 +322,8 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                       
                       {expandedId === call.id && (
                         <TableRow key={`${call.id}-expanded`}>
-                          <TableCell colSpan={7} className="p-0 bg-muted/30">
-                            <div className="p-5 border-t border-border/50 space-y-4 text-left">
+                          <TableCell colSpan={7} className="border-t border-[#E5E7EB] bg-[#F9FAFB] p-0 dark:border-border dark:bg-muted/30">
+                            <div className="space-y-4 p-5 text-left">
                               {/* Top row: Call status | Lead status | Title | Copy Summary */}
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 w-full min-w-0">
                                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -500,32 +496,30 @@ export const DashboardCallsTable = ({ calls, loading }: DashboardCallsTableProps
                   );
                 })}
               </TableBody>
-            </Table>
-            </div>
-          </div>
-          
-          {/* Load More / Show All */}
-          {calls.length > displayCount && (
-            <div className="flex items-center justify-center gap-3 py-4 border-t border-border">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDisplayCount((prev) => prev + 25)}
-              >
-                Load More ({calls.length - displayCount} remaining)
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDisplayCount(calls.length)}
-              >
-                Show All ({calls.length})
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </Table>
+        </div>
 
+        {calls.length > displayCount && (
+          <div className="flex flex-wrap items-center justify-center gap-3 border-t border-[#E5E7EB] py-4 dark:border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDisplayCount((prev) => prev + 25)}
+              className="border-[#E5E7EB] bg-white font-medium dark:border-border dark:bg-background"
+            >
+              Load More ({calls.length - displayCount} remaining)
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDisplayCount(calls.length)}
+              className="font-medium text-[#6B7280] hover:text-[#374151] dark:text-muted-foreground"
+            >
+              Show All ({calls.length})
+            </Button>
+          </div>
+        )}
+      </div>
     </>
   );
 };

@@ -579,7 +579,7 @@ export function LoadsTable({
           className={cn(
             LOADS_TABLE_DENSE_CLASS,
             "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
-            "[&_td.loads-target-cell]:!text-right",
+            "[&_td.loads-target-cell]:!text-center",
           )}
         >
         <TableHeader>
@@ -661,7 +661,7 @@ export function LoadsTable({
                 </div>
               </div>
             </TableHead>
-            <TableHead className="!text-right align-middle pr-3 text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
+            <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
               Target Pay
             </TableHead>
             <TableHead className="text-center align-middle text-xs font-semibold uppercase tracking-wide text-[#374151] sm:text-sm dark:text-foreground/90">
@@ -742,8 +742,8 @@ export function LoadsTable({
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="loads-target-cell py-3 pl-2 pr-3 align-middle">
-                    <div className="flex flex-col items-end gap-1">
+                  <TableCell className="loads-target-cell py-3 px-2 align-middle">
+                    <div className="flex flex-col items-center justify-center gap-1 text-center">
                       <span className="text-lg sm:text-xl font-bold tabular-nums text-[#111827]">
                         {targetCollapsed}
                       </span>

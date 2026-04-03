@@ -1153,106 +1153,107 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Global search + lane filters + owner toggle (job-board style) */}
-        <div className="mb-6 flex flex-col gap-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
-            <SmartSearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              variant="large"
-              placeholder="Search by load #, city, state, or phone..."
-              loads={loads}
-              className="min-w-0 w-full lg:flex-1"
-            />
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {showLaneFilters ? (
-                <LoadLaneFiltersPopover
-                  size="large"
-                  pickupState={lanePickupFilter}
-                  destState={laneDestFilter}
-                  onPickupChange={setLanePickupFilter}
-                  onDestChange={setLaneDestFilter}
-                  pickupStates={lanePickupStates}
-                  destStates={laneDestStates}
-                  open={laneFiltersOpen}
-                  onOpenChange={setLaneFiltersOpen}
-                />
-              ) : null}
-              <ToggleGroup
-                type="single"
-                value={ownerFilter}
-                onValueChange={(v) => v && setOwnerFilter(v as "all" | "my")}
-                className="inline-flex gap-1 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] p-1 dark:border-border dark:bg-muted/40"
-              >
-                <ToggleGroupItem
-                  value="all"
-                  className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
-                >
-                  {ownerLabels[mode].all}
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="my"
-                  className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
-                >
-                  {ownerLabels[mode].my}
-                </ToggleGroupItem>
-              </ToggleGroup>
-              {(searchQuery ||
-                ownerFilter !== "all" ||
-                lanePickupFilter !== "all" ||
-                laneDestFilter !== "all" ||
-                sourceFilter !== "all") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setOwnerFilter("all");
-                    setLanePickupFilter("all");
-                    setLaneDestFilter("all");
-                    setSourceFilter("all");
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Clear
-                </Button>
-              )}
-          </div>
-          </div>
+        {/* Full-width search only */}
+        <div className="mb-4">
+          <SmartSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            variant="large"
+            placeholder="Search by load #, city, state, or phone..."
+            loads={loads}
+            className="w-full min-w-0"
+          />
         </div>
 
-        {showLaneFilters ? (
-          <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
-            {CLIENT_SOURCE_PILLS.map((pill) => {
-              const n = countLoadsForPill(loadsForSourcePills, pill.types);
-              const active = sourceFilter === pill.id;
-              return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  onClick={() => setSourceFilter(pill.id)}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
-                      : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white dark:border-border dark:bg-muted/30 dark:text-foreground",
-                  )}
-                >
-                  <span>{pill.label}</span>
-                  <span
-                    className={cn(
-                      "tabular-nums text-xs font-semibold",
-                      active ? "text-white/90" : "text-[#6B7280] dark:text-muted-foreground",
-                    )}
-                  >
-                    {n}
-                  </span>
-                </button>
-              );
-            })}
+        {/* Source pills (when applicable) + Filters + All/My + Clear — pills left, controls right */}
+        <div className="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {showLaneFilters
+              ? CLIENT_SOURCE_PILLS.map((pill) => {
+                  const n = countLoadsForPill(loadsForSourcePills, pill.types);
+                  const active = sourceFilter === pill.id;
+                  return (
+                    <button
+                      key={pill.id}
+                      type="button"
+                      onClick={() => setSourceFilter(pill.id)}
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                        active
+                          ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
+                          : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white dark:border-border dark:bg-muted/30 dark:text-foreground",
+                      )}
+                    >
+                      <span>{pill.label}</span>
+                      <span
+                        className={cn(
+                          "tabular-nums text-xs font-semibold",
+                          active ? "text-white/90" : "text-[#6B7280] dark:text-muted-foreground",
+                        )}
+                      >
+                        {n}
+                      </span>
+                    </button>
+                  );
+                })
+              : null}
           </div>
-        ) : null}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {showLaneFilters ? (
+              <LoadLaneFiltersPopover
+                size="large"
+                pickupState={lanePickupFilter}
+                destState={laneDestFilter}
+                onPickupChange={setLanePickupFilter}
+                onDestChange={setLaneDestFilter}
+                pickupStates={lanePickupStates}
+                destStates={laneDestStates}
+                open={laneFiltersOpen}
+                onOpenChange={setLaneFiltersOpen}
+              />
+            ) : null}
+            <ToggleGroup
+              type="single"
+              value={ownerFilter}
+              onValueChange={(v) => v && setOwnerFilter(v as "all" | "my")}
+              className="inline-flex gap-1 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] p-1 dark:border-border dark:bg-muted/40"
+            >
+              <ToggleGroupItem
+                value="all"
+                className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
+              >
+                {ownerLabels[mode].all}
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="my"
+                className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
+              >
+                {ownerLabels[mode].my}
+              </ToggleGroupItem>
+            </ToggleGroup>
+            {(searchQuery ||
+              ownerFilter !== "all" ||
+              lanePickupFilter !== "all" ||
+              laneDestFilter !== "all" ||
+              sourceFilter !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setOwnerFilter("all");
+                  setLanePickupFilter("all");
+                  setLaneDestFilter("all");
+                  setSourceFilter("all");
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* Single unified table based on mode */}
         {mode === "open" && (

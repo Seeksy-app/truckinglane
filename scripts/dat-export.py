@@ -66,6 +66,7 @@ _TEMPLATE_TYPES_REQUIRE_ORIGIN_DEST = frozenset(
         "aljex_big500",
         "vms_email",
         "aljex_spot",
+        "semco_email",
     }
 )
 
@@ -128,7 +129,7 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
     tt = load.get("template_type") or ""
     raw_equip = ""
     if not trailer:
-        if tt in ("adelphia_xlsx", "vms_email", "oldcastle_gsheet"):
+        if tt in ("adelphia_xlsx", "vms_email", "semco_email", "oldcastle_gsheet"):
             raw_equip = "F"
     elif "van" in trailer_l or "dry" in trailer_l:
         raw_equip = "V"

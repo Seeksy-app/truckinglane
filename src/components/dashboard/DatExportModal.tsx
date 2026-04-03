@@ -213,9 +213,9 @@ export function DatExportModal({
             Select which sources to include — nothing is pre-checked. Sources with pending loads are highlighted; sources
             with zero pending cannot be selected. Counts are dispatch-open (<code className="text-xs">dispatch_status</code>{" "}
             = open), active (<code className="text-xs">is_active</code>), with no DAT upload yet (
-            <code className="text-xs">dat_posted_at</code> empty). Only Adelphia, Oldcastle, Big 500,
-            VMS, and Spot Loads require complete origin and destination for export; other sources (including Trucker Tools
-            and Century) can export with partial locations.
+            <code className="text-xs">dat_posted_at</code> empty). Adelphia, Oldcastle, Big 500, VMS,
+            Spot Loads, and SEMCO require complete origin and destination for export; Trucker Tools and
+            Century can export with partial locations.
           </DialogDescription>
         </DialogHeader>
 

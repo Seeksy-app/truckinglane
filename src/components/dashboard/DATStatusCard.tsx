@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, XCircle } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { DAT_ELIGIBLE_TEMPLATE_TYPES } from "@/lib/datExport";
 interface FailedLoad {
   id: string;
   load_number: string;
@@ -41,10 +42,12 @@ export function DATStatusCard() {
         return q;
       };
 
-      // Pending: dat_posted_at IS NULL, active, dispatch open (matches export / reminder queries)
+      // Pending: same as DAT export / nav reminder — eligible sources only, plus:
+      // is_active = true AND dat_posted_at IS NULL AND dispatch_status = 'open'
       let pendingQ = supabase
         .from("loads")
         .select("*", { count: "exact", head: true })
+        .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
         .eq("dispatch_status", "open");
@@ -62,10 +65,11 @@ export function DATStatusCard() {
       const { count: uploaded, error: uploadedErr } = await uploadedQ;
       if (uploadedErr) throw uploadedErr;
 
-      // Need destination: same as pending + missing pickup or destination city (zip not required for DAT bulk template)
+      // Need destination: same filters as pending + missing pickup or destination city (zip not required for DAT bulk template)
       let needDestQ = supabase
         .from("loads")
         .select("*", { count: "exact", head: true })
+        .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
         .eq("dispatch_status", "open")
@@ -79,6 +83,7 @@ export function DATStatusCard() {
         .select(
           "id, load_number, pickup_city, pickup_state, dest_city, dest_state, template_type, dat_posted_at, dispatch_status",
         )
+        .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
         .eq("dispatch_status", "open")
@@ -172,7 +177,9 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {pending} pending (<code className="text-xs">dat_posted_at</code> null, open, active) · {uploaded} uploaded (
+              {pending} pending (DAT-eligible <code className="text-xs">template_type</code>,{" "}
+              <code className="text-xs">dispatch_status</code> open, <code className="text-xs">is_active</code>,{" "}
+              <code className="text-xs">dat_posted_at</code> null) · {uploaded} uploaded (
               <code className="text-xs">dat_posted_at</code> set, active) · {failed} need destination (missing{" "}
               <code className="text-xs">pickup_city</code> or <code className="text-xs">dest_city</code>; zip optional)
             </p>

@@ -11,6 +11,7 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "aljex_big500",
   "aljex_spot",
   "vms_email",
+  "semco_email",
   "adelphia_xlsx",
   "oldcastle_gsheet",
   "century_xlsx",
@@ -18,7 +19,7 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "truckertools",
 ] as const;
 
-/** UI groups for the Export to DAT modal (maps to template_type). */
+/** UI groups for the Export to DAT modal (maps to template_type). Order matches modal list. */
 export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "big500", label: "Big 500", templateTypes: ["aljex_big500"] as const },
   { id: "spot", label: "Spot Loads", templateTypes: ["aljex_spot"] as const },
@@ -26,6 +27,7 @@ export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "adelphia", label: "Adelphia", templateTypes: ["adelphia_xlsx"] as const },
   { id: "oldcastle", label: "Oldcastle", templateTypes: ["oldcastle_gsheet"] as const },
   { id: "century", label: "Century", templateTypes: ["century_xlsx", "Century"] as const },
+  { id: "semco", label: "SEMCO", templateTypes: ["semco_email"] as const },
   { id: "truckertools", label: "Trucker Tools", templateTypes: ["truckertools"] as const },
 ] as const;
 
@@ -38,11 +40,13 @@ const DAT_EXPORT_REQUIRES_ORIGIN_DEST_TEMPLATE_TYPES = new Set<string>([
   "aljex_big500",
   "vms_email",
   "aljex_spot",
+  "semco_email",
 ]);
 
 /**
- * Trucker Tools and Century are excluded — export even with sparse O/D. All other DAT-eligible
- * types not in this set are also treated as not requiring O/D (defensive).
+ * Trucker Tools and Century are excluded — export even with sparse O/D. SEMCO and the named
+ * sources above require full O/D. All other DAT-eligible types not in this set are also treated as
+ * not requiring O/D (defensive).
  */
 export function templateTypeRequiresOriginDestForDatExport(templateType: string | null | undefined): boolean {
   const t = templateType || "";
@@ -69,6 +73,7 @@ export async function fetchDatPendingCountsBySource(
     big500: 0,
     spot: 0,
     vms: 0,
+    semco: 0,
     adelphia: 0,
     oldcastle: 0,
     century: 0,
@@ -325,6 +330,7 @@ export function mapEquipmentCode(trailerType: string | null | undefined, templat
     if (
       templateType === "adelphia_xlsx" ||
       templateType === "vms_email" ||
+      templateType === "semco_email" ||
       templateType === "oldcastle_gsheet" ||
       templateType === "century_xlsx" ||
       templateType === "Century" ||

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Upload, AlertTriangle, MapPin, CheckCircle2, XCircle } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { DAT_ELIGIBLE_TEMPLATE_TYPES } from "@/lib/datExport";
+import { DAT_ELIGIBLE_TEMPLATE_TYPES, SUPABASE_FILTER_DAT_DISPATCH_BOARD } from "@/lib/datExport";
 interface FailedLoad {
   id: string;
   load_number: string;
@@ -42,15 +42,14 @@ export function DATStatusCard() {
         return q;
       };
 
-      // Pending: same as DAT export / nav reminder — eligible sources only, plus:
-      // is_active = true AND dat_posted_at IS NULL AND dispatch_status = 'open'
+      // Pending: same as DAT export / nav reminder — eligible sources, dat_posted_at null, active, dispatch board open
       let pendingQ = supabase
         .from("loads")
         .select("*", { count: "exact", head: true })
         .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
-        .eq("dispatch_status", "open");
+        .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD);
       pendingQ = applyAgency(pendingQ);
       const { count: pending, error: pendingErr } = await pendingQ;
       if (pendingErr) throw pendingErr;
@@ -72,7 +71,7 @@ export function DATStatusCard() {
         .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
-        .eq("dispatch_status", "open")
+        .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
         .or("pickup_city.is.null,dest_city.is.null");
       needDestQ = applyAgency(needDestQ);
       const { count: needDestination, error: needDestErr } = await needDestQ;
@@ -86,7 +85,7 @@ export function DATStatusCard() {
         .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
         .eq("is_active", true)
         .is("dat_posted_at", null)
-        .eq("dispatch_status", "open")
+        .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
         .or("pickup_city.is.null,dest_city.is.null");
       failedListQ = applyAgency(failedListQ);
       const { data: failedRows, error: failedListErr } = await failedListQ;
@@ -177,9 +176,9 @@ export function DATStatusCard() {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {pending} pending (DAT-eligible <code className="text-xs">template_type</code>,{" "}
-              <code className="text-xs">dispatch_status</code> open, <code className="text-xs">is_active</code>,{" "}
-              <code className="text-xs">dat_posted_at</code> null) · {uploaded} uploaded (
+              {pending} pending (DAT-eligible <code className="text-xs">template_type</code>, dispatch board open,{" "}
+              <code className="text-xs">is_active</code>, <code className="text-xs">dat_posted_at</code> null) ·{" "}
+              {uploaded} uploaded (
               <code className="text-xs">dat_posted_at</code> set, active) · {failed} need destination (missing{" "}
               <code className="text-xs">pickup_city</code> or <code className="text-xs">dest_city</code>; zip optional)
             </p>

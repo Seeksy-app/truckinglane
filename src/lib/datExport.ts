@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Tables } from "@/integrations/supabase/types";
+import {
+  DAT_EXPORT_SOURCE_GROUPS,
+  type DatExportSourceGroupId,
+} from "@/config/datExportModalSources";
+
+export type { DatExportSourceGroupId };
+export { DAT_EXPORT_SOURCE_GROUPS };
 
 type Load = Tables<"loads">;
 
@@ -19,19 +26,13 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "truckertools",
 ] as const;
 
-/** UI groups for the Export to DAT modal (maps to template_type). Order matches modal list. */
-export const DAT_EXPORT_SOURCE_GROUPS = [
-  { id: "big500", label: "Big 500", templateTypes: ["aljex_big500"] as const },
-  { id: "spot", label: "Spot Loads", templateTypes: ["aljex_spot"] as const },
-  { id: "vms", label: "VMS", templateTypes: ["vms_email"] as const },
-  { id: "adelphia", label: "Adelphia", templateTypes: ["adelphia_xlsx"] as const },
-  { id: "oldcastle", label: "Oldcastle", templateTypes: ["oldcastle_gsheet"] as const },
-  { id: "century", label: "Century", templateTypes: ["century_xlsx", "Century"] as const },
-  { id: "semco", label: "SEMCO", templateTypes: ["semco_email"] as const },
-  { id: "truckertools", label: "Trucker Tools", templateTypes: ["truckertools"] as const },
-] as const;
-
-export type DatExportSourceGroupId = (typeof DAT_EXPORT_SOURCE_GROUPS)[number]["id"];
+/**
+ * PostgREST `or()` filter: load is on the dispatch board for DAT purposes.
+ * Includes `dispatch_status = 'open'` and legacy rows with null `dispatch_status` and booking `status = 'open'`
+ * (matches dashboard NEW-card dispatch logic; excludes `pending` / `archived` dispatch).
+ */
+export const SUPABASE_FILTER_DAT_DISPATCH_BOARD =
+  "dispatch_status.eq.open,and(dispatch_status.is.null,status.eq.open)";
 
 /** Only these sources require complete origin/destination before DAT export. */
 const DAT_EXPORT_REQUIRES_ORIGIN_DEST_TEMPLATE_TYPES = new Set<string>([
@@ -63,7 +64,7 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
 
 /**
  * Modal pending counts per source. Uses exact `count` queries (no 1000-row cap).
- * Same invariant as DAT board / Open loads: `dispatch_status = 'open'` (excludes pending dispatch, archived, etc.).
+ * Filters: `dat_posted_at` null, `is_active`, dispatch board open (see `SUPABASE_FILTER_DAT_DISPATCH_BOARD`).
  */
 export async function fetchDatPendingCountsBySource(
   supabase: SupabaseClient,
@@ -87,7 +88,7 @@ export async function fetchDatPendingCountsBySource(
       .in("template_type", [...g.templateTypes])
       .is("dat_posted_at", null)
       .eq("is_active", true)
-      .eq("dispatch_status", "open");
+      .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD);
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
       q = q.eq("agency_id", opts.impersonatedAgencyId);
@@ -126,7 +127,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
       .eq("template_type", "truckertools")
       .is("dat_posted_at", null)
       .eq("is_active", true)
-      .eq("dispatch_status", "open")
+      .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
       .order("ship_date", { ascending: true });
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -145,7 +146,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
       .in("template_type", otherTypes)
       .is("dat_posted_at", null)
       .eq("is_active", true)
-      .eq("dispatch_status", "open")
+      .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
       .order("ship_date", { ascending: true });
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -181,7 +182,7 @@ export async function fetchDatPendingLoadsForExport(
     .eq("template_type", "truckertools")
     .is("dat_posted_at", null)
     .eq("is_active", true)
-    .eq("dispatch_status", "open")
+    .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
     .order("ship_date", { ascending: true });
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     qtt = qtt.eq("agency_id", opts.impersonatedAgencyId);
@@ -196,7 +197,7 @@ export async function fetchDatPendingLoadsForExport(
     .in("template_type", otherTypes)
     .is("dat_posted_at", null)
     .eq("is_active", true)
-    .eq("dispatch_status", "open")
+    .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD)
     .order("ship_date", { ascending: true });
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);
@@ -227,7 +228,10 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
     if (load.is_active === false) return false;
-    if (load.dispatch_status !== "open") return false;
+    const onDispatchBoard =
+      load.dispatch_status === "open" ||
+      (load.dispatch_status == null && load.status === "open");
+    if (!onDispatchBoard) return false;
     return isExportableLoad(load);
   });
 }
@@ -523,7 +527,7 @@ export async function fetchDatPendingTotalForReminder(
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
     .eq("is_active", true)
-    .eq("dispatch_status", "open");
+    .or(SUPABASE_FILTER_DAT_DISPATCH_BOARD);
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);

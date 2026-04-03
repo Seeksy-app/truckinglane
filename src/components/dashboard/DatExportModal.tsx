@@ -17,6 +17,8 @@ import { Loader2, Download } from "lucide-react";
 import {
   DAT_EXPORT_SOURCE_GROUPS,
   type DatExportSourceGroupId,
+} from "@/config/datExportModalSources";
+import {
   fetchDatPendingCountsBySource,
   fetchDatPendingLoadsForSourceGroups,
   downloadDATExport,
@@ -211,8 +213,10 @@ export function DatExportModal({
           </DialogTitle>
           <DialogDescription>
             Select which sources to include — nothing is pre-checked. Sources with pending loads are highlighted; sources
-            with zero pending cannot be selected. Counts are dispatch-open (<code className="text-xs">dispatch_status</code>{" "}
-            = open), active (<code className="text-xs">is_active</code>), with no DAT upload yet (
+            with zero pending cannot be selected. Counts are on the dispatch board (
+            <code className="text-xs">dispatch_status</code> = open, or null dispatch with{" "}
+            <code className="text-xs">status</code> = open), active (<code className="text-xs">is_active</code>), with no
+            DAT upload yet (
             <code className="text-xs">dat_posted_at</code> empty). Adelphia, Oldcastle, Big 500, VMS,
             Spot Loads, and SEMCO require complete origin and destination for export; Trucker Tools and
             Century can export with partial locations.

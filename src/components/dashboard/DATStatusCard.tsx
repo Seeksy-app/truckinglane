@@ -41,7 +41,7 @@ export function DATStatusCard() {
         return q;
       };
 
-      // Pending: dat_posted_at IS NULL, active, dispatch open
+      // Pending: dat_posted_at IS NULL, active, dispatch open (matches export / reminder queries)
       let pendingQ = supabase
         .from("loads")
         .select("*", { count: "exact", head: true })

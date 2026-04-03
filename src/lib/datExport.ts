@@ -18,9 +18,6 @@ export const DAT_ELIGIBLE_TEMPLATE_TYPES = [
   "truckertools",
 ] as const;
 
-/** Dispatch states that count as “pending DAT” (not yet posted, still on the board). */
-export const DAT_PENDING_DISPATCH_STATUSES = ["open", "available"] as const;
-
 /** UI groups for the Export to DAT modal (maps to template_type). */
 export const DAT_EXPORT_SOURCE_GROUPS = [
   { id: "big500", label: "Big 500", templateTypes: ["aljex_big500"] as const },
@@ -62,7 +59,7 @@ export function filterDatEligibleLoads(loads: Load[]): Load[] {
 
 /**
  * Modal pending counts per source. Uses exact `count` queries (no 1000-row cap).
- * Trucker Tools: only `template_type`, `dat_posted_at IS NULL`, `is_active` — no dispatch or location filters.
+ * Same invariant as DAT board / Open loads: `dispatch_status = 'open'` (excludes pending dispatch, archived, etc.).
  */
 export async function fetchDatPendingCountsBySource(
   supabase: SupabaseClient,
@@ -84,14 +81,11 @@ export async function fetchDatPendingCountsBySource(
       .select("*", { count: "exact", head: true })
       .in("template_type", [...g.templateTypes])
       .is("dat_posted_at", null)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("dispatch_status", "open");
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
       q = q.eq("agency_id", opts.impersonatedAgencyId);
-    }
-
-    if (g.id !== "truckertools") {
-      q = q.in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES]);
     }
 
     const { count, error } = await q;
@@ -127,6 +121,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
       .eq("template_type", "truckertools")
       .is("dat_posted_at", null)
       .eq("is_active", true)
+      .eq("dispatch_status", "open")
       .order("ship_date", { ascending: true });
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -145,7 +140,7 @@ export async function fetchDatPendingLoadsForSourceGroups(
       .in("template_type", otherTypes)
       .is("dat_posted_at", null)
       .eq("is_active", true)
-      .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
+      .eq("dispatch_status", "open")
       .order("ship_date", { ascending: true });
 
     if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
@@ -181,6 +176,7 @@ export async function fetchDatPendingLoadsForExport(
     .eq("template_type", "truckertools")
     .is("dat_posted_at", null)
     .eq("is_active", true)
+    .eq("dispatch_status", "open")
     .order("ship_date", { ascending: true });
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     qtt = qtt.eq("agency_id", opts.impersonatedAgencyId);
@@ -195,7 +191,7 @@ export async function fetchDatPendingLoadsForExport(
     .in("template_type", otherTypes)
     .is("dat_posted_at", null)
     .eq("is_active", true)
-    .in("dispatch_status", [...DAT_PENDING_DISPATCH_STATUSES])
+    .eq("dispatch_status", "open")
     .order("ship_date", { ascending: true });
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);
@@ -226,7 +222,7 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
     }
     if ((load as { dat_posted_at?: string | null }).dat_posted_at != null) return false;
     if (load.is_active === false) return false;
-    if (load.dispatch_status === "archived") return false;
+    if (load.dispatch_status !== "open") return false;
     return isExportableLoad(load);
   });
 }
@@ -520,7 +516,8 @@ export async function fetchDatPendingTotalForReminder(
     .select("id", { count: "exact", head: true })
     .in("template_type", [...DAT_ELIGIBLE_TEMPLATE_TYPES])
     .is("dat_posted_at", null)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .eq("dispatch_status", "open");
 
   if (opts.role === "super_admin" && opts.impersonatedAgencyId) {
     q = q.eq("agency_id", opts.impersonatedAgencyId);

@@ -40,10 +40,8 @@ import { LoadExpandedRow } from "./LoadExpandedRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { downloadDATExport, isExportableLoad } from "@/lib/datExport";
-import {
-  truckerToolsInvoiceColumnDisplay,
-  truckerToolsNoRateRaw,
-} from "@/lib/truckerToolsLoads";
+import { truckerToolsNoRateRaw } from "@/lib/truckerToolsLoads";
+import { formatCityState, formatCurrency } from "@/components/loads/LoadNotes";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -63,7 +61,6 @@ import {
 } from "@/lib/aljexLoadBoard";
 import {
   compareLoadsByStateThenCity,
-  formatLaneStateCity,
   LOADS_TABLE_DENSE_CLASS,
   LOADS_TABLE_TOOLBAR_CLASS,
 } from "@/lib/loadTableDisplay";
@@ -71,6 +68,29 @@ import {
 type Load = Tables<"loads">;
 
 type LaneHeaderSort = { column: "pickup" | "delivery"; dir: "asc" | "desc" };
+
+function collapsedRouteTitle(load: Load): string {
+  const p = formatCityState(load.pickup_city, load.pickup_state);
+  const d = formatCityState(load.dest_city, load.dest_state);
+  return `${(p || "—").toUpperCase()} → ${(d || "—").toUpperCase()}`;
+}
+
+function collapsedMetaLine(load: Load): string {
+  const w = load.weight_lbs != null ? `${Number(load.weight_lbs).toLocaleString()} lbs` : null;
+  const parts = [load.ship_date?.trim() || null, load.trailer_type?.trim() || null, w].filter(Boolean);
+  return parts.length ? parts.join(" • ") : "—";
+}
+
+function collapsedStatusLabel(load: Load): string {
+  if (load.status === "closed" && load.close_reason === "covered") return "Covered";
+  const labels: Record<string, string> = {
+    open: "Open",
+    claimed: "Claimed",
+    booked: "Booked",
+    closed: "Closed",
+  };
+  return labels[load.status] || load.status;
+}
 
 interface LoadsTableProps {
   loads: Load[];
@@ -365,11 +385,17 @@ export function LoadsTable({
     });
   };
 
-  const statusStyles: Record<string, string> = {
-    open: "bg-[hsl(25,95%,53%)]/15 text-[hsl(25,95%,40%)] border-[hsl(25,95%,53%)]/30",
-    claimed: "bg-[hsl(210,80%,50%)]/15 text-[hsl(210,80%,40%)] border-[hsl(210,80%,50%)]/30",
-    booked: "bg-[hsl(145,63%,42%)]/15 text-[hsl(145,63%,32%)] border-[hsl(145,63%,42%)]/30",
-    closed: "bg-muted text-muted-foreground border-border",
+  const collapsedStatusPillClass = (load: Load) => {
+    if (load.status === "open") {
+      return "rounded-full bg-[#F97316] px-2.5 py-0.5 text-xs font-semibold text-white border-0 shadow-none";
+    }
+    if (load.status === "claimed") {
+      return "rounded-full bg-[#EFF6FF] px-2.5 py-0.5 text-xs font-semibold text-[#1E40AF] border border-[#BFDBFE]";
+    }
+    if (load.status === "booked") {
+      return "rounded-full bg-[#ECFDF5] px-2.5 py-0.5 text-xs font-semibold text-[#047857] border border-[#A7F3D0]";
+    }
+    return "rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-semibold text-[#374151] border border-[#E5E7EB]";
   };
 
   if (loading) {
@@ -390,45 +416,18 @@ export function LoadsTable({
     );
   }
 
-  // Helper to format rate display
-  const formatRate = (load: Load): { display: string; isPerTon: boolean } => {
-    const ttInv = truckerToolsInvoiceColumnDisplay(load);
-    if (ttInv) return ttInv;
-    // For per-ton loads - show "$X / ton" when rate exists
-    if (load.is_per_ton) {
-      if (load.rate_raw && load.rate_raw > 0) {
-        return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: true };
-      }
-      // Only show TBD when rate is truly missing/blank
-      return { display: "TBD", isPerTon: false };
-    }
-    
-    // For flat rate loads
-    if (load.customer_invoice_total && load.customer_invoice_total > 0) {
-      return { display: `$${load.customer_invoice_total.toLocaleString()}`, isPerTon: false };
-    }
-    
-    // Fallback to rate_raw if available
-    if (load.rate_raw && load.rate_raw > 0) {
-      return { display: `$${load.rate_raw.toLocaleString()}`, isPerTon: false };
-    }
-    
-    // Only show TBD when no rate data exists at all
-    return { display: "TBD", isPerTon: false };
-  };
-
-  const tableColSpan = enableOpenLoadActions ? 11 : 10;
+  const tableColSpan = enableOpenLoadActions ? 8 : 7;
 
   return (
     <>
     <div
       className={cn(
-        "w-full rounded-lg border border-border bg-card overflow-hidden",
+        "w-full rounded-lg border border-[#E5E7EB] bg-white overflow-hidden",
         enableOpenLoadActions && selectedCount > 0 && "pb-16",
       )}
     >
       {/* Sort & Filter Controls */}
-      <div className={LOADS_TABLE_TOOLBAR_CLASS}>
+      <div className={cn(LOADS_TABLE_TOOLBAR_CLASS, "!bg-[#F9FAFB] border-[#E5E7EB]")}>
         {/* Sort */}
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -530,9 +529,15 @@ export function LoadsTable({
       </div>
 
       <div className="w-full min-w-0 overflow-x-auto">
-        <Table className={LOADS_TABLE_DENSE_CLASS}>
+        <Table
+          className={cn(
+            LOADS_TABLE_DENSE_CLASS,
+            "[&_td.loads-route-cell]:!text-left [&_td.loads-route-cell]:align-middle [&_td.loads-route-cell]:!whitespace-normal",
+            "[&_td.loads-target-cell]:!text-right",
+          )}
+        >
         <TableHeader>
-          <TableRow className="bg-muted/50 border-b border-border">
+          <TableRow className="bg-[#F9FAFB] border-b border-[#E5E7EB] hover:bg-[#F9FAFB]">
             {enableOpenLoadActions && (
               <TableHead className="w-8 px-0.5 text-center align-middle">
                 <Checkbox
@@ -558,47 +563,55 @@ export function LoadsTable({
             <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
               Client
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
-              Ship Date
+            <TableHead className="!text-left align-middle min-w-[12rem] max-w-[min(42rem,55vw)] pl-3">
+              <div className="flex flex-col items-start gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide font-medium text-[#6B7280]">
+                  Route
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleLaneHeaderClick("pickup")}
+                    className={cn(
+                      "inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors",
+                      laneSort?.column === "pickup" ? "text-[#111827]" : "text-[#6B7280] hover:text-[#111827]",
+                    )}
+                    aria-label="Sort by pickup lane"
+                  >
+                    Pickup
+                    {laneSort?.column === "pickup" ? (
+                      laneSort.dir === "asc" ? (
+                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                      ) : (
+                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                      )
+                    ) : null}
+                  </button>
+                  <span className="text-[#D1D5DB]" aria-hidden>
+                    |
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleLaneHeaderClick("delivery")}
+                    className={cn(
+                      "inline-flex items-center gap-0.5 text-[10px] font-medium transition-colors",
+                      laneSort?.column === "delivery" ? "text-[#111827]" : "text-[#6B7280] hover:text-[#111827]",
+                    )}
+                    aria-label="Sort by delivery lane"
+                  >
+                    Delivery
+                    {laneSort?.column === "delivery" ? (
+                      laneSort.dir === "asc" ? (
+                        <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                      ) : (
+                        <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                      )
+                    ) : null}
+                  </button>
+                </div>
+              </div>
             </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
-              <button
-                type="button"
-                onClick={() => handleLaneHeaderClick("pickup")}
-                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
-                aria-label="Sort by pickup state"
-              >
-                Pickup
-                {laneSort?.column === "pickup" ? (
-                  laneSort.dir === "asc" ? (
-                    <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  ) : (
-                    <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  )
-                ) : null}
-              </button>
-            </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
-              <button
-                type="button"
-                onClick={() => handleLaneHeaderClick("delivery")}
-                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
-                aria-label="Sort by delivery state"
-              >
-                Delivery
-                {laneSort?.column === "delivery" ? (
-                  laneSort.dir === "asc" ? (
-                    <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  ) : (
-                    <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  )
-                ) : null}
-              </button>
-            </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
-              Invoice
-            </TableHead>
-            <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+            <TableHead className="!text-right text-[10px] uppercase tracking-wide font-medium text-[#6B7280] pr-3">
               Target Pay
             </TableHead>
             <TableHead className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
@@ -617,12 +630,18 @@ export function LoadsTable({
         </TableHeader>
         <TableBody>
           {filteredAndSortedLoads.slice(0, displayCount).map((load) => {
-            const isPending = load.status === "open" && !load.booked_by;
             const aljexTemplateBadge = getAljexTemplateBadgeLabel(load.template_type);
+            const targetCollapsed =
+              truckerToolsNoRateRaw(load) || load.target_pay == null || load.target_pay <= 0
+                ? "TBD"
+                : formatCurrency(load, load.target_pay) ?? "TBD";
             return (
               <Fragment key={load.id}>
                 <TableRow
-                  className={`cursor-pointer transition-colors hover:bg-muted/50 ${isPending ? "bg-[hsl(38,92%,50%)]/5" : ""}`}
+                  className={cn(
+                    "cursor-pointer border-b border-[#E5E7EB] bg-white transition-shadow transition-colors",
+                    "hover:shadow-[0_2px_10px_rgba(0,0,0,0.07)] hover:bg-white",
+                  )}
                   onClick={() => toggleExpand(load.id)}
                 >
                   {enableOpenLoadActions && (
@@ -664,52 +683,31 @@ export function LoadsTable({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="text-center tabular-nums text-sm sm:text-base">
-                    {load.ship_date || "—"}
+                  <TableCell className="loads-route-cell py-3 pl-3 pr-2 text-sm sm:text-base">
+                    <div className="flex flex-col gap-1 min-w-0 text-left">
+                      <div className="font-bold text-[#1A1A1A] leading-snug">
+                        {collapsedRouteTitle(load)}
+                      </div>
+                      <div className="text-xs sm:text-sm text-[#6B7280] leading-snug">
+                        {collapsedMetaLine(load)}
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell
-                    className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
-                    title={formatLaneStateCity(load.pickup_state, load.pickup_city) ?? load.pickup_location_raw ?? undefined}
-                  >
-                    {formatLaneStateCity(load.pickup_state, load.pickup_city) ??
-                      load.pickup_location_raw ??
-                      "—"}
-                  </TableCell>
-                  <TableCell
-                    className="text-center max-w-[min(14rem,28vw)] min-w-0 truncate text-sm sm:text-base"
-                    title={formatLaneStateCity(load.dest_state, load.dest_city) ?? load.dest_location_raw ?? undefined}
-                  >
-                    {formatLaneStateCity(load.dest_state, load.dest_city) ??
-                      load.dest_location_raw ??
-                      "—"}
-                  </TableCell>
-                  <TableCell className="text-center font-medium tabular-nums text-sm sm:text-base">
-                    {(() => {
-                      const rate = formatRate(load);
-                      return (
-                        <>
-                          {rate.display}
-                          {rate.isPerTon && (
-                            <span className="text-xs sm:text-sm text-muted-foreground ml-0.5">/ ton</span>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-center tabular-nums text-sm sm:text-base">
-                    {truckerToolsNoRateRaw(load)
-                      ? "—"
-                      : load.target_pay && load.target_pay > 0
-                        ? `$${load.target_pay.toLocaleString()}`
-                        : "TBD"}
+                  <TableCell className="loads-target-cell py-3 pl-2 pr-3 align-middle">
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-lg sm:text-xl font-bold tabular-nums text-[#111827]">
+                        {targetCollapsed}
+                      </span>
+                      {load.is_per_ton ? (
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-[#6B7280]">
+                          Per-ton
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center align-middle text-sm sm:text-base">
                     <div className="flex justify-center">
-                      <Badge
-                        className={`${statusStyles[load.status] || statusStyles.open} text-xs sm:text-sm h-6 px-2`}
-                      >
-                        {load.status === "booked" ? "Booked" : load.status === "closed" ? "Closed" : load.status === "claimed" ? "Claimed" : "Open"}
-                      </Badge>
+                      <span className={collapsedStatusPillClass(load)}>{collapsedStatusLabel(load)}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-sm sm:text-base" onClick={(e) => e.stopPropagation()}>
@@ -729,10 +727,10 @@ export function LoadsTable({
                                 variant="outline"
                                 size="sm"
                                 className={cn(
-                                  "h-8 px-2 text-xs sm:text-sm font-semibold shrink-0 cursor-pointer",
+                                  "h-8 px-2 text-xs sm:text-sm font-semibold shrink-0 cursor-pointer shadow-none",
                                   isPosted
                                     ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white"
-                                    : "border-amber-400/70 bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                                    : "border-[#1F2937] bg-[#1F2937] text-white hover:bg-[#111827] hover:text-white",
                                 )}
                                 disabled={datPostingId === load.id}
                                 onClick={(e) => handleRowPostToDat(load, e)}

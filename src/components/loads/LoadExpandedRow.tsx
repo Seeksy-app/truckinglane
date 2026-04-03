@@ -312,21 +312,46 @@ export function LoadExpandedRow({
         onConfirm={handleCloseCovered}
       />
 
-      <div className="px-3 py-3 border-t border-border/40">
+      <div className="px-3 py-3 border-t border-[#E5E7EB] bg-[#F9FAFB]">
         <div
           className={cn(
-            "rounded-[12px] bg-[#FFFFFF] p-5",
-            "shadow-[0_2px_8px_rgba(0,0,0,0.08)]",
-            "border border-[#F3F4F6]",
+            "relative rounded-[12px] bg-[#FFFFFF] p-5 pt-6",
+            "shadow-[0_2px_12px_rgba(0,0,0,0.08)]",
+            "border border-[#E5E7EB]",
           )}
         >
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          {/* Status + per-ton: top right */}
+          <div className="absolute top-4 right-5 z-10 flex flex-wrap items-center justify-end gap-2">
+            {load.is_per_ton ? (
+              <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#374151]">
+                Per-ton
+              </span>
+            ) : null}
+            {load.status === "open" ? (
+              <span className="inline-flex items-center rounded-full bg-[#F97316] px-3 py-1 text-sm font-semibold text-white shadow-none">
+                {getStatusLabel()}
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold",
+                  load.status === "claimed" && "bg-[#EFF6FF] text-[#1E40AF]",
+                  load.status === "booked" && "bg-[#ECFDF5] text-[#047857]",
+                  load.status === "closed" && "bg-[#F3F4F6] text-[#374151]",
+                )}
+              >
+                {getStatusLabel()}
+              </span>
+            )}
+          </div>
+
+          {/* Header: load # + badges (leave room for status top-right) */}
+          <div className="flex flex-wrap items-start justify-between gap-2 pr-[min(12rem,36%)] mb-4">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold tabular-nums text-[#111827]">
+              <span className="text-sm font-semibold tabular-nums text-[#111827]">
                 #{load.load_number}
               </span>
-              <Badge variant="outline" className="text-[10px] font-medium h-6 px-2 border-[#E5E7EB] text-[#374151]">
+              <Badge variant="outline" className="text-[10px] font-medium h-6 px-2 border-[#E5E7EB] text-[#374151] bg-white">
                 {sourceLabel}
               </Badge>
               {aljexTemplateBadge ? (
@@ -340,7 +365,7 @@ export function LoadExpandedRow({
               {load.close_reason === "covered" && (
                 <Badge
                   variant="outline"
-                  className="text-[10px] h-6 px-2 border-green-500/40 bg-green-50 text-green-800 gap-0.5 inline-flex items-center"
+                  className="text-[10px] h-6 px-2 border-[#BBF7D0] bg-[#F0FDF4] text-[#166534] gap-0.5 inline-flex items-center"
                 >
                   <ShieldCheck className="h-3 w-3 shrink-0" />
                   Covered
@@ -354,7 +379,7 @@ export function LoadExpandedRow({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-[#6B7280]"
+                    className="h-8 w-8 p-0 shrink-0 text-[#6B7280] hover:text-[#111827]"
                     onClick={(e) => onOpenDetail(e)}
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -365,13 +390,13 @@ export function LoadExpandedRow({
             ) : null}
           </div>
 
-          {/* Origin → Destination */}
-          <h3 className="text-[18px] font-bold leading-snug text-[#1A1A1A] tracking-tight">
+          {/* Origin → Destination — centered */}
+          <h3 className="text-center text-[20px] font-bold leading-snug text-[#1A1A1A] tracking-tight px-2">
             {routeTitle}
           </h3>
 
-          {/* Three columns */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mt-5">
+          {/* Three columns — financials only in col 3; no duplicate status */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mt-6">
             <div className="flex flex-col gap-4 min-w-0">
               <ExpandedField label="Ship Date">{load.ship_date ?? "—"}</ExpandedField>
               <ExpandedField label="Pickup">{pickup}</ExpandedField>
@@ -382,57 +407,33 @@ export function LoadExpandedRow({
               <ExpandedField label="Weight">{weightLine}</ExpandedField>
               <ExpandedField label="Commodity">{commodityDisplay}</ExpandedField>
             </div>
-            <div className="flex flex-col gap-4 min-w-0">
+            <div className="flex flex-col gap-5 min-w-0">
               <div className="flex flex-col gap-1">
                 <div className={labelSm}>Rate</div>
                 <div className={valMuted}>{rateStr}</div>
               </div>
               <div className="flex flex-col gap-1">
                 <div className={labelSm}>Target Pay</div>
-                <div className="text-base font-bold text-[#111827]">{targetPayStr}</div>
+                <div className="text-3xl font-bold tabular-nums leading-tight tracking-tight text-[#111827]">
+                  {targetPayStr}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <div className={labelSm}>Max Pay</div>
                 <div className={valMuted}>{maxPayStr}</div>
               </div>
-              <div className="flex flex-col gap-2 pt-1">
-                <div className={labelSm}>Status</div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {load.status === "open" ? (
-                    <span className="inline-flex items-center rounded-full bg-[#F97316] px-3 py-1 text-sm font-semibold text-white">
-                      {getStatusLabel()}
-                    </span>
-                  ) : (
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold",
-                        load.status === "claimed" && "bg-blue-100 text-blue-900",
-                        load.status === "booked" && "bg-emerald-100 text-emerald-900",
-                        load.status === "closed" && "bg-[#F3F4F6] text-[#374151]",
-                      )}
-                    >
-                      {getStatusLabel()}
-                    </span>
-                  )}
-                  {load.is_per_ton ? (
-                    <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white px-2.5 py-0.5 text-xs font-medium text-[#374151]">
-                      Per-ton
-                    </span>
-                  ) : null}
-                </div>
-              </div>
             </div>
           </div>
 
           <div className="mt-5">
-            <MarketRatesSection load={load} />
+            <MarketRatesSection load={load} tone="neutral" />
           </div>
 
           <div className="my-5 h-px w-full bg-[#F3F4F6]" aria-hidden />
 
           {callScriptText ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="text-[11px] font-medium tracking-wider text-[#6B7280] [font-variant:small-caps]">
                   CALL SCRIPT
                 </div>
@@ -457,7 +458,7 @@ export function LoadExpandedRow({
                   )}
                 </Button>
               </div>
-              <pre className="text-left text-sm font-sans leading-relaxed text-[#111827] whitespace-pre-wrap m-0">
+              <pre className="text-sm font-sans leading-relaxed text-[#111827] whitespace-pre-wrap m-0">
                 {callScriptText}
               </pre>
             </div>
@@ -580,7 +581,7 @@ export function LoadExpandedRow({
                       "h-9 px-3 text-sm font-semibold shadow-none",
                       isDatPosted
                         ? "border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600 hover:text-white"
-                        : "bg-[#1F2937] text-white hover:bg-[#111827]",
+                        : "border border-[#1F2937] bg-[#1F2937] text-white hover:bg-[#111827]",
                     )}
                     disabled={datPostingId === load.id || isDatPosted}
                     onClick={(e) => onPostToDat(e)}

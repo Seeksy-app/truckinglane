@@ -35,13 +35,14 @@ function hasMarketRateData(data: DatLaneRatesResponse): boolean {
   return postings.some((p) => p.rate != null && Number.isFinite(p.rate));
 }
 
-function competitivenessClass(our: number, marketAvg: number): string {
+function competitivenessClass(our: number, marketAvg: number, neutral?: boolean): string {
   if (!marketAvg || marketAvg <= 0 || !our || our <= 0) {
     return "text-muted-foreground";
   }
   const ratio = our / marketAvg;
   if (ratio >= 0.95) return "text-emerald-700 dark:text-emerald-400";
   if (ratio < 0.85) return "text-red-600 dark:text-red-400";
+  if (neutral) return "text-[#4B5563]";
   return "text-amber-700 dark:text-amber-400";
 }
 
@@ -49,12 +50,14 @@ function MarketRatesBody({
   ourRate,
   avg,
   postings,
+  neutral,
 }: {
   ourRate: number | null;
   avg: number | null;
   postings: DatLanePosting[];
+  neutral?: boolean;
 }) {
-  const cmpClass = competitivenessClass(ourRate ?? 0, avg ?? 0);
+  const cmpClass = competitivenessClass(ourRate ?? 0, avg ?? 0, neutral);
 
   return (
     <div className="space-y-3 text-sm">
@@ -80,7 +83,12 @@ function MarketRatesBody({
 
       </p>
       {postings.length > 0 && (
-        <div className="rounded-md border border-border/80 bg-muted/20 overflow-hidden">
+        <div
+          className={cn(
+            "rounded-md border overflow-hidden",
+            neutral ? "border-[#E5E7EB] bg-[#F9FAFB]" : "border-border/80 bg-muted/20",
+          )}
+        >
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 gap-y-1 px-2 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground border-b border-border/60">
             <span>Company</span>
             <span className="text-right">Rate</span>
@@ -114,7 +122,15 @@ function MarketRatesBody({
  * Only renders when lane params exist, fetch succeeds, and response contains usable rate data.
  * Hidden while loading, on error, or when data is null/unavailable.
  */
-export function MarketRatesSection({ load }: { load: Load }) {
+export function MarketRatesSection({
+  load,
+  tone = "default",
+}: {
+  load: Load;
+  /** Avoid amber/yellow tints (e.g. expanded load card). */
+  tone?: "default" | "neutral";
+}) {
+  const neutral = tone === "neutral";
   const params = buildLaneRatesParams(load);
   const ourRate = load.rate_raw != null && Number.isFinite(Number(load.rate_raw)) ? Number(load.rate_raw) : null;
 
@@ -144,8 +160,13 @@ export function MarketRatesSection({ load }: { load: Load }) {
   const postings = data.postings ?? [];
 
   return (
-    <div className="rounded-md border border-border/70 bg-background/50 p-2">
-      <MarketRatesBody ourRate={ourRate} avg={avg} postings={postings} />
+    <div
+      className={cn(
+        "rounded-md border p-2",
+        neutral ? "border-[#E5E7EB] bg-white" : "border-border/70 bg-background/50",
+      )}
+    >
+      <MarketRatesBody ourRate={ourRate} avg={avg} postings={postings} neutral={neutral} />
     </div>
   );
 }

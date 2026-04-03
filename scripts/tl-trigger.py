@@ -94,6 +94,26 @@ _ALJEX_LOAD_UPSERT_TEMPLATE = {
 }
 
 
+def _apply_aljex_spot_rate_and_carrier_pay(out: dict) -> None:
+    """Spot loads: ensure rate_raw mirrors invoice when missing; apply universal flat carrier pay."""
+    if str(out.get("template_type") or "") != "aljex_spot":
+        return
+    inv_f = _coerce_float(out.get("customer_invoice_total")) or 0.0
+    if inv_f <= 0:
+        return
+    rr_f = _coerce_float(out.get("rate_raw")) or 0.0
+    if rr_f <= 0:
+        out["rate_raw"] = inv_f
+        rr_f = inv_f
+    target_pay, max_pay = _target_max_pay_universal(False, rr_f, inv_f)
+    out["target_pay"] = target_pay
+    out["max_pay"] = max_pay
+    out["target_commission"] = round(inv_f * 0.2, 2)
+    out["max_commission"] = round(inv_f * 0.15, 2)
+    out["commission_target_pct"] = 0.2
+    out["commission_max_pct"] = 0.15
+
+
 def _normalize_aljex_load_row(load: dict) -> dict:
     out = dict(_ALJEX_LOAD_UPSERT_TEMPLATE)
     for k, v in load.items():
@@ -103,6 +123,7 @@ def _normalize_aljex_load_row(load: dict) -> dict:
     ds = out.get("dispatch_status")
     if ds in (None, "", "available"):
         out["dispatch_status"] = "open"
+    _apply_aljex_spot_rate_and_carrier_pay(out)
     return out
 
 

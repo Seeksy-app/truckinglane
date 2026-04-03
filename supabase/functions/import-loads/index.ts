@@ -247,7 +247,11 @@ function mapAljexSpotRow(row: Record<string, string>, agencyId: string): Record<
   const destLocationRaw = [destCity, destState].filter(Boolean).join(", ");
 
   const today = new Date().toISOString().split("T")[0];
-  const rateFields = calculateRateFields(rateRaw, weightLbs, false);
+  let rateFields = calculateRateFields(rateRaw, weightLbs, false);
+  const inv = rateFields.customer_invoice_total;
+  if (inv > 0 && (rateFields.rate_raw == null || Number(rateFields.rate_raw) === 0)) {
+    rateFields = calculateRateFields(inv, weightLbs, false);
+  }
 
   return {
     agency_id: agencyId,

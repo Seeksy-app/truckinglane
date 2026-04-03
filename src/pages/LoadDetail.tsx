@@ -557,9 +557,9 @@ function LoadDetailContent() {
 
           {/* Call Script — Aljex dispatcher loads use live AI-voice template; others use stored load_call_script */}
           {callScriptDisplay ? (
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="font-serif text-xl">Call Script</CardTitle>
+            <Card className="text-left">
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2 text-left">
+                <CardTitle className="font-serif text-xl text-left">Call Script</CardTitle>
                 <Button
                   type="button"
                   variant="outline"
@@ -581,8 +581,8 @@ function LoadDetailContent() {
                   )}
                 </Button>
               </CardHeader>
-              <CardContent>
-                <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
+              <CardContent className="text-left">
+                <p className="text-left text-foreground whitespace-pre-wrap text-sm leading-relaxed">
                   {callScriptDisplay}
                 </p>
               </CardContent>

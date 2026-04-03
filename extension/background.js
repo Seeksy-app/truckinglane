@@ -532,8 +532,14 @@ function scrapeAljexLoads() {
       const weightNum = parseFloat(weightRaw.replace(/[^0-9.]/g, '')) || null;
       const rateNum = parseFloat(customerRate.replace(/[^0-9.]/g, '')) || 0;
       const isPerTonSpot = false;
-      const rateRawSpot = rateNum;
-      const paySpot = aljexTargetMaxPay(isPerTonSpot, rateNum, rateRawSpot);
+      const customerInvoiceTotal = rateNum;
+      // Mirror linehaul on rate_raw (universal flat pay uses COALESCE(rate_raw, invoice)).
+      const rateRawSpot = customerInvoiceTotal > 0 ? customerInvoiceTotal : null;
+      const paySpot = aljexTargetMaxPay(isPerTonSpot, customerInvoiceTotal, rateRawSpot);
+      const targetCommission =
+        customerInvoiceTotal > 0 ? Math.round(customerInvoiceTotal * 0.2) : 0;
+      const maxCommission =
+        customerInvoiceTotal > 0 ? Math.round(customerInvoiceTotal * 0.15) : 0;
 
       loads.push({
         agency_id: '25127efb-6eef-412a-a5d0-3d8242988323',
@@ -543,9 +549,13 @@ function scrapeAljexLoads() {
         status: 'open',
         is_per_ton: isPerTonSpot,
         rate_raw: rateRawSpot,
-        customer_invoice_total: rateNum,
+        customer_invoice_total: customerInvoiceTotal,
         target_pay: paySpot.target_pay,
         max_pay: paySpot.max_pay,
+        target_commission: targetCommission,
+        max_commission: maxCommission,
+        commission_target_pct: customerInvoiceTotal > 0 ? 0.2 : 0,
+        commission_max_pct: customerInvoiceTotal > 0 ? 0.15 : 0,
         pickup_city: originCity,
         pickup_state: originState,
         pickup_location_raw: originRaw,

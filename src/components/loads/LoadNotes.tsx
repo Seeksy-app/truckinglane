@@ -8,7 +8,7 @@ import {
 type Load = Tables<"loads">;
 
 // Format rate display
-const formatRateDisplay = (load: Load): string | null => {
+export function formatRateDisplay(load: Load): string | null {
   const tt = truckerToolsRateFieldDisplay(
     load.template_type,
     load.rate_raw,
@@ -20,10 +20,10 @@ const formatRateDisplay = (load: Load): string | null => {
     return `$${Number(load.rate_raw).toLocaleString()}/ton`;
   }
   return `$${Number(load.rate_raw).toLocaleString()}`;
-};
+}
 
 // Format currency with TBD handling for per-ton
-const formatCurrency = (load: Load, value: number | null): string | null => {
+export function formatCurrency(load: Load, value: number | null): string | null {
   if (load.is_per_ton && (!load.weight_lbs || load.customer_invoice_total === 0)) {
     return "TBD";
   }
@@ -31,7 +31,7 @@ const formatCurrency = (load: Load, value: number | null): string | null => {
   if (tt !== undefined) return tt;
   if (!value && value !== 0) return null;
   return `$${value.toLocaleString()}`;
-};
+}
 
 // Format location string
 const formatLocation = (city?: string | null, state?: string | null, zip?: string | null): string | null => {
@@ -156,7 +156,7 @@ interface LoadDetailsGridProps {
 }
 
 // Get commodity display value - infer for Adelphia loads if not set
-function getCommodityDisplay(load: Load): string | null {
+export function getCommodityDisplay(load: Load): string | null {
   // If commodity is already set, use it
   if (load.commodity) return load.commodity;
   

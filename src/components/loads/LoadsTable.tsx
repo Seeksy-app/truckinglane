@@ -25,7 +25,6 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
-  ArrowUpDown,
   ArrowUp,
   ArrowDown,
   Filter,
@@ -59,15 +58,31 @@ import {
   getAljexTemplateBadgeLabel,
   getLoadBoardClientPrimaryLabel,
 } from "@/lib/aljexLoadBoard";
-import {
-  compareLoadsByStateThenCity,
-  LOADS_TABLE_DENSE_CLASS,
-  LOADS_TABLE_TOOLBAR_CLASS,
-} from "@/lib/loadTableDisplay";
+import { compareLoadsByStateThenCity, LOADS_TABLE_DENSE_CLASS } from "@/lib/loadTableDisplay";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Load = Tables<"loads">;
 
 type LaneHeaderSort = { column: "pickup" | "delivery"; dir: "asc" | "desc" };
+
+/** Broker source pills (order fixed). `types: null` = All. */
+const CLIENT_SOURCE_PILLS: { id: string; label: string; types: string[] | null }[] = [
+  { id: "all", label: "All", types: null },
+  { id: "adelphia_xlsx", label: "Adelphia", types: ["adelphia_xlsx"] },
+  { id: "oldcastle_gsheet", label: "Oldcastle", types: ["oldcastle_gsheet"] },
+  { id: "truckertools", label: "Trucker Tools", types: ["truckertools"] },
+  { id: "__century__", label: "Century", types: ["century_xlsx", "Century"] },
+  { id: "__semco__", label: "SEMCO", types: ["semco_email", "semco_xlsx"] },
+  { id: "aljex_big500", label: "Big 500", types: ["aljex_big500"] },
+  { id: "aljex_spot", label: "Spot Loads", types: ["aljex_spot"] },
+  { id: "vms_email", label: "VMS", types: ["vms_email"] },
+];
+
+function countLoadsForPill(loads: Load[], types: string[] | null): number {
+  if (!types) return loads.length;
+  const set = new Set(types);
+  return loads.filter((l) => l.template_type != null && set.has(l.template_type)).length;
+}
 
 function collapsedRouteTitle(load: Load): string {
   const p = formatCityState(load.pickup_city, load.pickup_state);
@@ -92,6 +107,13 @@ function collapsedStatusLabel(load: Load): string {
   return labels[load.status] || load.status;
 }
 
+export type ExternalLaneFilters = {
+  pickupState: string;
+  destState: string;
+  setPickupState: (v: string) => void;
+  setDestState: (v: string) => void;
+};
+
 interface LoadsTableProps {
   loads: Load[];
   loading: boolean;
@@ -99,6 +121,8 @@ interface LoadsTableProps {
   onRefresh: () => void;
   /** Open Loads mode: selection, bulk DAT/archive, per-row DAT. */
   enableOpenLoadActions?: boolean;
+  /** When set, pickup/delivery state filters are controlled by the parent (e.g. dashboard search row). */
+  externalLaneFilters?: ExternalLaneFilters;
 }
 
 const INITIAL_DISPLAY_COUNT = 25;
@@ -122,13 +146,18 @@ export function LoadsTable({
   isDemo = false,
   onRefresh,
   enableOpenLoadActions = false,
+  externalLaneFilters,
 }: LoadsTableProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(INITIAL_DISPLAY_COUNT);
   const [laneSort, setLaneSort] = useState<LaneHeaderSort | null>(null);
-  const [pickupStateFilter, setPickupStateFilter] = useState<string>("all");
-  const [destStateFilter, setDestStateFilter] = useState<string>("all");
+  const [internalPickupStateFilter, setInternalPickupStateFilter] = useState<string>("all");
+  const [internalDestStateFilter, setInternalDestStateFilter] = useState<string>("all");
+  const pickupStateFilter = externalLaneFilters?.pickupState ?? internalPickupStateFilter;
+  const destStateFilter = externalLaneFilters?.destState ?? internalDestStateFilter;
+  const setPickupStateFilter = externalLaneFilters?.setPickupState ?? setInternalPickupStateFilter;
+  const setDestStateFilter = externalLaneFilters?.setDestState ?? setInternalDestStateFilter;
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
@@ -137,6 +166,7 @@ export function LoadsTable({
   const [bulkDatBusy, setBulkDatBusy] = useState(false);
   /** Demo only: rows user "posted" locally (no DB). */
   const [demoDatPostedIds, setDemoDatPostedIds] = useState<Set<string>>(() => new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   /** Matches dashboard query: no archived dispatch rows in table or Client counts. */
   const loadsExcludingArchived = useMemo(
@@ -162,39 +192,17 @@ export function LoadsTable({
     setExpandedId(expandedId === id ? null : id);
   };
 
-  // Extract unique states and clients from loads for filter dropdowns
-  const { pickupStates, destStates, clients, clientCounts } = useMemo(() => {
+  // Pickup / delivery state options for advanced filters
+  const { pickupStates, destStates } = useMemo(() => {
     const pickupSet = new Set<string>();
     const destSet = new Set<string>();
-    const clientSet = new Set<string>();
-    const countMap: Record<string, number> = {};
-    
     loadsExcludingArchived.forEach((load) => {
       if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
       if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
-      if (load.template_type) {
-        clientSet.add(load.template_type);
-        countMap[load.template_type] = (countMap[load.template_type] || 0) + 1;
-      }
     });
-    
     return {
       pickupStates: Array.from(pickupSet).sort(),
       destStates: Array.from(destSet).sort(),
-      clients: Array.from(clientSet).sort((a, b) => {
-        // Custom order: VMS first, then Adelphia, then Aljex
-        const order: Record<string, number> = {
-          vms_email: 1,
-          adelphia_xlsx: 2,
-          aljex_flat: 3,
-          aljex_big500: 3,
-          aljex_spot: 4,
-          oldcastle_gsheet: 5,
-          truckertools: 6,
-        };
-        return (order[a] || 99) - (order[b] || 99);
-      }),
-      clientCounts: countMap,
     };
   }, [loadsExcludingArchived]);
 
@@ -202,9 +210,13 @@ export function LoadsTable({
   const filteredAndSortedLoads = useMemo(() => {
     let result = loadsExcludingArchived;
     
-    // Apply client filter
+    // Apply client (source) filter
     if (clientFilter !== "all") {
-      result = result.filter((l) => l.template_type === clientFilter);
+      const pill = CLIENT_SOURCE_PILLS.find((p) => p.id === clientFilter);
+      if (pill?.types?.length) {
+        const set = new Set(pill.types);
+        result = result.filter((l) => l.template_type != null && set.has(l.template_type));
+      }
     }
     
     // Apply pickup state filter
@@ -426,105 +438,127 @@ export function LoadsTable({
         enableOpenLoadActions && selectedCount > 0 && "pb-16",
       )}
     >
-      {/* Sort & Filter Controls */}
-      <div className={cn(LOADS_TABLE_TOOLBAR_CLASS, "!bg-[#F9FAFB] border-[#E5E7EB]")}>
-        {/* Sort */}
-        <div className="flex items-center gap-1.5">
-          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="text-muted-foreground">Sort:</span>
-          <button
-            type="button"
-            onClick={() => setLaneSort(null)}
-            className={cn(
-              "h-9 inline-flex min-w-[5.5rem] shrink-0 items-center rounded-md border border-border bg-background px-3 text-sm sm:text-base transition-colors hover:bg-muted/60",
-              laneSort != null && "ring-1 ring-primary/35",
-            )}
-            title={
-              laneSort != null
-                ? "Switch back to client order"
-                : "Sorted by client (use Pickup / Delivery headers to sort by lane)"
-            }
-          >
-            Client
-          </button>
+      {/* Source pills + advanced lane filters */}
+      <div className="space-y-3 border-b border-[#E5E7EB] bg-white px-4 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {CLIENT_SOURCE_PILLS.map((pill) => {
+              const n = countLoadsForPill(loadsExcludingArchived, pill.types);
+              const active = clientFilter === pill.id;
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setClientFilter(pill.id)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "border-[#F97316] bg-[#F97316] text-white shadow-sm"
+                      : "border-[#E5E7EB] bg-[#FAFAFA] text-[#374151] hover:border-[#D1D5DB] hover:bg-white",
+                  )}
+                >
+                  <span>{pill.label}</span>
+                  <span
+                    className={cn(
+                      "tabular-nums text-xs font-semibold",
+                      active ? "text-white/90" : "text-[#6B7280]",
+                    )}
+                  >
+                    {n}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {!externalLaneFilters && (
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-9 shrink-0 gap-2 border-[#E5E7EB] bg-white text-[#374151] shadow-sm",
+                    (pickupStateFilter !== "all" || destStateFilter !== "all") && "border-[#F97316]/50",
+                  )}
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {(pickupStateFilter !== "all" || destStateFilter !== "all") && (
+                    <span className="h-2 w-2 rounded-full bg-[#F97316]" aria-hidden />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 space-y-4" align="end">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pickup state</p>
+                  <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
+                    <SelectTrigger className="h-10 w-full bg-background">
+                      <SelectValue placeholder="All states" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-[280px]">
+                      <SelectItem value="all">All states</SelectItem>
+                      {pickupStates.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Delivery state</p>
+                  <Select value={destStateFilter} onValueChange={setDestStateFilter}>
+                    <SelectTrigger className="h-10 w-full bg-background">
+                      <SelectValue placeholder="All states" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover max-h-[280px]">
+                      <SelectItem value="all">All states</SelectItem>
+                      {destStates.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-between gap-2 border-t border-border pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => {
+                      setPickupStateFilter("all");
+                      setDestStateFilter("all");
+                    }}
+                  >
+                    Reset lane filters
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => setFiltersOpen(false)}>
+                    Done
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
-
-        <div className="h-6 w-px bg-border hidden sm:block" />
-
-        {/* Filter by Client */}
-        <div className="flex items-center gap-1.5">
-          <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="text-muted-foreground">Client:</span>
-          <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger className="h-9 min-w-[14rem] w-[min(100%,18rem)] max-w-[20rem] text-sm sm:text-base bg-background">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover min-w-[var(--radix-select-trigger-width)]">
-              <SelectItem value="all">All ({loadsExcludingArchived.length})</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client} value={client}>
-                  {getLoadBoardClientPrimaryLabel(client)}
-                  {client === "aljex_big500" ? " (Big 500)" : ""} ({clientCounts[client] ?? 0})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Filter by Pickup State */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Pickup:</span>
-          <Select value={pickupStateFilter} onValueChange={setPickupStateFilter}>
-            <SelectTrigger className="h-9 min-w-[8rem] w-[min(100%,11rem)] max-w-[13rem] text-sm sm:text-base bg-background">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover max-h-[300px] min-w-[var(--radix-select-trigger-width)]">
-              <SelectItem value="all">All States</SelectItem>
-              {pickupStates.map((state) => (
-                <SelectItem key={state} value={state}>
-                  {state}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Filter by Delivery State */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Delivery:</span>
-          <Select value={destStateFilter} onValueChange={setDestStateFilter}>
-            <SelectTrigger className="h-9 min-w-[8rem] w-[min(100%,11rem)] max-w-[13rem] text-sm sm:text-base bg-background">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover max-h-[300px] min-w-[var(--radix-select-trigger-width)]">
-              <SelectItem value="all">All States</SelectItem>
-              {destStates.map((state) => (
-                <SelectItem key={state} value={state}>
-                  {state}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Clear Filters Button */}
         {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="h-9 px-2 text-sm sm:text-base text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        )}
-
-        {/* Filter count indicator */}
-        {hasActiveFilters && (
-          <span className="text-sm sm:text-base text-muted-foreground">
-            Showing {filteredAndSortedLoads.length} of {loadsExcludingArchived.length}
-          </span>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[#6B7280]">
+            <span>
+              Showing {filteredAndSortedLoads.length} of {loadsExcludingArchived.length} loads
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-[#F97316] hover:text-[#ea580c]"
+              onClick={clearFilters}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Clear filters
+            </Button>
+          </div>
         )}
       </div>
 

@@ -447,15 +447,26 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     </DropdownMenu>
                   )}
                   {isAdmin && (
-                    <Button
-                      variant={isOnAdminPage ? 'secondary' : 'ghost'}
-                      size="sm"
-                      onClick={() => navigate('/admin/dashboard')}
-                      className="gap-2"
-                    >
-                      <Users className="h-4 w-4" />
-                      <span className="hidden sm:inline">Admin</span>
-                    </Button>
+                    <>
+                      <Button
+                        variant={isOnAdminPage ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => navigate('/admin/dashboard')}
+                        className="gap-2"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span className="hidden sm:inline">Admin</span>
+                      </Button>
+                      <Button
+                        variant={location.pathname === '/admin/session-logs' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        onClick={() => navigate('/admin/session-logs')}
+                        className="gap-2"
+                      >
+                        <Activity className="h-4 w-4" />
+                        <span className="hidden lg:inline">Sessions</span>
+                      </Button>
+                    </>
                   )}
                 </>
               )}

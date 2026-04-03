@@ -8,6 +8,9 @@ interface SmartSearchInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Larger control for dashboard load list (full-width search). */
+  variant?: "default" | "large";
+  className?: string;
   loads?: Array<{
     load_number?: string;
     pickup_city?: string | null;
@@ -21,6 +24,8 @@ export function SmartSearchInput({
   value,
   onChange,
   placeholder = "Search load #, city, state...",
+  variant = "default",
+  className,
   loads = [],
 }: SmartSearchInputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -84,9 +89,16 @@ export function SmartSearchInput({
     }
   };
 
+  const large = variant === "large";
+
   return (
-    <div className="relative flex-1">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+    <div className={cn("relative w-full min-w-0", className)}>
+      <Search
+        className={cn(
+          "absolute text-muted-foreground pointer-events-none z-10 top-1/2 -translate-y-1/2",
+          large ? "left-4 h-5 w-5" : "left-3 h-4 w-4",
+        )}
+      />
       <Input
         ref={inputRef}
         placeholder={placeholder}
@@ -98,15 +110,21 @@ export function SmartSearchInput({
           setTimeout(() => setIsFocused(false), 150);
         }}
         onKeyDown={handleKeyDown}
-        className="pl-10 pr-8 bg-card border-border"
+        className={cn(
+          "w-full border-[#E5E7EB]",
+          large ? "h-12 pl-12 pr-11 text-base py-3 rounded-xl bg-white shadow-sm" : "pl-10 pr-8 bg-card border-border shadow-none",
+        )}
       />
       {value && (
         <button
           onClick={() => onChange("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          className={cn(
+            "absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors",
+            large ? "right-4" : "right-3",
+          )}
           type="button"
         >
-          <X className="h-4 w-4" />
+          <X className={large ? "h-5 w-5" : "h-4 w-4"} />
         </button>
       )}
 

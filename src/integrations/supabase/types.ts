@@ -2397,6 +2397,47 @@ export type Database = {
           },
         ]
       }
+      session_logs: {
+        Row: {
+          action: string
+          agency_id: string
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          note: string | null
+          user_display_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          agency_id: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          note?: string | null
+          user_display_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          agency_id?: string
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          note?: string | null
+          user_display_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       status_checks: {
         Row: {
           checked_at: string

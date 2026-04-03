@@ -39,6 +39,7 @@ import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
 import Help from "./pages/Help";
 import ChromeExtensionGuide from "./pages/ChromeExtensionGuide";
+import SessionLogsPage from "./pages/SessionLogsPage";
 import KnowledgeBaseAdmin from "./pages/KnowledgeBaseAdmin";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
@@ -196,6 +197,14 @@ const App = () => (
                   <ProtectedRoute>
                     <AdminDashboard />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/session-logs"
+                element={
+                  <AdminRoute>
+                    <SessionLogsPage />
+                  </AdminRoute>
                 }
               />
               <Route

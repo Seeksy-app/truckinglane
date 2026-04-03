@@ -6,11 +6,13 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { DashboardStats, DashboardMode } from "@/components/dashboard/DashboardStats";
 import { LoadsTable } from "@/components/loads/LoadsTable";
+import { LoadLaneFiltersPopover } from "@/components/loads/LoadLaneFiltersPopover";
 import { AppHeader } from "@/components/AppHeader";
 import { useToast } from "@/hooks/use-toast";
 import { useLoads } from "@/hooks/useLoads";
 import { useRealtimeDashboard } from "@/hooks/useRealtimeDashboard";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Badge } from "@/components/ui/badge";
 import { X, CheckCircle, Package, RotateCcw, Plus, RefreshCw, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +50,7 @@ import { readLeadSoundMutedFromStorage, writeLeadSoundMutedToStorage } from "@/l
 import { useLeadNotifications } from "@/hooks/useLeadNotifications";
 import { CreateLoadModal } from "@/components/loads/CreateLoadModal";
 import { DATStatusCard } from "@/components/dashboard/DATStatusCard";
+import { RecentSessionsWidget } from "@/components/dashboard/RecentSessionsWidget";
 import { DatPendingReminderBanner } from "@/components/dashboard/DatPendingReminderBanner";
 import { useDatPendingReminder } from "@/hooks/useDatPendingReminder";
 import {
@@ -103,6 +106,9 @@ const Dashboard = () => {
   const [newPulseDismissed, setNewPulseDismissed] = useState(false);
   const prevNewLoadsCountRef = useRef<number | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<"all" | "my">("all");
+  const [lanePickupFilter, setLanePickupFilter] = useState("all");
+  const [laneDestFilter, setLaneDestFilter] = useState("all");
+  const [laneFiltersOpen, setLaneFiltersOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [createLoadOpen, setCreateLoadOpen] = useState(false);
   const [highlightedLeadPhone, setHighlightedLeadPhone] = useState<string | null>(null);
@@ -888,6 +894,56 @@ const Dashboard = () => {
   }, [loads, searchQuery, newLoadsCutoffIso]);
 
   useEffect(() => {
+    setLanePickupFilter("all");
+    setLaneDestFilter("all");
+    setLaneFiltersOpen(false);
+  }, [mode]);
+
+  const loadsForLaneFilterOptions = useMemo(() => {
+    switch (mode) {
+      case "open":
+        return filteredOpenLoads;
+      case "booked":
+        return filteredBookedLoads;
+      case "new":
+        return filteredNewLoads;
+      case "claimed":
+        return filteredClaimedLoads;
+      default:
+        return [];
+    }
+  }, [mode, filteredOpenLoads, filteredBookedLoads, filteredNewLoads, filteredClaimedLoads]);
+
+  const { lanePickupStates, laneDestStates } = useMemo(() => {
+    const rows = loadsForLaneFilterOptions.filter((l) => l.dispatch_status !== "archived");
+    const pickupSet = new Set<string>();
+    const destSet = new Set<string>();
+    rows.forEach((load) => {
+      if (load.pickup_state?.trim()) pickupSet.add(load.pickup_state.trim().toUpperCase());
+      if (load.dest_state?.trim()) destSet.add(load.dest_state.trim().toUpperCase());
+    });
+    return {
+      lanePickupStates: Array.from(pickupSet).sort(),
+      laneDestStates: Array.from(destSet).sort(),
+    };
+  }, [loadsForLaneFilterOptions]);
+
+  const showLaneFilters =
+    mode === "open" ||
+    mode === "booked" ||
+    mode === "new" ||
+    (mode === "claimed" && filteredClaimedLoads.length > 0);
+
+  const dashboardLaneFilters = showLaneFilters
+    ? {
+        pickupState: lanePickupFilter,
+        destState: laneDestFilter,
+        setPickupState: setLanePickupFilter,
+        setDestState: setLaneDestFilter,
+      }
+    : undefined;
+
+  useEffect(() => {
     if (prevNewLoadsCountRef.current === null) {
       prevNewLoadsCountRef.current = stats.newLoads;
       return;
@@ -1017,13 +1073,27 @@ const Dashboard = () => {
           }}
         />
 
+        {isAdmin && effectiveAgencyId ? (
+          <RecentSessionsWidget agencyId={effectiveAgencyId} />
+        ) : null}
+
         {/* Controls bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-foreground">{modeTitles[mode]}</h2>
-            <span className="text-sm text-muted-foreground">
-              ({getCurrentData().length} items)
-            </span>
+            <Badge
+              variant="secondary"
+              className="rounded-full border-0 bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-medium text-[#6B7280] dark:bg-muted dark:text-muted-foreground"
+            >
+              {getCurrentData().length}{" "}
+              {mode === "pending"
+                ? "leads"
+                : mode === "calls"
+                  ? "calls"
+                  : mode === "claimed"
+                    ? "items"
+                    : "loads"}
+            </Badge>
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>
@@ -1070,41 +1140,71 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Global search + owner toggle */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <SmartSearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search load #, city, state, phone..."
-            loads={loads}
-          />
-          <ToggleGroup
-            type="single"
-            value={ownerFilter}
-            onValueChange={(v) => v && setOwnerFilter(v as "all" | "my")}
-            className="border border-border rounded-md bg-card"
-          >
-            <ToggleGroupItem value="all" className="px-4 text-sm data-[state=on]:bg-muted">
-              {ownerLabels[mode].all}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="my" className="px-4 text-sm data-[state=on]:bg-muted">
-              {ownerLabels[mode].my}
-            </ToggleGroupItem>
-          </ToggleGroup>
-          {(searchQuery || ownerFilter !== "all") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearchQuery("");
-                setOwnerFilter("all");
-              }}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Clear All
-            </Button>
-          )}
+        {/* Global search + lane filters + owner toggle (job-board style) */}
+        <div className="mb-6 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
+            <SmartSearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              variant="large"
+              placeholder="Search by load #, city, state, or phone..."
+              loads={loads}
+              className="min-w-0 w-full lg:flex-1"
+            />
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {showLaneFilters ? (
+                <LoadLaneFiltersPopover
+                  size="large"
+                  pickupState={lanePickupFilter}
+                  destState={laneDestFilter}
+                  onPickupChange={setLanePickupFilter}
+                  onDestChange={setLaneDestFilter}
+                  pickupStates={lanePickupStates}
+                  destStates={laneDestStates}
+                  open={laneFiltersOpen}
+                  onOpenChange={setLaneFiltersOpen}
+                />
+              ) : null}
+              <ToggleGroup
+                type="single"
+                value={ownerFilter}
+                onValueChange={(v) => v && setOwnerFilter(v as "all" | "my")}
+                className="inline-flex gap-1 rounded-full border border-[#E5E7EB] bg-[#F9FAFB] p-1 dark:border-border dark:bg-muted/40"
+              >
+                <ToggleGroupItem
+                  value="all"
+                  className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
+                >
+                  {ownerLabels[mode].all}
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="my"
+                  className="rounded-full px-4 py-2 text-sm font-medium data-[state=on]:bg-white data-[state=on]:text-[#111827] data-[state=on]:shadow-sm dark:data-[state=on]:bg-background"
+                >
+                  {ownerLabels[mode].my}
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {(searchQuery ||
+                ownerFilter !== "all" ||
+                lanePickupFilter !== "all" ||
+                laneDestFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setOwnerFilter("all");
+                    setLanePickupFilter("all");
+                    setLaneDestFilter("all");
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+          </div>
+          </div>
         </div>
 
         {/* Single unified table based on mode */}
@@ -1114,6 +1214,7 @@ const Dashboard = () => {
             loading={loadsLoading}
             onRefresh={refetchLoads}
             enableOpenLoadActions
+            externalLaneFilters={dashboardLaneFilters}
           />
         )}
 
@@ -1123,7 +1224,12 @@ const Dashboard = () => {
             {filteredClaimedLoads.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">Claimed Loads ({filteredClaimedLoads.length})</h3>
-                <LoadsTable loads={filteredClaimedLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+                <LoadsTable
+                  loads={filteredClaimedLoads}
+                  loading={loadsLoading}
+                  onRefresh={refetchLoads}
+                  externalLaneFilters={dashboardLaneFilters}
+                />
               </div>
             )}
             
@@ -1172,11 +1278,21 @@ const Dashboard = () => {
         )}
 
         {mode === "booked" && (
-          <LoadsTable loads={filteredBookedLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+          <LoadsTable
+            loads={filteredBookedLoads}
+            loading={loadsLoading}
+            onRefresh={refetchLoads}
+            externalLaneFilters={dashboardLaneFilters}
+          />
         )}
 
         {mode === "new" && (
-          <LoadsTable loads={filteredNewLoads} loading={loadsLoading} onRefresh={refetchLoads} />
+          <LoadsTable
+            loads={filteredNewLoads}
+            loading={loadsLoading}
+            onRefresh={refetchLoads}
+            externalLaneFilters={dashboardLaneFilters}
+          />
         )}
       </div>
 

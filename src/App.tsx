@@ -38,6 +38,7 @@ import CompleteAgencySetup from "./pages/CompleteAgencySetup";
 import MyKeywords from "./pages/MyKeywords";
 import CsvConverter from "./pages/CsvConverter";
 import Help from "./pages/Help";
+import ChromeExtensionGuide from "./pages/ChromeExtensionGuide";
 import KnowledgeBaseAdmin from "./pages/KnowledgeBaseAdmin";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
@@ -258,6 +259,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Help />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help/chrome-extension"
+                element={
+                  <ProtectedRoute>
+                    <ChromeExtensionGuide />
                   </ProtectedRoute>
                 }
               />

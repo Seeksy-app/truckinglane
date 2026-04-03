@@ -81,6 +81,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   );
   const isOnDashboard = location.pathname === '/dashboard';
   const isOnHelpPage = location.pathname === '/help';
+  const isOnExtensionGuidePage = location.pathname === '/help/chrome-extension';
 
   // Show agency-level nav when impersonating or when user is not super admin
   const showAgencyNav = !isSuperAdmin || isImpersonating;
@@ -497,6 +498,16 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
               <CircleHelp className="h-4 w-4" />
               <span className="hidden sm:inline">Help</span>
             </Button>
+            <Button
+              variant={isOnExtensionGuidePage ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => navigate('/help/chrome-extension')}
+              className="gap-1.5"
+              aria-label="Chrome extension guide — how to use the extension"
+            >
+              <Chrome className="h-4 w-4" />
+              <span className="hidden sm:inline">Extension guide</span>
+            </Button>
             <NotificationCenter />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -549,9 +560,13 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     </DropdownMenuItem>
                   </>
                 )}
-                <DropdownMenuItem onClick={() => navigate('/extension')}>
+                <DropdownMenuItem onClick={() => navigate('/help/chrome-extension')}>
                   <Chrome className="h-4 w-4 mr-2" />
-                  Chrome Extension
+                  Extension guide
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/extension')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Install extension
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/profile')}>
                   <UserCircle className="h-4 w-4 mr-2" />

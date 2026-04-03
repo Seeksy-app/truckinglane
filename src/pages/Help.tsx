@@ -10,7 +10,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { BookOpen, Loader2, Search } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BookOpen, Chrome, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type KbMediaRow = {
@@ -91,6 +92,21 @@ export default function Help() {
             Quick answers for agents. Search below or open a section.
           </p>
         </div>
+
+        <Link
+          to="/help/chrome-extension"
+          className="mb-8 flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Chrome className="h-6 w-6 text-primary" aria-hidden />
+          </div>
+          <div className="min-w-0 text-left">
+            <p className="font-semibold text-foreground">Chrome Extension Guide</p>
+            <p className="text-sm text-muted-foreground">
+              Step-by-step: Trucker Tools, Spot Loads, Big 500, and tips — written in plain language.
+            </p>
+          </div>
+        </Link>
 
         <div className="relative mb-8">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

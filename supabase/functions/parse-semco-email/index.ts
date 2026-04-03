@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
+import { computeCommissions, computeTargetPayMaxPay } from "../_shared/targetPay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -254,10 +255,17 @@ Deno.serve(async (req) => {
       );
       const load_number = loadNumberFromSourceHash(source_hash);
       const inv = load.rate_raw;
-      const target_pay = Math.round(inv * 0.8 * 100) / 100;
-      const max_pay = Math.round(inv * 0.85 * 100) / 100;
-      const target_commission = Math.round(inv * 0.2 * 100) / 100;
-      const max_commission = Math.round(inv * 0.15 * 100) / 100;
+      const { target_pay, max_pay } = computeTargetPayMaxPay(false, inv, inv);
+      const comm = computeCommissions({
+        isPerTon: false,
+        rateRaw: inv,
+        customerInvoiceTotal: inv,
+        targetPay: target_pay,
+        maxPay: max_pay,
+        weightLbs: null,
+      });
+      const target_commission = comm.target_commission;
+      const max_commission = comm.max_commission;
       const pickupRaw = [load.pickup_city, load.pickup_state].filter(Boolean).join(", ");
       const destRaw = [load.dest_city, load.dest_state].filter(Boolean).join(", ");
       const script =

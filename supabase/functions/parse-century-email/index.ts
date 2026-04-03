@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { computeCommissions, computeTargetPayMaxPay } from "../_shared/targetPay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -263,8 +264,15 @@ Deno.serve(async (req) => {
       const h = await hash3(ext.pickup_state, ext.dest_state, `${j}-${ext.pickup_city}-${ext.dest_city}`);
       const loadNumber = `CENT-${ext.pickup_state}-${ext.dest_state}-${h}`;
       const commodity = ext.contains_bales ? "baled aluminum" : "crushed cars";
-      const targetPay = Math.round(Math.max(0, rate - 10));
-      const maxPay = Math.round(Math.max(0, rate - 5));
+      const { target_pay: targetPay, max_pay: maxPay } = computeTargetPayMaxPay(true, rate, 0);
+      const comm = computeCommissions({
+        isPerTon: true,
+        rateRaw: rate,
+        customerInvoiceTotal: 0,
+        targetPay,
+        maxPay,
+        weightLbs: null,
+      });
 
       finalRows.push({
         agency_id: CENTURY_AGENCY_ID,
@@ -288,8 +296,8 @@ Deno.serve(async (req) => {
         customer_invoice_total: 0,
         target_pay: targetPay,
         max_pay: maxPay,
-        target_commission: 0,
-        max_commission: 0,
+        target_commission: comm.target_commission,
+        max_commission: comm.max_commission,
         commission_target_pct: 0.2,
         commission_max_pct: 0.15,
         rate_raw: rate,

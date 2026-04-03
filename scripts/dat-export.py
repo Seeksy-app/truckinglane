@@ -186,6 +186,7 @@ def map_load_to_dat_row(load: dict[str, Any]) -> dict[str, str]:
     }
 
 
+# Fixed DAT template headers only — map_load_to_dat_row never includes rate_raw, invoice, target_pay, max_pay.
 DAT_COLUMNS = [
     "Pickup Earliest*",
     "Pickup Latest",

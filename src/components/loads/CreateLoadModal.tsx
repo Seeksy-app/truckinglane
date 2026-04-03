@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { calculateRateFields } from "@/lib/targetPay";
 
 interface CreateLoadModalProps {
   open: boolean;
@@ -92,24 +93,13 @@ export function CreateLoadModal({ open, onOpenChange }: CreateLoadModalProps) {
         agencyId = membership.agency_id;
       }
 
-      // Calculate rate fields
       const rateNumeric = rate ? parseFloat(rate.replace(/[$,]/g, "")) : null;
       const weight = weightLbs ? parseFloat(weightLbs) : null;
-      const weightTons = weight ? weight / 2000 : 0;
-
-      let invoiceTotal = 0;
-      if (rateNumeric) {
-        if (isPerTon && weightTons > 0) {
-          invoiceTotal = Math.round(rateNumeric * weightTons);
-        } else if (!isPerTon) {
-          invoiceTotal = Math.round(rateNumeric);
-        }
-      }
-
-      const targetPay = Math.round(invoiceTotal * 0.80);
-      const targetCommission = Math.round(invoiceTotal * 0.20);
-      const maxPay = Math.round(invoiceTotal * 0.85);
-      const maxCommission = Math.round(invoiceTotal * 0.15);
+      const rateFields = calculateRateFields(
+        rateNumeric != null && !Number.isNaN(rateNumeric) ? rateNumeric : null,
+        weight != null && !Number.isNaN(weight) ? weight : null,
+        isPerTon,
+      );
 
       const pickupLocationRaw = [pickupCity, pickupState, pickupZip].filter(Boolean).join(", ");
       const destLocationRaw = [destCity, destState, destZip].filter(Boolean).join(", ");
@@ -136,15 +126,7 @@ export function CreateLoadModal({ open, onOpenChange }: CreateLoadModalProps) {
         commodity: commodity || null,
         miles: miles || null,
         weight_lbs: weight,
-        rate_raw: rateNumeric,
-        is_per_ton: isPerTon,
-        customer_invoice_total: invoiceTotal,
-        target_pay: targetPay,
-        target_commission: targetCommission,
-        max_pay: maxPay,
-        max_commission: maxCommission,
-        commission_target_pct: 0.20,
-        commission_max_pct: 0.15,
+        ...rateFields,
         dispatch_status: dispatchStatus || null,
         status: "open",
         is_active: true,

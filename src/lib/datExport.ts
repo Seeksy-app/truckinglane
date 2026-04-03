@@ -231,7 +231,9 @@ export function getDatPendingLoads(loads: Load[]): Load[] {
   });
 }
 
-// Official DAT bulk upload template columns
+// Official DAT bulk upload template columns only — CSV rows are built exclusively from
+// mapLoadToDAT → these headers. rate_raw, customer_invoice_total, target_pay, and max_pay
+// are never written to DAT export (app or scripts/dat-export.py).
 export const DAT_COLUMNS = [
   "Pickup Earliest*",
   "Pickup Latest",

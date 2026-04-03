@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
+import { calculateRateFields } from "../_shared/targetPay.ts";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
@@ -196,60 +197,6 @@ function parseTarpRequired(value: string | undefined | null): boolean {
   return ["Y", "YES", "TRUE", "1"].includes(upper);
 }
 
-function calculateRateFields(rateRaw: number | null, weightLbs: number | null, isPerTon: boolean) {
-  // Handle null/missing rate - load should still import
-  if (rateRaw === null || rateRaw === 0) {
-    return {
-      rate_raw: null,
-      is_per_ton: isPerTon,
-      customer_invoice_total: 0,
-      target_pay: 0,
-      target_commission: 0,
-      max_pay: 0,
-      max_commission: 0,
-      commission_target_pct: 0.20,
-      commission_max_pct: 0.15,
-    };
-  }
-  
-  const rate = rateRaw;
-  const weight = weightLbs || 0;
-  const weightTons = weight / 2000;
-  
-  // For per-ton rates: only calculate invoice if we have weight
-  // If no weight, invoice remains 0 (will display as TBD in UI)
-  let invoiceTotal = 0;
-  if (isPerTon) {
-    if (weightTons > 0) {
-      invoiceTotal = Math.round(rate * weightTons);
-    }
-    // If no weight, leave invoiceTotal as 0 - UI will show "TBD"
-  } else {
-    invoiceTotal = Math.round(rate);
-  }
-  
-  // Per-ton: carrier target = ($/ton − $10) × tons; flat: 80% of invoice
-  const targetPay =
-    isPerTon && weightTons > 0
-      ? Math.round((rate - 10) * weightTons)
-      : Math.round(invoiceTotal * 0.80);
-  const targetCommission = Math.round(invoiceTotal * 0.20);
-  const maxPay = Math.round(invoiceTotal * 0.85);
-  const maxCommission = Math.round(invoiceTotal * 0.15);
-  
-  return {
-    rate_raw: rate,
-    is_per_ton: isPerTon,
-    customer_invoice_total: invoiceTotal,
-    target_pay: targetPay,
-    target_commission: targetCommission,
-    max_pay: maxPay,
-    max_commission: maxCommission,
-    commission_target_pct: 0.20,
-    commission_max_pct: 0.15,
-  };
-}
-
 function generateLoadCallScript(load: Record<string, unknown>): string {
   const loadNumber = load.load_number || "";
   const pickupRaw = load.pickup_location_raw || "";
@@ -300,6 +247,7 @@ function mapAljexSpotRow(row: Record<string, string>, agencyId: string): Record<
   const destLocationRaw = [destCity, destState].filter(Boolean).join(", ");
 
   const today = new Date().toISOString().split("T")[0];
+  const rateFields = calculateRateFields(rateRaw, weightLbs, false);
 
   return {
     agency_id: agencyId,
@@ -315,14 +263,7 @@ function mapAljexSpotRow(row: Record<string, string>, agencyId: string): Record<
     delivery_date: purgeDate || today,
     trailer_type: trailerType,
     weight_lbs: weightLbs,
-    rate_raw: rateRaw,
-    customer_invoice_total: rateRaw || 0,
-    target_pay: rateRaw ? Math.round(rateRaw * 0.8) : 0,
-    target_commission: rateRaw ? Math.round(rateRaw * 0.2) : 0,
-    max_pay: rateRaw ? Math.round(rateRaw * 0.85) : 0,
-    max_commission: rateRaw ? Math.round(rateRaw * 0.15) : 0,
-    commission_target_pct: 0.20,
-    commission_max_pct: 0.15,
+    ...rateFields,
     status: "open",
     dispatch_status: ALJEX_SCRAPED_DISPATCH_STATUS,
     is_active: true,

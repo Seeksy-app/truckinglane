@@ -26,11 +26,11 @@ interface DashboardStatsProps {
   };
   activeMode: DashboardMode;
   onModeChange: (mode: DashboardMode) => void;
-  /** Agency / super admin — shows Oldcastle “Sync Now” next to DAT board. */
+  /** Agency / super admin — shows “Sync Oldcastle” under the DAT board card. */
   isAdmin?: boolean;
   /** When true, NEW card does not pulse (user opened NEW; count unchanged until more new loads arrive). */
   newPulseDismissed?: boolean;
-  /** After a successful Oldcastle VPS sync (admin Sync Now). */
+  /** After a successful Oldcastle VPS sync (admin “Sync Oldcastle”). */
   onOldcastleSyncSuccess?: () => void;
 }
 
@@ -173,12 +173,17 @@ export const DashboardStats = ({
               className="w-full shrink-0"
               disabled={oldcastleSyncInProgress}
               onClick={() => void syncOldcastle()}
-              title="Sync Oldcastle loads from Google Sheet (VPS)"
+              title="Pull Oldcastle loads from Google Sheet (VPS)"
+              aria-label={
+                oldcastleSyncInProgress
+                  ? "Syncing Oldcastle, please wait"
+                  : "Sync Oldcastle from Google Sheet"
+              }
             >
               {oldcastleSyncInProgress ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" aria-hidden />
               ) : null}
-              {oldcastleSyncInProgress ? "Syncing…" : "Sync Now"}
+              {oldcastleSyncInProgress ? "Syncing Oldcastle…" : "Sync Oldcastle"}
             </Button>
           ) : null}
         </div>

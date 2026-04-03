@@ -412,25 +412,24 @@ async function syncAljexWithScrape() {
 // ── INJECTED INTO ALJEX TAB ───────────────────────────────────
 function scrapeAljexLoads() {
   const loads = [];
+  /** Universal TL rules: flat = COALESCE(rate_raw, invoice)*0.80/0.85; per-ton = rate-10 / rate-5 ($/ton). */
   function aljexTargetMaxPay(isPerTon, customerInvoiceTotal, rateRaw) {
     const inv = Number(customerInvoiceTotal);
+    const r = Number(rateRaw);
+    const hasR = Number.isFinite(r) && r > 0;
     const hasInv = Number.isFinite(inv) && inv > 0;
-    if (!hasInv) {
-      return { target_pay: 0, max_pay: 0 };
-    }
     if (isPerTon) {
-      const r = Number(rateRaw);
-      if (!Number.isFinite(r) || r <= 0) {
-        return { target_pay: 0, max_pay: 0 };
-      }
+      if (!hasR) return { target_pay: 0, max_pay: 0 };
       return {
-        target_pay: Math.round(r - 10),
-        max_pay: Math.round(r - 8),
+        target_pay: Math.round(Math.max(0, r - 10)),
+        max_pay: Math.round(Math.max(0, r - 5)),
       };
     }
+    const base = hasR ? r : hasInv ? inv : 0;
+    if (base <= 0) return { target_pay: 0, max_pay: 0 };
     return {
-      target_pay: Math.round(inv * 0.8),
-      max_pay: Math.round(inv * 0.85),
+      target_pay: Math.round(base * 0.8),
+      max_pay: Math.round(base * 0.85),
     };
   }
   try {

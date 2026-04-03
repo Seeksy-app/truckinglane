@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import { calculateRateFields } from "../_shared/targetPay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,27 +43,6 @@ function simpleHash(str: string): string {
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16).padStart(8, '0').substring(0, 8);
-}
-
-function calculateRateFields(rateRaw: number | null) {
-  if (rateRaw === null || rateRaw === 0) {
-    return {
-      rate_raw: null, is_per_ton: false,
-      customer_invoice_total: 0, target_pay: 0, target_commission: 0,
-      max_pay: 0, max_commission: 0,
-      commission_target_pct: 0.20, commission_max_pct: 0.15,
-    };
-  }
-  const invoiceTotal = Math.round(rateRaw);
-  return {
-    rate_raw: rateRaw, is_per_ton: false,
-    customer_invoice_total: invoiceTotal,
-    target_pay: Math.round(invoiceTotal * 0.80),
-    target_commission: Math.round(invoiceTotal * 0.20),
-    max_pay: Math.round(invoiceTotal * 0.85),
-    max_commission: Math.round(invoiceTotal * 0.15),
-    commission_target_pct: 0.20, commission_max_pct: 0.15,
-  };
 }
 
 // ---------- parsing ----------
@@ -238,7 +218,7 @@ function mapToLoad(parsed: ParsedLoad): Record<string, unknown> {
   const destRaw = [parsed.delivery_city, parsed.delivery_state].filter(Boolean).join(", ");
   const contentKey = `${pickupRaw}|${destRaw}|${parsed.rate}|${parsed.equipment}|${parsed.sheet_name}`;
   const loadNumber = `OC-${simpleHash(contentKey)}`;
-  const rateFields = calculateRateFields(parsed.rate);
+  const rateFields = calculateRateFields(parsed.rate, null, false);
 
   let trailerType: string | null = null;
   if (parsed.equipment) {

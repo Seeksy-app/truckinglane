@@ -130,6 +130,21 @@ def _truckertools_api_raw_from_row(row: dict) -> dict | None:
     return raw if isinstance(raw, dict) else None
 
 
+def _target_max_pay_universal(is_per_ton: bool, rate_raw: float | None, customer_invoice_total: float) -> tuple[float, float]:
+    """Flat: COALESCE(rate_raw, invoice)*0.80/0.85; per-ton: rate-10 / rate-5. Matches _shared/targetPay.ts."""
+    if is_per_ton:
+        r = float(rate_raw or 0)
+        if r <= 0:
+            return 0.0, 0.0
+        return round(max(0.0, r - 10), 2), round(max(0.0, r - 5), 2)
+    inv = float(customer_invoice_total or 0)
+    r = float(rate_raw or 0)
+    base = r if r > 0 else inv
+    if base <= 0:
+        return 0.0, 0.0
+    return round(base * 0.8, 2), round(base * 0.85, 2)
+
+
 def _remap_truckertools_load_from_api(row: dict) -> dict:
     """
     Map Trucker Tools API item (nested in source_row.raw) to Supabase `loads` columns.
@@ -141,9 +156,7 @@ def _remap_truckertools_load_from_api(row: dict) -> dict:
       pickupDate -> ship_date
       equipmentType -> trailer_type
       weight -> weight_lbs
-      offerRate -> rate_raw AND customer_invoice_total
-      target_pay = rate * 0.80, max_pay = rate * 0.85,
-      target_commission = rate - target_pay, max_commission = rate - max_pay
+      offerRate -> rate_raw AND customer_invoice_total; pay fields via _target_max_pay_universal (flat).
     """
     raw = _truckertools_api_raw_from_row(row)
     if not raw:
@@ -179,12 +192,12 @@ def _remap_truckertools_load_from_api(row: dict) -> dict:
 
     rate = _coerce_float(raw.get("offerRate")) if "offerRate" in raw else None
     if rate is not None:
-        target_pay = round(rate * 0.80)
-        max_pay = round(rate * 0.85)
+        is_pt = bool(out.get("is_per_ton"))
+        target_pay, max_pay = _target_max_pay_universal(is_pt, rate, rate)
         out["target_pay"] = target_pay
         out["max_pay"] = max_pay
-        out["target_commission"] = round(rate - target_pay)
-        out["max_commission"] = round(rate - max_pay)
+        out["target_commission"] = round(rate - target_pay, 2)
+        out["max_commission"] = round(rate - max_pay, 2)
         out["rate_raw"] = rate
         out["customer_invoice_total"] = rate
         out["commission_target_pct"] = 0.2

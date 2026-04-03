@@ -3,11 +3,22 @@ import csv, json, urllib.request, re, sys, io
 
 SUPABASE_URL = "https://vjgakkomhphvdbwjjwiv.supabase.co"
 AGENCY_ID = "25127efb-6eef-412a-a5d0-3d8242988323"
-MARGIN = 0.20  # 20% margin target
-
 env = open("/root/.truckinglane-dat.env").read()
 sk = re.search(r"SUPABASE_SERVICE_ROLE_KEY=(\S+)", env)
 SERVICE_KEY = sk.group(1)
+
+
+def compute_target_max_pay(is_per_ton: bool, rate: float, customer_total: float) -> tuple[float, float]:
+    """Universal TL carrier pay (keep in sync with supabase/functions/_shared/targetPay.ts)."""
+    if is_per_ton:
+        if rate <= 0:
+            return 0.0, 0.0
+        return round(max(0.0, rate - 10), 2), round(max(0.0, rate - 5), 2)
+    base = rate if rate > 0 else customer_total
+    if base <= 0:
+        return 0.0, 0.0
+    return round(base * 0.8, 2), round(base * 0.85, 2)
+
 
 def parse_num(val):
     try:
@@ -33,7 +44,6 @@ for row in reader:
     status = row[13].strip().lower()
 
     rate = parse_num(row[294]) if len(row) > 294 else 0
-    benchmark = parse_num(row[131])  # Aljex benchmark carrier rate
     miles = parse_num(row[48])
     weight_lbs = parse_num(row[43])
     
@@ -56,14 +66,7 @@ for row in reader:
         # Flat rate - use as-is
         customer_total = rate
 
-    # Target carrier pay = revenue minus margin
-    target_pay = customer_total * (1 - MARGIN)
-    # For per-ton loads, benchmark is also per-ton - convert to total first
-    if benchmark > 0 and is_per_ton:
-        benchmark_total = benchmark * tons
-        target_pay = min(target_pay, benchmark_total)
-    elif benchmark > 0 and not is_per_ton:
-        target_pay = min(target_pay, benchmark)
+    target_pay, max_pay = compute_target_max_pay(is_per_ton, rate, customer_total)
 
     is_open = status == "open"
     is_archived_by_status = status in ("covered", "delivered")
@@ -90,8 +93,8 @@ for row in reader:
         "miles": miles if miles > 0 else None,
         "is_per_ton": is_per_ton,
         "customer_invoice_total": round(customer_total, 2),
-        "target_pay": round(target_pay, 2),
-        "max_pay": round(target_pay * 1.05, 2),  # 5% flex above target
+        "target_pay": target_pay,
+        "max_pay": max_pay,
         "rate_raw": str(rate),
         "is_active": is_open if is_open or is_archived_by_status else True,
         "source_row": json.dumps({

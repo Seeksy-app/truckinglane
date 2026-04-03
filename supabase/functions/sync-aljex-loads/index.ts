@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
+import { calculateRateFields } from "../_shared/targetPay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,35 +94,6 @@ function parseDate(value: string | undefined | null): string | null {
 function parseTarpRequired(value: string | undefined | null): boolean {
   if (!value) return false;
   return ["Y", "YES", "TRUE", "1"].includes(String(value).toUpperCase().trim());
-}
-
-function calculateRateFields(rateRaw: number | null, weightLbs: number | null, isPerTon: boolean) {
-  if (rateRaw === null || rateRaw === 0) {
-    return {
-      rate_raw: null, is_per_ton: isPerTon,
-      customer_invoice_total: 0, target_pay: 0, target_commission: 0,
-      max_pay: 0, max_commission: 0,
-      commission_target_pct: 0.20, commission_max_pct: 0.15,
-    };
-  }
-  const weightTons = (weightLbs || 0) / 2000;
-  const invoiceTotal = isPerTon && weightTons > 0
-    ? Math.round(rateRaw * weightTons)
-    : Math.round(rateRaw);
-  const targetPay =
-    isPerTon && weightTons > 0
-      ? Math.round((rateRaw - 10) * weightTons)
-      : Math.round(invoiceTotal * 0.80);
-  return {
-    rate_raw: rateRaw, is_per_ton: isPerTon,
-    customer_invoice_total: invoiceTotal,
-    target_pay: targetPay,
-    target_commission: Math.round(invoiceTotal * 0.20),
-    max_pay: Math.round(invoiceTotal * 0.85),
-    max_commission: Math.round(invoiceTotal * 0.15),
-    commission_target_pct: 0.20,
-    commission_max_pct: 0.15,
-  };
 }
 
 function generateLoadCallScript(load: Record<string, unknown>): string {

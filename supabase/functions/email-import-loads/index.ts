@@ -2,6 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import {
+  calculateRateFields,
+  computeCommissions,
+  computeTargetPayMaxPay,
+} from "../_shared/targetPay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -270,52 +275,6 @@ function parseTarpRequired(value: string | undefined | null): boolean {
   if (!value) return false;
   const upper = String(value).toUpperCase().trim();
   return ["Y", "YES", "TRUE", "1"].includes(upper);
-}
-
-function calculateRateFields(rateRaw: number | null, weightLbs: number | null, isPerTon: boolean) {
-  if (rateRaw === null || rateRaw === 0) {
-    return {
-      rate_raw: null,
-      is_per_ton: isPerTon,
-      customer_invoice_total: 0,
-      target_pay: 0,
-      target_commission: 0,
-      max_pay: 0,
-      max_commission: 0,
-      commission_target_pct: 0.20,
-      commission_max_pct: 0.15,
-    };
-  }
-  
-  const rate = rateRaw;
-  const weight = weightLbs || 0;
-  const weightTons = weight / 2000;
-  
-  let invoiceTotal = 0;
-  if (isPerTon) {
-    if (weightTons > 0) {
-      invoiceTotal = Math.round(rate * weightTons);
-    }
-  } else {
-    invoiceTotal = Math.round(rate);
-  }
-  
-  const targetPay = Math.round(invoiceTotal * 0.80);
-  const targetCommission = Math.round(invoiceTotal * 0.20);
-  const maxPay = Math.round(invoiceTotal * 0.85);
-  const maxCommission = Math.round(invoiceTotal * 0.15);
-  
-  return {
-    rate_raw: rate,
-    is_per_ton: isPerTon,
-    customer_invoice_total: invoiceTotal,
-    target_pay: targetPay,
-    target_commission: targetCommission,
-    max_pay: maxPay,
-    max_commission: maxCommission,
-    commission_target_pct: 0.20,
-    commission_max_pct: 0.15,
-  };
 }
 
 // ============= CENTURY PDF (Claude) =============
@@ -1673,11 +1632,21 @@ Deno.serve(async (req) => {
           const tonsPositive = tons > 0;
           const weightLbs = tonsPositive ? Math.round(tons * 2000) : null;
           const customerInvoiceTotal = tonsPositive ? Math.round(ratePerTon * tons) : 0;
-          // Per-ton loads: target/max are $/ton off rate, not % of invoice
-          const targetPay = Math.round(Math.max(0, ratePerTon - 10));
-          const maxPay = Math.round(Math.max(0, ratePerTon - 5));
-          const targetCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.2) : 0;
-          const maxCommission = tonsPositive ? Math.round(customerInvoiceTotal * 0.15) : 0;
+          const { target_pay: targetPay, max_pay: maxPay } = computeTargetPayMaxPay(
+            true,
+            ratePerTon,
+            customerInvoiceTotal,
+          );
+          const comm = computeCommissions({
+            isPerTon: true,
+            rateRaw: ratePerTon,
+            customerInvoiceTotal,
+            targetPay,
+            maxPay,
+            weightLbs,
+          });
+          const targetCommission = comm.target_commission;
+          const maxCommission = comm.max_commission;
 
           const commodity = ext.contains_bales ? "baled aluminum" : "crushed cars";
           const pickupRaw = ext.pickup_city && ext.pickup_state

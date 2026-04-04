@@ -77,6 +77,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@types/google.maps": "^3.58.1",
     "@types/node": "^22.16.5",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",

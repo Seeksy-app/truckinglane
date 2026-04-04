@@ -2555,6 +2555,98 @@ export type Database = {
         }
         Relationships: []
       }
+      tracking_pings: {
+        Row: {
+          accuracy: number | null
+          created_at: string
+          heading: number | null
+          id: string
+          lat: number
+          lng: number
+          session_id: string
+          speed: number | null
+        }
+        Insert: {
+          accuracy?: number | null
+          created_at?: string
+          heading?: number | null
+          id?: string
+          lat: number
+          lng: number
+          session_id: string
+          speed?: number | null
+        }
+        Update: {
+          accuracy?: number | null
+          created_at?: string
+          heading?: number | null
+          id?: string
+          lat?: number
+          lng?: number
+          session_id?: string
+          speed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_pings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_sessions: {
+        Row: {
+          agency_id: string
+          created_at: string
+          driver_phone: string | null
+          id: string
+          last_ping_at: string | null
+          load_id: string
+          started_at: string | null
+          status: string
+          token: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          driver_phone?: string | null
+          id?: string
+          last_ping_at?: string | null
+          load_id: string
+          started_at?: string | null
+          status?: string
+          token: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          driver_phone?: string | null
+          id?: string
+          last_ping_at?: string | null
+          load_id?: string
+          started_at?: string | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_sessions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_sessions_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trust_page_access_logs: {
         Row: {
           action: string
@@ -2745,6 +2837,24 @@ export type Database = {
           leads_claimed: number
           leads_closed: number
           leads_created: number
+        }[]
+      }
+      get_active_tracking_for_map: {
+        Args: { p_agency_id: string }
+        Returns: {
+          session_id: string
+          token: string
+          driver_phone: string | null
+          last_ping_at: string | null
+          session_status: string
+          load_number: string
+          pickup_city: string | null
+          pickup_state: string | null
+          dest_city: string | null
+          dest_state: string | null
+          ping_lat: number | null
+          ping_lng: number | null
+          ping_at: string | null
         }[]
       }
       get_keyword_analytics: {

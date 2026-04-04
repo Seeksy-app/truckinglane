@@ -137,3 +137,9 @@ verify_jwt = false
 
 [functions.sync-google-loads]
 verify_jwt = false
+
+[functions.tracking-ping]
+verify_jwt = false
+
+[functions.send-tracking-link]
+verify_jwt = true

@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   ExternalLink,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,7 +39,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, formatPhone } from "@/lib/utils";
+import { sendTrackingLinkRequest } from "@/lib/sendTrackingLink";
+import { Input } from "@/components/ui/input";
 
 type Load = Tables<"loads">;
 
@@ -92,6 +95,9 @@ export function LoadExpandedRow({
   const [scriptCopied, setScriptCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [coveredDialogOpen, setCoveredDialogOpen] = useState(false);
+  const [showDriverPhoneForTracking, setShowDriverPhoneForTracking] = useState(false);
+  const [trackingPhoneDraft, setTrackingPhoneDraft] = useState("");
+  const [sendingTracking, setSendingTracking] = useState(false);
 
   const handleCopyNotes = async () => {
     const notes = formatLoadNotes(load);
@@ -295,6 +301,48 @@ export function LoadExpandedRow({
   const rateStr = formatRateDisplay(load) ?? "—";
   const targetPayStr = formatCurrency(load, load.target_pay) ?? "—";
   const maxPayStr = formatCurrency(load, load.max_pay) ?? "—";
+
+  const dispatchOpenForTracking =
+    load.dispatch_status === "open" ||
+    load.dispatch_status == null ||
+    String(load.dispatch_status ?? "").trim() === "";
+  const canSendTrackingLink =
+    !isDemo &&
+    (load.status === "claimed" || load.status === "booked") &&
+    dispatchOpenForTracking;
+
+  const handleSendTrackingLink = async () => {
+    if (!canSendTrackingLink || sendingTracking) return;
+    const hasStored = !!load.booked_by_phone?.trim();
+    if (!hasStored && !showDriverPhoneForTracking) {
+      setShowDriverPhoneForTracking(true);
+      return;
+    }
+    if (!hasStored && !trackingPhoneDraft.trim()) {
+      toast.error("Enter the driver’s phone number");
+      return;
+    }
+    setSendingTracking(true);
+    try {
+      const res = await sendTrackingLinkRequest(
+        load.id,
+        hasStored ? undefined : trackingPhoneDraft,
+      );
+      if ("needPhone" in res && res.needPhone) {
+        setShowDriverPhoneForTracking(true);
+        return;
+      }
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`Tracking link sent to ${formatPhone(res.phone_e164)}`);
+      setShowDriverPhoneForTracking(false);
+      setTrackingPhoneDraft("");
+    } finally {
+      setSendingTracking(false);
+    }
+  };
 
   const outlineBtn =
     "border border-[#F3F4F6] bg-white text-[#111827] shadow-none hover:bg-[#F9FAFB]";
@@ -569,6 +617,37 @@ export function LoadExpandedRow({
                 <RotateCcw className="h-4 w-4" />
                 Re-open
               </Button>
+            )}
+
+            {canSendTrackingLink && (
+              <>
+                {showDriverPhoneForTracking && !load.booked_by_phone?.trim() && (
+                  <Input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="Driver mobile number"
+                    value={trackingPhoneDraft}
+                    onChange={(e) => setTrackingPhoneDraft(e.target.value)}
+                    className="h-9 max-w-[220px] bg-white border-[#E5E7EB] text-sm"
+                  />
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={updating || sendingTracking}
+                  className={cn("h-9 gap-1.5 shadow-none", outlineBtn)}
+                  onClick={() => void handleSendTrackingLink()}
+                >
+                  {sendingTracking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MapPin className="h-4 w-4" />
+                  )}
+                  Send Tracking Link
+                </Button>
+              </>
             )}
 
             {enableOpenLoadActions && onPostToDat ? (

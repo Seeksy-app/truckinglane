@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp, MapPin } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -76,6 +76,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const isOnAdminPage = location.pathname.startsWith('/admin');
   const isOnPlatformPage = location.pathname === '/platform';
   const isOnAnalyticsPage = location.pathname === '/analytics';
+  const isOnLiveMapPage = location.pathname === '/live-map';
   const isOnLeadGenPage = ['/lead-discovery', '/accounts', '/prospecting', '/status'].some(p =>
     location.pathname === p || location.pathname.startsWith('/accounts/')
   );
@@ -85,6 +86,11 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
 
   // Show agency-level nav when impersonating or when user is not super admin
   const showAgencyNav = !isSuperAdmin || isImpersonating;
+
+  const showLiveMapNav =
+    showAgencyNav &&
+    !!role &&
+    (role === 'agent' || role === 'agency_admin' || role === 'super_admin');
 
   const { data: datPendingNavCount = 0 } = useQuery({
     queryKey: ["dat-pending-nav-badge", role, impersonatedAgencyId],
@@ -245,7 +251,11 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
               {showAgencyNav && (
                 <>
                   <Button
-                    variant={isOnDashboard && !isOnAdminPage && !isOnAnalyticsPage ? 'secondary' : 'ghost'}
+                    variant={
+                      isOnDashboard && !isOnAdminPage && !isOnAnalyticsPage && !isOnLiveMapPage
+                        ? 'secondary'
+                        : 'ghost'
+                    }
                     size="sm"
                     onClick={() => navigate('/dashboard')}
                     className="gap-2"
@@ -271,6 +281,17 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     <BarChart3 className="h-4 w-4" />
                     <span className="hidden sm:inline">Analytics</span>
                   </Button>
+                  {showLiveMapNav && (
+                    <Button
+                      variant={isOnLiveMapPage ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => navigate('/live-map')}
+                      className="gap-2"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      <span className="hidden sm:inline">Live Map</span>
+                    </Button>
+                  )}
                   
                   {/* Loads dropdown: import, DAT exports */}
                   <DropdownMenu>
@@ -569,6 +590,12 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Analytics
                     </DropdownMenuItem>
+                    {showLiveMapNav && (
+                      <DropdownMenuItem onClick={() => navigate('/live-map')}>
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Live Map
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
                 <DropdownMenuItem onClick={() => navigate('/help/chrome-extension')}>

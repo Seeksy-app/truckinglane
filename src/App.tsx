@@ -43,6 +43,8 @@ import SessionLogsPage from "./pages/SessionLogsPage";
 import KnowledgeBaseAdmin from "./pages/KnowledgeBaseAdmin";
 import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
+import TrackingPage from "./pages/TrackingPage";
+import LiveMapPage from "./pages/LiveMapPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -155,6 +157,7 @@ const App = () => (
               <Route path="/trust" element={<Trust />} />
               <Route path="/csv-converter" element={<CsvConverter />} />
               <Route path="/status" element={<Status />} />
+              <Route path="/track/:token" element={<TrackingPage />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/legal/:slug" element={<Legal />} />
@@ -236,6 +239,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Analytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/live-map"
+                element={
+                  <ProtectedRoute>
+                    <LiveMapPage />
                   </ProtectedRoute>
                 }
               />

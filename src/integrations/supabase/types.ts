@@ -2397,6 +2397,355 @@ export type Database = {
           },
         ]
       }
+      carriers: {
+        Row: {
+          address: string | null
+          agency_id: string
+          city: string | null
+          created_at: string
+          dba_name: string | null
+          dot_number: string | null
+          id: string
+          legal_name: string
+          mc_number: string | null
+          phone: string | null
+          state: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          agency_id: string
+          city?: string | null
+          created_at?: string
+          dba_name?: string | null
+          dot_number?: string | null
+          id?: string
+          legal_name: string
+          mc_number?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          agency_id?: string
+          city?: string | null
+          created_at?: string
+          dba_name?: string | null
+          dot_number?: string | null
+          id?: string
+          legal_name?: string
+          mc_number?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carriers_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          agency_id: string
+          city: string | null
+          company_name: string
+          contact_name: string | null
+          created_at: string
+          id: string
+          phone: string | null
+          state: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          agency_id: string
+          city?: string | null
+          company_name: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          agency_id?: string
+          city?: string | null
+          company_name?: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_stops: {
+        Row: {
+          address: string | null
+          appointment_at: string | null
+          appointment_note: string | null
+          city: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          facility_name: string | null
+          id: string
+          must_deliver_at: string | null
+          ready_at: string | null
+          shipment_id: string
+          sort_order: number
+          state: string | null
+          stop_type: string
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          appointment_at?: string | null
+          appointment_note?: string | null
+          city?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          facility_name?: string | null
+          id?: string
+          must_deliver_at?: string | null
+          ready_at?: string | null
+          shipment_id: string
+          sort_order?: number
+          state?: string | null
+          stop_type: string
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          appointment_at?: string | null
+          appointment_note?: string | null
+          city?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          facility_name?: string | null
+          id?: string
+          must_deliver_at?: string | null
+          ready_at?: string | null
+          shipment_id?: string
+          sort_order?: number
+          state?: string | null
+          stop_type?: string
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_stops_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          agency_id: string
+          arrived_consignee_at: string | null
+          arrived_pickup_at: string | null
+          bill_to_address: string | null
+          bill_to_city: string | null
+          bill_to_company: string | null
+          bill_to_same_as_customer: boolean
+          bill_to_state: string | null
+          bill_to_zip: string | null
+          carrier_dot: string | null
+          carrier_id: string | null
+          carrier_lh_rate: number | null
+          carrier_max_rate: number | null
+          carrier_mc: string | null
+          carrier_rate_type: string
+          commodity: string | null
+          conf_sent_at: string | null
+          created_at: string
+          customer_fsc_pct: number | null
+          customer_fsc_per_mile: number | null
+          customer_id: string | null
+          customer_lh_rate: number | null
+          customer_rate_type: string
+          customer_ref: string | null
+          delivered_at: string | null
+          dispatched_at: string | null
+          dispatcher_name: string | null
+          dispatcher_phone: string | null
+          driver_cell: string | null
+          driver_name: string | null
+          driver_phone: string | null
+          equipment_footage: number | null
+          equipment_type: string | null
+          id: string
+          in_transit_at: string | null
+          loaded_at: string | null
+          note_bol: string | null
+          note_rate_conf: string | null
+          note_special_instructions: string | null
+          note_updates: string | null
+          pieces: number | null
+          pro_number: string
+          scac: string | null
+          status: string
+          trailer_number: string | null
+          truck_number: string | null
+          updated_at: string
+          weight_lbs: number | null
+        }
+        Insert: {
+          agency_id: string
+          arrived_consignee_at?: string | null
+          arrived_pickup_at?: string | null
+          bill_to_address?: string | null
+          bill_to_city?: string | null
+          bill_to_company?: string | null
+          bill_to_same_as_customer?: boolean
+          bill_to_state?: string | null
+          bill_to_zip?: string | null
+          carrier_dot?: string | null
+          carrier_id?: string | null
+          carrier_lh_rate?: number | null
+          carrier_max_rate?: number | null
+          carrier_mc?: string | null
+          carrier_rate_type?: string
+          commodity?: string | null
+          conf_sent_at?: string | null
+          created_at?: string
+          customer_fsc_pct?: number | null
+          customer_fsc_per_mile?: number | null
+          customer_id?: string | null
+          customer_lh_rate?: number | null
+          customer_rate_type?: string
+          customer_ref?: string | null
+          delivered_at?: string | null
+          dispatched_at?: string | null
+          dispatcher_name?: string | null
+          dispatcher_phone?: string | null
+          driver_cell?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          equipment_footage?: number | null
+          equipment_type?: string | null
+          id?: string
+          in_transit_at?: string | null
+          loaded_at?: string | null
+          note_bol?: string | null
+          note_rate_conf?: string | null
+          note_special_instructions?: string | null
+          note_updates?: string | null
+          pieces?: number | null
+          pro_number: string
+          scac?: string | null
+          status?: string
+          trailer_number?: string | null
+          truck_number?: string | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Update: {
+          agency_id?: string
+          arrived_consignee_at?: string | null
+          arrived_pickup_at?: string | null
+          bill_to_address?: string | null
+          bill_to_city?: string | null
+          bill_to_company?: string | null
+          bill_to_same_as_customer?: boolean
+          bill_to_state?: string | null
+          bill_to_zip?: string | null
+          carrier_dot?: string | null
+          carrier_id?: string | null
+          carrier_lh_rate?: number | null
+          carrier_max_rate?: number | null
+          carrier_mc?: string | null
+          carrier_rate_type?: string
+          commodity?: string | null
+          conf_sent_at?: string | null
+          created_at?: string
+          customer_fsc_pct?: number | null
+          customer_fsc_per_mile?: number | null
+          customer_id?: string | null
+          customer_lh_rate?: number | null
+          customer_rate_type?: string
+          customer_ref?: string | null
+          delivered_at?: string | null
+          dispatched_at?: string | null
+          dispatcher_name?: string | null
+          dispatcher_phone?: string | null
+          driver_cell?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          equipment_footage?: number | null
+          equipment_type?: string | null
+          id?: string
+          in_transit_at?: string | null
+          loaded_at?: string | null
+          note_bol?: string | null
+          note_rate_conf?: string | null
+          note_special_instructions?: string | null
+          note_updates?: string | null
+          pieces?: number | null
+          pro_number?: string
+          scac?: string | null
+          status?: string
+          trailer_number?: string | null
+          truck_number?: string | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_logs: {
         Row: {
           action: string

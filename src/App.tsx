@@ -45,6 +45,8 @@ import BusinessDevelopment from "./pages/BusinessDevelopment";
 import LookUpload from "./pages/LookUpload";
 import TrackingPage from "./pages/TrackingPage";
 import LiveMapPage from "./pages/LiveMapPage";
+import ShipmentsPage from "./pages/ShipmentsPage";
+import ShipmentFormPage from "./pages/ShipmentFormPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -247,6 +249,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <LiveMapPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/shipments"
+                element={
+                  <ProtectedRoute>
+                    <ShipmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/shipments/:id"
+                element={
+                  <ProtectedRoute>
+                    <ShipmentFormPage />
                   </ProtectedRoute>
                 }
               />

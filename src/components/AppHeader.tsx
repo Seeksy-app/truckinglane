@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp, MapPin } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, Users, ChevronDown, BarChart3, Chrome, Sparkles, Search, Building2, ListTodo, Activity, Upload, FileSpreadsheet, Loader2, CheckCircle2, XCircle, Bell, BellOff, UserCircle, Globe, Eye, X, Zap, Download, CircleHelp, MapPin, Package } from 'lucide-react';
 import { LogoIcon } from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -77,6 +77,7 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const isOnPlatformPage = location.pathname === '/platform';
   const isOnAnalyticsPage = location.pathname === '/analytics';
   const isOnLiveMapPage = location.pathname === '/live-map';
+  const isOnShipmentsPage = location.pathname.startsWith('/shipments');
   const isOnLeadGenPage = ['/lead-discovery', '/accounts', '/prospecting', '/status'].some(p =>
     location.pathname === p || location.pathname.startsWith('/accounts/')
   );
@@ -88,6 +89,11 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
   const showAgencyNav = !isSuperAdmin || isImpersonating;
 
   const showLiveMapNav =
+    showAgencyNav &&
+    !!role &&
+    (role === 'agent' || role === 'agency_admin' || role === 'super_admin');
+
+  const showShipmentsNav =
     showAgencyNav &&
     !!role &&
     (role === 'agent' || role === 'agency_admin' || role === 'super_admin');
@@ -252,7 +258,11 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                 <>
                   <Button
                     variant={
-                      isOnDashboard && !isOnAdminPage && !isOnAnalyticsPage && !isOnLiveMapPage
+                      isOnDashboard &&
+                      !isOnAdminPage &&
+                      !isOnAnalyticsPage &&
+                      !isOnLiveMapPage &&
+                      !isOnShipmentsPage
                         ? 'secondary'
                         : 'ghost'
                     }
@@ -290,6 +300,17 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                     >
                       <MapPin className="h-4 w-4" />
                       <span className="hidden sm:inline">Live Map</span>
+                    </Button>
+                  )}
+                  {showShipmentsNav && (
+                    <Button
+                      variant={isOnShipmentsPage ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => navigate('/shipments')}
+                      className="gap-2"
+                    >
+                      <Package className="h-4 w-4" />
+                      <span className="hidden sm:inline">Shipments</span>
                     </Button>
                   )}
                   
@@ -594,6 +615,12 @@ export function AppHeader({ leadSoundMuted = false, onLeadSoundMutedChange }: Ap
                       <DropdownMenuItem onClick={() => navigate('/live-map')}>
                         <MapPin className="h-4 w-4 mr-2" />
                         Live Map
+                      </DropdownMenuItem>
+                    )}
+                    {showShipmentsNav && (
+                      <DropdownMenuItem onClick={() => navigate('/shipments')}>
+                        <Package className="h-4 w-4 mr-2" />
+                        Shipments
                       </DropdownMenuItem>
                     )}
                   </>
